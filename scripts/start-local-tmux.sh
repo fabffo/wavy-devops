@@ -17,7 +17,7 @@ tmux new-window -t "$session" -n tiers-api -c "$base_dir/wavy-tiers-api" \
 tmux new-window -t "$session" -n contrats-api -c "$base_dir/wavy-contrats-api" \
   'WAVY_CONTRATS_DB_HOST=localhost WAVY_CONTRATS_DB_PORT=5432 WAVY_CONTRATS_DB_NAME=wavy_contrats_db ./mvnw spring-boot:run -Dspring-boot.run.profiles=local'
 tmux new-window -t "$session" -n factures-api -c "$base_dir/wavy-factures-api" \
-  'WAVY_FACTURES_DB_HOST=localhost WAVY_FACTURES_DB_PORT=5432 WAVY_FACTURES_DB_NAME=wavy_factures_db WAVY_FACTURES_DB_USER=factures_user WAVY_FACTURES_DB_PASSWORD=factures_password ./mvnw spring-boot:run -Dspring-boot.run.profiles=local'
+  'WAVY_FACTURES_DB_HOST=localhost WAVY_FACTURES_DB_PORT=5432 WAVY_FACTURES_DB_NAME=wavy_factures_db WAVY_FACTURES_DB_USERNAME=factures_user WAVY_FACTURES_DB_PASSWORD=factures_password ./mvnw spring-boot:run -Dspring-boot.run.profiles=local'
 tmux new-window -t "$session" -n gateway -c "$base_dir/wavy-gateway" \
   './mvnw spring-boot:run'
 tmux new-window -t "$session" -n socle-front -c "$base_dir/wavy-socle-front" \
