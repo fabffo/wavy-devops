@@ -173,6 +173,85 @@ CREATE DATABASE wavy_factures_db OWNER factures_user;
 
 ## Procedures
 
+### Procedure validee local manuel
+
+Cette procedure correspond a l'etat valide avec PostgreSQL WSL unique sur `localhost:5432`, les quatre APIs lancees en local manuel et le gateway sur `8088`.
+
+Bases PostgreSQL validees :
+
+| Base | User | Password |
+|---|---|---|
+| `wavy_socle_db` | `socle_user` | `motdepassefort` |
+| `wavy_tiers_db` | `tiers_user` | `tiers_password` |
+| `wavy_contrats_db` | `contrats_user` | `contrats_password` |
+| `wavy_factures_db` | `factures_user` | `factures_password` |
+
+Demarrage des APIs et du gateway, dans cinq terminaux separes :
+
+```bash
+cd ~/projets/wavy-socle-api
+./mvnw spring-boot:run -Dspring-boot.run.profiles=local
+```
+
+```bash
+cd ~/projets/wavy-tiers-api
+./mvnw spring-boot:run -Dspring-boot.run.profiles=local
+```
+
+```bash
+cd ~/projets/wavy-contrats-api
+./mvnw spring-boot:run -Dspring-boot.run.profiles=local
+```
+
+```bash
+cd ~/projets/wavy-factures-api
+./mvnw spring-boot:run -Dspring-boot.run.profiles=local
+```
+
+```bash
+cd ~/projets/wavy-gateway
+./mvnw spring-boot:run -Dspring-boot.run.profiles=local
+```
+
+Ports valides :
+
+| Service | Port |
+|---|---:|
+| `wavy-socle-api` | 8080 |
+| `wavy-tiers-api` | 8081 |
+| `wavy-contrats-api` | 8082 |
+| `wavy-factures-api` | 8083 |
+| `wavy-gateway` | 8088 |
+
+Chargement des donnees demo locales :
+
+```bash
+cd ~/projets/wavy-devops/dev/demo-local
+./load-demo-local.sh
+```
+
+Tests Linux / WSL via gateway :
+
+```bash
+curl -i -H 'X-Tenant-Id: 100' -H 'X-Utilisateur-Id: 100' -H 'X-Societe-Courante-Id: 100' http://localhost:8088/api/tiers
+curl -i -H 'X-Tenant-Id: 100' -H 'X-Utilisateur-Id: 100' -H 'X-Societe-Courante-Id: 100' http://localhost:8088/api/contrats
+curl -i -H 'X-Tenant-Id: 100' -H 'X-Utilisateur-Id: 100' -H 'X-Societe-Courante-Id: 100' http://localhost:8088/api/factures
+```
+
+Tests Windows CMD via gateway :
+
+```cmd
+curl -i -H "X-Tenant-Id: 100" -H "X-Utilisateur-Id: 100" -H "X-Societe-Courante-Id: 100" http://localhost:8088/api/tiers
+curl -i -H "X-Tenant-Id: 100" -H "X-Utilisateur-Id: 100" -H "X-Societe-Courante-Id: 100" http://localhost:8088/api/contrats
+curl -i -H "X-Tenant-Id: 100" -H "X-Utilisateur-Id: 100" -H "X-Societe-Courante-Id: 100" http://localhost:8088/api/factures
+```
+
+#### Resultat attendu
+
+- `GET /api/tiers` retourne notamment `Client Demo SAS` et `Prestataire Demo SAS`.
+- `GET /api/contrats` retourne notamment `CTR-DEMO-2026-001`.
+- `GET /api/factures` retourne notamment `FAC-DEMO-2026-001`, avec sa ligne `Prestation journaliere` et sa ventilation TVA a `20`.
+
 ### Local manuel
 
 ```bash
