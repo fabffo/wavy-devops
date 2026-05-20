@@ -22,6 +22,8 @@ tmux new-window -t "$session" -n gateway -c "$base_dir/wavy-gateway" \
   './mvnw spring-boot:run'
 tmux new-window -t "$session" -n socle-front -c "$base_dir/wavy-socle-front" \
   'npm start'
+tmux new-window -t "$session" -n tiers-front -c "$base_dir/wavy-tiers-front" \
+  'npm start'
 tmux new-window -t "$session" -n contrats-front -c "$base_dir/wavy-contrats-front" \
   'npm start'
 tmux new-window -t "$session" -n factures-front -c "$base_dir/wavy-factures-front" \
