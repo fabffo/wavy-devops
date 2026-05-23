@@ -1,14 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-base_dir="${WAVY_PROJECTS_DIR:-$HOME/projets}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
-for project in wavy-factures-front wavy-contrats-front wavy-socle-front wavy-gateway wavy-factures-api wavy-contrats-api wavy-tiers-api wavy-socle-api; do
-  compose="$base_dir/$project/docker-compose.local.yml"
-  env_file="$base_dir/$project/.env.local"
-  if [[ -f "$compose" ]]; then
-    args=(-f "$compose")
-    [[ -f "$env_file" ]] && args=(--env-file "$env_file" "${args[@]}")
-    docker compose "${args[@]}" down
-  fi
-done
+docker compose --env-file "$ROOT_DIR/.env.local" -f "$ROOT_DIR/docker-compose.local.yml" down

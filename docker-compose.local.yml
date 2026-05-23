@@ -1,0 +1,274 @@
+services:
+  socle-postgres:
+    image: postgres:16-alpine
+    container_name: socle-db-local
+    environment:
+      POSTGRES_DB: ${WAVY_SOCLE_DB_NAME}
+      POSTGRES_USER: ${WAVY_SOCLE_DB_USERNAME}
+      POSTGRES_PASSWORD: ${WAVY_SOCLE_DB_PASSWORD}
+    ports:
+      - "${WAVY_SOCLE_DB_HOST_PORT}:5432"
+    volumes:
+      - socle-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${WAVY_SOCLE_DB_USERNAME} -d ${WAVY_SOCLE_DB_NAME}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - wavy-local
+
+  tiers-postgres:
+    image: postgres:16-alpine
+    container_name: tiers-db-local
+    environment:
+      POSTGRES_DB: ${WAVY_TIERS_DB_NAME}
+      POSTGRES_USER: ${WAVY_TIERS_DB_USER}
+      POSTGRES_PASSWORD: ${WAVY_TIERS_DB_PASSWORD}
+    ports:
+      - "${WAVY_TIERS_DB_HOST_PORT}:5432"
+    volumes:
+      - tiers-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${WAVY_TIERS_DB_USER} -d ${WAVY_TIERS_DB_NAME}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - wavy-local
+
+  contrats-postgres:
+    image: postgres:16-alpine
+    container_name: contrats-db-local
+    environment:
+      POSTGRES_DB: ${WAVY_CONTRATS_DB_NAME}
+      POSTGRES_USER: ${WAVY_CONTRATS_DB_USER}
+      POSTGRES_PASSWORD: ${WAVY_CONTRATS_DB_PASSWORD}
+    ports:
+      - "${WAVY_CONTRATS_DB_HOST_PORT}:5432"
+    volumes:
+      - contrats-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${WAVY_CONTRATS_DB_USER} -d ${WAVY_CONTRATS_DB_NAME}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - wavy-local
+
+  factures-postgres:
+    image: postgres:16-alpine
+    container_name: factures-db-local
+    environment:
+      POSTGRES_DB: ${WAVY_FACTURES_DB_NAME}
+      POSTGRES_USER: ${WAVY_FACTURES_DB_USER}
+      POSTGRES_PASSWORD: ${WAVY_FACTURES_DB_PASSWORD}
+    ports:
+      - "${WAVY_FACTURES_DB_HOST_PORT}:5432"
+    volumes:
+      - factures-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${WAVY_FACTURES_DB_USER} -d ${WAVY_FACTURES_DB_NAME}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - wavy-local
+
+  wavy-socle-api-local:
+    container_name: wavy-socle-api-local
+    build:
+      context: ../wavy-socle-api
+      dockerfile: Dockerfile
+    environment:
+      SPRING_PROFILES_ACTIVE: ${WAVY_SOCLE_SPRING_PROFILES_ACTIVE}
+      WAVY_SOCLE_DB_HOST: socle-postgres
+      WAVY_SOCLE_DB_PORT: 5432
+      WAVY_SOCLE_DB_NAME: ${WAVY_SOCLE_DB_NAME}
+      WAVY_SOCLE_DB_USERNAME: ${WAVY_SOCLE_DB_USERNAME}
+      WAVY_SOCLE_DB_USER: ${WAVY_SOCLE_DB_USERNAME}
+      WAVY_SOCLE_DB_PASSWORD: ${WAVY_SOCLE_DB_PASSWORD}
+      WAVY_SOCLE_DB_URL: jdbc:postgresql://socle-postgres:5432/${WAVY_SOCLE_DB_NAME}
+      WAVY_SOCLE_API_PORT: 8080
+      SPRING_DATASOURCE_URL: jdbc:postgresql://socle-postgres:5432/${WAVY_SOCLE_DB_NAME}
+      SPRING_DATASOURCE_USERNAME: ${WAVY_SOCLE_DB_USERNAME}
+      SPRING_DATASOURCE_PASSWORD: ${WAVY_SOCLE_DB_PASSWORD}
+      SPRING_DATASOURCE_DRIVER_CLASS_NAME: org.postgresql.Driver
+    ports:
+      - "${WAVY_SOCLE_API_HOST_PORT}:8080"
+    depends_on:
+      socle-postgres:
+        condition: service_healthy
+    networks:
+      - wavy-local
+
+  wavy-tiers-api-local:
+    container_name: wavy-tiers-api-local
+    build:
+      context: ../wavy-tiers-api
+      dockerfile: Dockerfile
+    environment:
+      SPRING_PROFILES_ACTIVE: ${WAVY_TIERS_SPRING_PROFILES_ACTIVE}
+      WAVY_TIERS_DB_HOST: tiers-postgres
+      WAVY_TIERS_DB_PORT: 5432
+      WAVY_TIERS_DB_NAME: ${WAVY_TIERS_DB_NAME}
+      WAVY_TIERS_DB_USER: ${WAVY_TIERS_DB_USER}
+      WAVY_TIERS_DB_USERNAME: ${WAVY_TIERS_DB_USER}
+      WAVY_TIERS_DB_PASSWORD: ${WAVY_TIERS_DB_PASSWORD}
+      WAVY_TIERS_API_PORT: 8081
+    ports:
+      - "${WAVY_TIERS_API_HOST_PORT}:8081"
+    depends_on:
+      tiers-postgres:
+        condition: service_healthy
+    networks:
+      - wavy-local
+
+  wavy-contrats-api-local:
+    container_name: wavy-contrats-api-local
+    build:
+      context: ../wavy-contrats-api
+      dockerfile: Dockerfile
+    environment:
+      SPRING_PROFILES_ACTIVE: ${WAVY_CONTRATS_SPRING_PROFILES_ACTIVE}
+      WAVY_CONTRATS_DB_HOST: contrats-postgres
+      WAVY_CONTRATS_DB_PORT: 5432
+      WAVY_CONTRATS_DB_NAME: ${WAVY_CONTRATS_DB_NAME}
+      WAVY_CONTRATS_DB_USER: ${WAVY_CONTRATS_DB_USER}
+      WAVY_CONTRATS_DB_USERNAME: ${WAVY_CONTRATS_DB_USER}
+      WAVY_CONTRATS_DB_PASSWORD: ${WAVY_CONTRATS_DB_PASSWORD}
+      WAVY_CONTRATS_API_PORT: 8082
+      WAVY_CONTRATS_STOCKAGE_PIECES_JOINTES: /app/data/contrats/pieces-jointes
+    ports:
+      - "${WAVY_CONTRATS_API_HOST_PORT}:8082"
+    volumes:
+      - contrats-pieces-jointes:/app/data/contrats/pieces-jointes
+    depends_on:
+      contrats-postgres:
+        condition: service_healthy
+    networks:
+      - wavy-local
+
+  wavy-factures-api-local:
+    container_name: wavy-factures-api-local
+    build:
+      context: ../wavy-factures-api
+      dockerfile: Dockerfile
+    environment:
+      SPRING_PROFILES_ACTIVE: ${WAVY_FACTURES_SPRING_PROFILES_ACTIVE}
+      WAVY_FACTURES_DB_HOST: factures-postgres
+      WAVY_FACTURES_DB_PORT: 5432
+      WAVY_FACTURES_DB_NAME: ${WAVY_FACTURES_DB_NAME}
+      WAVY_FACTURES_DB_USER: ${WAVY_FACTURES_DB_USER}
+      WAVY_FACTURES_DB_USERNAME: ${WAVY_FACTURES_DB_USER}
+      WAVY_FACTURES_DB_PASSWORD: ${WAVY_FACTURES_DB_PASSWORD}
+      WAVY_FACTURES_API_PORT: 8083
+      SPRING_DATASOURCE_URL: jdbc:postgresql://factures-postgres:5432/${WAVY_FACTURES_DB_NAME}
+      SPRING_DATASOURCE_USERNAME: ${WAVY_FACTURES_DB_USER}
+      SPRING_DATASOURCE_PASSWORD: ${WAVY_FACTURES_DB_PASSWORD}
+      SPRING_DATASOURCE_DRIVER_CLASS_NAME: org.postgresql.Driver
+      SPRING_JPA_DATABASE_PLATFORM: org.hibernate.dialect.PostgreSQLDialect
+    ports:
+      - "${WAVY_FACTURES_API_HOST_PORT}:8083"
+    depends_on:
+      factures-postgres:
+        condition: service_healthy
+    networks:
+      - wavy-local
+
+  wavy-gateway-local:
+    container_name: wavy-gateway-global-local
+    build:
+      context: ../wavy-gateway
+      dockerfile: Dockerfile
+    environment:
+      SPRING_PROFILES_ACTIVE: ${WAVY_GATEWAY_SPRING_PROFILES_ACTIVE}
+      WAVY_GATEWAY_PORT: 8088
+      WAVY_ROUTES_SOCLE_URI: http://wavy-socle-api-local:8080
+      WAVY_TIERS_API_URI: http://wavy-tiers-api-local:8081
+      WAVY_CONTRATS_API_URI: http://wavy-contrats-api-local:8082
+      WAVY_FACTURES_API_URL: http://wavy-factures-api-local:8083
+    ports:
+      - "${WAVY_GATEWAY_HOST_PORT}:8088"
+    depends_on:
+      wavy-socle-api-local:
+        condition: service_started
+      wavy-tiers-api-local:
+        condition: service_started
+      wavy-contrats-api-local:
+        condition: service_started
+      wavy-factures-api-local:
+        condition: service_started
+    networks:
+      - wavy-local
+
+  wavy-socle-front-local:
+    container_name: wavy-socle-front-global-local
+    build:
+      context: ../wavy-socle-front
+      dockerfile: Dockerfile
+    environment:
+      API_UPSTREAM: http://wavy-gateway-local:8088
+    ports:
+      - "${WAVY_SOCLE_FRONT_HOST_PORT}:80"
+    depends_on:
+      wavy-gateway-local:
+        condition: service_started
+    networks:
+      - wavy-local
+
+  wavy-tiers-front-local:
+    container_name: wavy-tiers-front-global-local
+    build:
+      context: ../wavy-tiers-front
+      dockerfile: Dockerfile
+      args:
+        API_BASE_URL: http://localhost:${WAVY_GATEWAY_HOST_PORT}
+    ports:
+      - "${WAVY_TIERS_FRONT_HOST_PORT}:80"
+    depends_on:
+      wavy-gateway-local:
+        condition: service_started
+    networks:
+      - wavy-local
+
+  wavy-contrats-front-local:
+    container_name: wavy-contrats-front-global-local
+    build:
+      context: ../wavy-contrats-front
+      dockerfile: Dockerfile
+      args:
+        API_BASE_URL: http://localhost:${WAVY_GATEWAY_HOST_PORT}
+    ports:
+      - "${WAVY_CONTRATS_FRONT_HOST_PORT}:80"
+    depends_on:
+      wavy-gateway-local:
+        condition: service_started
+    networks:
+      - wavy-local
+
+  wavy-factures-front-local:
+    container_name: wavy-factures-front-global-local
+    build:
+      context: ../wavy-factures-front
+      dockerfile: Dockerfile
+      args:
+        API_GATEWAY_BASE_URL: http://localhost:${WAVY_GATEWAY_HOST_PORT}/api
+    ports:
+      - "${WAVY_FACTURES_FRONT_HOST_PORT}:80"
+    depends_on:
+      wavy-gateway-local:
+        condition: service_started
+    networks:
+      - wavy-local
+
+networks:
+  wavy-local:
+    name: wavy-local
+
+volumes:
+  socle-postgres-data:
+  tiers-postgres-data:
+  contrats-postgres-data:
+  factures-postgres-data:
+  contrats-pieces-jointes:
