@@ -73,6 +73,35 @@ on conflict (id) do update set
     actif = excluded.actif,
     date_modification = now();
 
+
+insert into role (id, code, libelle)
+values
+  (100, 'ADMIN_PLATEFORME', 'Administrateur plateforme'),
+  (101, 'ADMIN_TENANT', 'Administrateur tenant')
+on conflict (code) do update
+set libelle = excluded.libelle;
+
+insert into utilisateur_role (
+  id,
+  date_creation,
+  date_modification,
+  tenant_id,
+  utilisateur_id,
+  role_id
+)
+select
+  100,
+  now(),
+  now(),
+  100,
+  u.id,
+  r.id
+from utilisateur u
+join role r on r.code = 'ADMIN_PLATEFORME'
+where u.email = 'demo@wavy.local'
+on conflict (tenant_id, utilisateur_id, role_id) do nothing;
+
+
 select setval(pg_get_serial_sequence('tenant', 'id'), greatest((select max(id) from tenant), 100), true);
 select setval(pg_get_serial_sequence('societe_interne', 'id'), greatest((select max(id) from societe_interne), 100), true);
 select setval(pg_get_serial_sequence('utilisateur', 'id'), greatest((select max(id) from utilisateur), 100), true);
