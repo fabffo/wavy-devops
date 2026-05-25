@@ -15,7 +15,7 @@ insert into tiers (
     (10, 3, 4, 'PERSONNE_PHYSIQUE', null, 'ACTIF', null, null, 'Sophie', 'Durand', null, null, null, 'sophie.durand@demo-services.fr', null, true, now(), now()),
     (11, 3, 4, 'PERSONNE_PHYSIQUE', null, 'ACTIF', null, null, 'Thomas', 'Moreau', null, null, null, 'thomas.moreau@demo-services.fr', null, true, now(), now()),
     (12, 3, 4, 'ORGANISATION', 'ENTREPRISE', 'ACTIF', 'Banque Recette Entreprises', 'Banque Recette Entreprises', null, null, '910000005', null, null, 'agence@banque-recette.fr', null, true, now(), now()),
-    (13, 3, 4, 'ORGANISME_FISCAL', 'ENTREPRISE', 'ACTIF', 'URSSAF Recette', 'URSSAF Recette', null, null, '910000006', null, null, 'contact@urssaf-recette.fr', null, true, now(), now()),
+    (13, 3, 4, 'ORGANISATION', 'ENTREPRISE', 'ACTIF', 'URSSAF Recette', 'URSSAF Recette', null, null, '910000006', null, null, 'contact@urssaf-recette.fr', null, true, now(), now()),
     (14, 3, 5, 'ORGANISATION', 'ENTREPRISE', 'ACTIF', 'Client Immo Patrimoine SAS', 'Client Immo Patrimoine SAS', null, null, '910000007', null, null, 'contact@immo-patrimoine.fr', null, true, now(), now()),
     (15, 3, 5, 'ORGANISATION', 'ENTREPRISE', 'ACTIF', 'Maintenance Immo Recette SAS', 'Maintenance Immo Recette SAS', null, null, '910000008', null, null, 'contact@maintenance-immo.fr', null, true, now(), now()),
     (16, 3, 5, 'ORGANISATION', 'ENTREPRISE', 'ACTIF', 'Banque Immo Recette', 'Banque Immo Recette', null, null, '910000009', null, null, 'agence@banque-immo-recette.fr', null, true, now(), now()),

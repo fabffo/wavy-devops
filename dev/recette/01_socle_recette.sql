@@ -253,27 +253,78 @@ on conflict (id) do update set
     actif = excluded.actif,
     date_modification = now();
 
-insert into role (
-    id, code, libelle
-) values
-(
-    1,
-    'ADMIN_TENANT',
-    'Administrateur du tenant'
-),
-(
-    2,
-    'GESTIONNAIRE',
-    'Gestionnaire'
-),
-(
-    3,
-    'LECTURE_SEULE',
-    'Lecture seule'
+with roles_recette (
+    id,
+    code,
+    libelle
+) as (
+    values
+        (1, 'ADMIN_TENANT', 'Administrateur du tenant'),
+        (2, 'GESTIONNAIRE', 'Gestionnaire'),
+        (3, 'LECTURE_SEULE', 'Lecture seule')
 )
-on conflict (id) do update set
-    code = excluded.code,
-    libelle = excluded.libelle;
+update role r
+set
+    code = rr.code,
+    libelle = rr.libelle
+from roles_recette rr
+where r.id = rr.id
+and (
+    r.code = rr.code
+    or not exists (
+        select 1
+        from role r_code
+        where r_code.code = rr.code
+        and r_code.id <> r.id
+    )
+);
+
+with roles_recette (
+    id,
+    code,
+    libelle
+) as (
+    values
+        (1, 'ADMIN_TENANT', 'Administrateur du tenant'),
+        (2, 'GESTIONNAIRE', 'Gestionnaire'),
+        (3, 'LECTURE_SEULE', 'Lecture seule')
+)
+update role r
+set libelle = rr.libelle
+from roles_recette rr
+where r.code = rr.code;
+
+insert into role (
+    id,
+    code,
+    libelle
+)
+select
+    rr.id,
+    rr.code,
+    rr.libelle
+from (
+    values
+        (1, 'ADMIN_TENANT', 'Administrateur du tenant'),
+        (2, 'GESTIONNAIRE', 'Gestionnaire'),
+        (3, 'LECTURE_SEULE', 'Lecture seule')
+) as rr (
+    id,
+    code,
+    libelle
+)
+where not exists (
+    select 1
+    from role r
+    where r.id = rr.id
+    or r.code = rr.code
+);
+
+select setval(
+    pg_get_serial_sequence('role', 'id'),
+    coalesce((select max(id) from role), 0) + 1,
+    false
+);
 
 insert into role (
     code,
