@@ -1,19 +1,47 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-base_dir="${WAVY_PROJECTS_DIR:-$HOME/projets}"
-network="${WAVY_DOCKER_RECETTE_NETWORK:-wavy-recette}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+COMPOSE_FILE="$ROOT_DIR/docker-compose.recette.yml"
+ENV_FILE="$ROOT_DIR/.env.recette"
+EXAMPLE_ENV_FILE="$ROOT_DIR/.env.recette.example"
 
-docker network inspect "$network" >/dev/null 2>&1 || docker network create "$network"
-
-for project in wavy-socle-api wavy-tiers-api wavy-contrats-api wavy-factures-api wavy-gateway wavy-socle-front wavy-contrats-front wavy-factures-front; do
-  compose="$base_dir/$project/docker-compose.recette.yml"
-  env_file="$base_dir/$project/.env.recette"
-  if [[ -f "$compose" ]]; then
-    args=(-f "$compose")
-    [[ -f "$env_file" ]] && args=(--env-file "$env_file" "${args[@]}")
-    docker compose "${args[@]}" up -d --build
+if [ ! -f "$ENV_FILE" ]; then
+  echo "Fichier .env.recette introuvable."
+  if [ -f "$EXAMPLE_ENV_FILE" ]; then
+    read -rp "Voulez-vous copier .env.recette.example en .env.recette ? [Y/n] " answer
+    answer="${answer:-Y}"
+    if [[ "$answer" =~ ^[Yy] ]]; then
+      cp "$EXAMPLE_ENV_FILE" "$ENV_FILE"
+      echo "Fichier .env.recette créé à partir de l'exemple. Ajustez les variables si nécessaire."
+    else
+      echo "Abandon." >&2
+      exit 1
+    fi
   else
-    echo "Ignore, compose absent: $compose"
+    echo "Fichier d'exemple non trouvé : $EXAMPLE_ENV_FILE" >&2
+    exit 1
   fi
-done
+fi
+
+compose() {
+  docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" "$@"
+}
+
+echo "Construction du jar wavy-gateway utilisé par son Dockerfile..."
+(cd "$ROOT_DIR/../wavy-gateway" && ./mvnw -q -DskipTests package)
+
+echo "Démarrage de la pile Docker recette..."
+compose up -d --build
+
+echo
+cat <<EOF
+Pile Docker recette démarrée.
+URLs :
+- Gateway : http://localhost:28088
+- Socle   : http://localhost:24200
+- Tiers   : http://localhost:24201
+- Contrats: http://localhost:24202
+- Factures: http://localhost:24203
+EOF

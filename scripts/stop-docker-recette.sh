@@ -1,14 +1,32 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-base_dir="${WAVY_PROJECTS_DIR:-$HOME/projets}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+COMPOSE_FILE="$ROOT_DIR/docker-compose.recette.yml"
+ENV_FILE="$ROOT_DIR/.env.recette"
+REMOVE_VOLUMES=false
 
-for project in wavy-factures-front wavy-contrats-front wavy-socle-front wavy-gateway wavy-factures-api wavy-contrats-api wavy-tiers-api wavy-socle-api; do
-  compose="$base_dir/$project/docker-compose.recette.yml"
-  env_file="$base_dir/$project/.env.recette"
-  if [[ -f "$compose" ]]; then
-    args=(-f "$compose")
-    [[ -f "$env_file" ]] && args=(--env-file "$env_file" "${args[@]}")
-    docker compose "${args[@]}" down
-  fi
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --volumes)
+      REMOVE_VOLUMES=true
+      shift
+      ;;
+    *)
+      echo "Usage: $0 [--volumes]" >&2
+      exit 1
+      ;;
+  esac
 done
+
+compose() {
+  docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" "$@"
+}
+
+echo "Arrêt des services Docker recette..."
+if [ "$REMOVE_VOLUMES" = true ]; then
+  compose down --volumes
+else
+  compose down
+fi
