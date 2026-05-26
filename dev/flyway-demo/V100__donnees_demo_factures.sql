@@ -7,8 +7,8 @@ insert into facture (
     netapayer, montant_deja_paye, resteapayer, mode_paiement, indemnite_forfaitaire_recouvrement,
     date_creation, date_modification
 ) values
-    (100, 100, 100, 100, 'VENTE', 'FACTURE', 'SERVICE', 'PRESTATION_SERVICES', 'BROUILLON', 'NON_TRANSMISE', 'AUCUN', 100, 100, 'FA-2026-100-000001', '2026-05-12', '2026-05-12', '2026-05-12', '2026-06-11', 'Maintenance Alpha mai 2026', 'EUR', 'Wavy Demo Services', 'FR', 'Alpha Industrie SAS', '910000001', 'TVA_STANDARD', false, 1000.00, 0.00, 200.00, 1200.00, 1200.00, 0.00, 1200.00, 'VIREMENT', 40.00, now(), now()),
-    (101, 100, 100, 101, 'VENTE', 'FACTURE', 'SERVICE', 'PRESTATION_SERVICES', 'VALIDEE', 'NON_TRANSMISE', 'AUCUN', 101, 101, 'FA-2026-100-000002', '2026-05-12', '2026-05-12', '2026-05-12', '2026-06-11', 'Support Beta mai 2026', 'EUR', 'Wavy Demo Services', 'FR', 'Beta Distribution SAS', '910000002', 'TVA_STANDARD', false, 1000.00, 0.00, 200.00, 1200.00, 1200.00, 0.00, 1200.00, 'VIREMENT', 40.00, now(), now())
+    (100, 100, 100, 100, 'VENTE', 'FACTURE_DOIT', 'SERVICE', 'PRESTATION_SERVICES', 'BROUILLON', 'NON_TRANSMISE', 'AUCUN', 100, 100, 'FA-2026-100-000001', '2026-05-12', '2026-05-12', '2026-05-12', '2026-06-11', 'Maintenance Alpha mai 2026', 'EUR', 'Wavy Demo Services', 'FR', 'Alpha Industrie SAS', '910000001', 'TVA_STANDARD', false, 1000.00, 0.00, 200.00, 1200.00, 1200.00, 0.00, 1200.00, 'VIREMENT', 40.00, now(), now()),
+    (101, 100, 100, 101, 'VENTE', 'FACTURE_DOIT', 'SERVICE', 'PRESTATION_SERVICES', 'VALIDEE', 'NON_TRANSMISE', 'AUCUN', 101, 101, 'FA-2026-100-000002', '2026-05-12', '2026-05-12', '2026-05-12', '2026-06-11', 'Support Beta mai 2026', 'EUR', 'Wavy Demo Services', 'FR', 'Beta Distribution SAS', '910000002', 'TVA_STANDARD', false, 1000.00, 0.00, 200.00, 1200.00, 1200.00, 0.00, 1200.00, 'VIREMENT', 40.00, now(), now())
 on conflict do nothing;
 
 insert into ligne_facture (

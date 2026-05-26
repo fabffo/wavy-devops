@@ -20,7 +20,7 @@ insert into facture (
     date_creation, date_modification
 ) values (
     100, 100, 100, 100, 100,
-    100, 'FAC-DEMO-2026-001', 'Facture demo client', 'FACTURE', 'VENTE',
+    100, 'FAC-DEMO-2026-001', 'Facture demo client', 'FACTURE_DOIT', 'VENTE',
     'SERVICE', 'PRESTATION_SERVICES', 'VALIDEE', 'NON_TRANSMISE',
     'AUCUN', 'TVA_STANDARD', 'VIREMENT', 'EUR',
     '2026-05-13', '2026-05-13', '2026-06-12', '2026-05-13',

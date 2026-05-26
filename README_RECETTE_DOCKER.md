@@ -101,6 +101,11 @@ curl -i http://localhost:28088/api/contrats \
   -H "X-Utilisateur-Id: 6" \
   -H "X-Societe-Courante-Id: 4"
 
+curl -i http://localhost:28088/api/factures/ventes \
+  -H "X-Tenant-Id: 3" \
+  -H "X-Utilisateur-Id: 6" \
+  -H "X-Societe-Courante-Id: 4"
+
 curl -i http://localhost:28088/api/factures \
   -H "X-Tenant-Id: 3" \
   -H "X-Utilisateur-Id: 6" \

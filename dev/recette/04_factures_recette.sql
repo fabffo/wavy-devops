@@ -1,5 +1,19 @@
 begin;
 
+alter table facture drop constraint if exists facture_type_facture_check;
+
+update facture
+set type_facture = 'FACTURE_DOIT'
+where type_facture = 'FACTURE';
+
+update facture
+set numero_facture = regexp_replace(numero_facture, '^FA-', 'FAC-')
+where numero_facture like 'FA-%';
+
+alter table facture
+    add constraint facture_type_facture_check
+    check (type_facture in ('FACTURE_DOIT', 'AVOIR', 'ACOMPTE'));
+
 insert into facture (
     id, tenant_id, societe_interne_id, utilisateur_createur_id, tiers_id,
     contrat_id, numero_facture, libelle, type_facture, sens_facture,
@@ -24,7 +38,7 @@ insert into facture (
     4,
     'FAC-REC-2026-001',
     'Facture Alpha Industrie',
-    'FACTURE',
+    'FACTURE_DOIT',
     'VENTE',
     'SERVICE',
     'PRESTATION_SERVICES',
@@ -77,7 +91,7 @@ insert into facture (
     5,
     'FAC-REC-2026-002',
     'Facture Beta Distribution',
-    'FACTURE',
+    'FACTURE_DOIT',
     'VENTE',
     'SERVICE',
     'PRESTATION_SERVICES',
