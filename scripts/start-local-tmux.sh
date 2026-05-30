@@ -1,33 +1,63 @@
 #!/usr/bin/env bash
-set -euo pipefail
+set -e
 
-base_dir="${WAVY_PROJECTS_DIR:-$HOME/projets}"
-session="${WAVY_TMUX_SESSION:-wavy-local}"
+SESSION="wavy-local"
 
-tmux has-session -t "$session" 2>/dev/null && {
-  echo "Session tmux deja active: $session"
-  tmux attach -t "$session"
-  exit 0
-}
+# Stop ancienne session si elle existe
+tmux kill-session -t "$SESSION" 2>/dev/null || true
 
-tmux new-session -d -s "$session" -n socle-api -c "$base_dir/wavy-socle-api" \
-  'WAVY_SOCLE_DB_URL=jdbc:postgresql://localhost:5432/wavy_socle_db ./mvnw spring-boot:run -Dspring-boot.run.profiles=local'
-tmux new-window -t "$session" -n tiers-api -c "$base_dir/wavy-tiers-api" \
-  'WAVY_TIERS_DB_HOST=localhost WAVY_TIERS_DB_PORT=5432 WAVY_TIERS_DB_NAME=wavy_tiers_db ./mvnw spring-boot:run -Dspring-boot.run.profiles=local'
-tmux new-window -t "$session" -n contrats-api -c "$base_dir/wavy-contrats-api" \
-  'WAVY_CONTRATS_DB_HOST=localhost WAVY_CONTRATS_DB_PORT=5432 WAVY_CONTRATS_DB_NAME=wavy_contrats_db ./mvnw spring-boot:run -Dspring-boot.run.profiles=local'
-tmux new-window -t "$session" -n factures-api -c "$base_dir/wavy-factures-api" \
-  'WAVY_FACTURES_DB_HOST=localhost WAVY_FACTURES_DB_PORT=5432 WAVY_FACTURES_DB_NAME=wavy_factures_db WAVY_FACTURES_DB_USERNAME=factures_user WAVY_FACTURES_DB_PASSWORD=factures_password ./mvnw spring-boot:run -Dspring-boot.run.profiles=local'
-tmux new-window -t "$session" -n gateway -c "$base_dir/wavy-gateway" \
-  './mvnw spring-boot:run'
-tmux new-window -t "$session" -n socle-front -c "$base_dir/wavy-socle-front" \
-  'npm start'
-tmux new-window -t "$session" -n tiers-front -c "$base_dir/wavy-tiers-front" \
-  'npm start'
-tmux new-window -t "$session" -n contrats-front -c "$base_dir/wavy-contrats-front" \
-  'npm start'
-tmux new-window -t "$session" -n factures-front -c "$base_dir/wavy-factures-front" \
-  'npm start'
+# Création session
+tmux new-session -d -s "$SESSION" -n socle-api
 
-echo "Session tmux demarree: $session"
-echo "Attacher: tmux attach -t $session"
+tmux send-keys -t "$SESSION:socle-api" \
+"cd ~/projets/wavy-socle-api && ./mvnw spring-boot:run -Dspring-boot.run.profiles=local" C-m
+
+tmux new-window -t "$SESSION" -n tiers-api
+tmux send-keys -t "$SESSION:tiers-api" \
+"cd ~/projets/wavy-tiers-api && mvn spring-boot:run -Dspring-boot.run.profiles=local" C-m
+
+tmux new-window -t "$SESSION" -n contrats-api
+tmux send-keys -t "$SESSION:contrats-api" \
+"cd ~/projets/wavy-contrats-api && ./mvnw spring-boot:run -Dspring-boot.run.profiles=local" C-m
+
+tmux new-window -t "$SESSION" -n factures-api
+tmux send-keys -t "$SESSION:factures-api" \
+"cd ~/projets/wavy-factures-api && ./mvnw spring-boot:run -Dspring-boot.run.profiles=local" C-m
+
+tmux new-window -t "$SESSION" -n gateway
+tmux send-keys -t "$SESSION:gateway" \
+"cd ~/projets/wavy-gateway && ./mvnw spring-boot:run -Dspring-boot.run.profiles=local" C-m
+
+tmux new-window -t "$SESSION" -n socle-front
+tmux send-keys -t "$SESSION:socle-front" \
+"cd ~/projets/wavy-socle-front && npm start" C-m
+
+tmux new-window -t "$SESSION" -n tiers-front
+tmux send-keys -t "$SESSION:tiers-front" \
+"cd ~/projets/wavy-tiers-front && npm start" C-m
+
+tmux new-window -t "$SESSION" -n contrats-front
+tmux send-keys -t "$SESSION:contrats-front" \
+"cd ~/projets/wavy-contrats-front && npm start" C-m
+
+tmux new-window -t "$SESSION" -n factures-front
+tmux send-keys -t "$SESSION:factures-front" \
+"cd ~/projets/wavy-factures-front && npm start" C-m
+
+echo "Session tmux locale démarrée : $SESSION"
+echo ""
+echo "APIs :"
+echo "- Socle    : http://localhost:8080"
+echo "- Tiers    : http://localhost:8081"
+echo "- Contrats : http://localhost:8082"
+echo "- Factures : http://localhost:8083"
+echo "- Gateway  : http://localhost:8088"
+echo ""
+echo "Fronts :"
+echo "- Socle    : http://localhost:4200"
+echo "- Tiers    : http://localhost:4201"
+echo "- Contrats : http://localhost:4202"
+echo "- Factures : http://localhost:4203"
+echo ""
+echo "Pour ouvrir tmux :"
+echo "tmux attach -t $SESSION"
