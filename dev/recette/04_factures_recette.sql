@@ -134,6 +134,59 @@ insert into facture (
     0.00,
     now(),
     now()
+),
+(
+    6,
+    3,
+    4,
+    6,
+    4,
+    4,
+    'FAC-REC-2026-003',
+    'Facture Alpha mixte contrat et libre',
+    'FACTURE_DOIT',
+    'VENTE',
+    'SERVICE',
+    'PRESTATION_SERVICES',
+    'BROUILLON',
+    'NON_TRANSMISE',
+    'AUCUN',
+    'TVA_STANDARD',
+    'VIREMENT',
+    'EUR',
+    '2026-05-14',
+    '2026-05-14',
+    '2026-06-13',
+    '2026-05-14',
+    350.00,
+    60.00,
+    410.00,
+    0.00,
+    0.00,
+    410.00,
+    410.00,
+    false,
+    'Wavy Services',
+    '982880312',
+    '98288031200011',
+    '8 rue Raymond Marcheron',
+    '92170',
+    'Vanves',
+    'France',
+    'contact@wavyservices.fr',
+    'Client Alpha Industrie SAS',
+    '910000001',
+    null,
+    '12 boulevard de la Recette',
+    '75010',
+    'Paris',
+    'France',
+    'contact@alpha-industrie.fr',
+    'Paiement à 30 jours',
+    0.00,
+    0.00,
+    now(),
+    now()
 )
 on conflict (id) do update set
     tenant_id = excluded.tenant_id,
@@ -232,6 +285,46 @@ insert into ligne_facture (
     1,
     now(),
     now()
+),
+(
+    6,
+    6,
+    4,
+    'Prestation journalière contrat',
+    1.0000,
+    'JOUR',
+    250.00,
+    0.0000,
+    0.00,
+    250.00,
+    0.00,
+    250.00,
+    20.0000,
+    50.00,
+    300.00,
+    1,
+    now(),
+    now()
+),
+(
+    7,
+    6,
+    null,
+    'Frais libres complémentaires',
+    2.0000,
+    'FORFAIT',
+    50.00,
+    0.0000,
+    0.00,
+    100.00,
+    0.00,
+    100.00,
+    10.0000,
+    10.00,
+    110.00,
+    2,
+    now(),
+    now()
 )
 on conflict (id) do update set
     facture_id = excluded.facture_id,
@@ -272,6 +365,24 @@ insert into ventilation_tva_facture (
     200.00,
     now(),
     now()
+),
+(
+    6,
+    6,
+    10.0000,
+    100.00,
+    10.00,
+    now(),
+    now()
+),
+(
+    7,
+    6,
+    20.0000,
+    250.00,
+    50.00,
+    now(),
+    now()
 )
 on conflict (id) do update set
     facture_id = excluded.facture_id,
@@ -280,8 +391,8 @@ on conflict (id) do update set
     montant_tva = excluded.montant_tva,
     date_modification = now();
 
-select setval(pg_get_serial_sequence('facture', 'id'), greatest((select max(id) from facture), 5), true);
-select setval(pg_get_serial_sequence('ligne_facture', 'id'), greatest((select max(id) from ligne_facture), 5), true);
-select setval(pg_get_serial_sequence('ventilation_tva_facture', 'id'), greatest((select max(id) from ventilation_tva_facture), 5), true);
+select setval(pg_get_serial_sequence('facture', 'id'), greatest((select max(id) from facture), 6), true);
+select setval(pg_get_serial_sequence('ligne_facture', 'id'), greatest((select max(id) from ligne_facture), 7), true);
+select setval(pg_get_serial_sequence('ventilation_tva_facture', 'id'), greatest((select max(id) from ventilation_tva_facture), 7), true);
 
 commit;
