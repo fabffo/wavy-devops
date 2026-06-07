@@ -1,3 +1,11 @@
 .env.local
 .env.recette
 backups/
+.env.pur-local
+
+# Fichiers secrets locaux
+.env
+.env.*
+!.env.example
+!.env.local.example
+!.env.recette.example

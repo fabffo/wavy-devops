@@ -112,6 +112,44 @@ curl -i http://localhost:28088/api/factures \
   -H "X-Societe-Courante-Id: 4"
 ```
 
+Extraction IA des factures de vente : voir `README_FACTURES_IA.md` pour la configuration `WAVY_AI_*`, les limites et les commandes curl.
+
+Factures d'achat :
+
+```bash
+curl -i http://localhost:28088/api/factures/achats \
+  -H "X-Tenant-Id: 3" \
+  -H "X-Utilisateur-Id: 6" \
+  -H "X-Societe-Courante-Id: 4"
+
+curl -i -X POST http://localhost:28088/api/factures/achats \
+  -H "Content-Type: application/json" \
+  -H "X-Tenant-Id: 3" \
+  -H "X-Utilisateur-Id: 6" \
+  -H "X-Societe-Courante-Id: 4" \
+  -d '{
+    "categorieAchat": "FRAIS_GENERAUX",
+    "numeroFactureFournisseur": "OVH-2026-001",
+    "dateFacture": "2026-01-15",
+    "dateReception": "2026-01-16",
+    "dateEcheance": "2026-02-15",
+    "fournisseurNom": "OVH",
+    "libelle": "Hébergement cloud",
+    "devise": "EUR",
+    "regimeTva": "TVA_STANDARD",
+    "modePaiement": "VIREMENT",
+    "lignes": [
+      {
+        "libelle": "Hébergement cloud",
+        "quantite": 1,
+        "unite": "MOIS",
+        "prixUnitaireHt": 100,
+        "tauxTva": 20
+      }
+    ]
+  }'
+```
+
 ## Remarques
 
 - `.env.recette` ne doit pas être versionné.

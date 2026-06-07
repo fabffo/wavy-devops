@@ -22,7 +22,7 @@ tmux send-keys -t "$SESSION:contrats-api" \
 
 tmux new-window -t "$SESSION" -n factures-api
 tmux send-keys -t "$SESSION:factures-api" \
-"cd ~/projets/wavy-factures-api && ./mvnw spring-boot:run -Dspring-boot.run.profiles=local" C-m
+"cd ~/projets/wavy-factures-api && set -a && source ~/projets/wavy-devops/.env.pur-local && set +a && ./mvnw spring-boot:run -Dspring-boot.run.profiles=local" C-m
 
 tmux new-window -t "$SESSION" -n gateway
 tmux send-keys -t "$SESSION:gateway" \
@@ -44,6 +44,10 @@ tmux new-window -t "$SESSION" -n factures-front
 tmux send-keys -t "$SESSION:factures-front" \
 "cd ~/projets/wavy-factures-front && npm start" C-m
 
+tmux new-window -t "$SESSION" -n wavy-pwa
+tmux send-keys -t "$SESSION:wavy-pwa" \
+"cd ~/projets/wavy-pwa && npm start" C-m
+
 echo "Session tmux locale démarrée : $SESSION"
 echo ""
 echo "APIs :"
@@ -58,6 +62,7 @@ echo "- Socle    : http://localhost:4200"
 echo "- Tiers    : http://localhost:4201"
 echo "- Contrats : http://localhost:4202"
 echo "- Factures : http://localhost:4203"
+echo "- Wavy PWA : http://localhost:4204"
 echo ""
 echo "Pour ouvrir tmux :"
 echo "tmux attach -t $SESSION"

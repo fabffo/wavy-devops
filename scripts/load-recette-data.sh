@@ -57,6 +57,8 @@ run_sql socle-postgres WAVY_SOCLE_DB_USERNAME "$WAVY_SOCLE_DB_NAME" "$RECIPE_DIR
 run_sql tiers-postgres WAVY_TIERS_DB_USER "$WAVY_TIERS_DB_NAME" "$RECIPE_DIR/02_tiers_recette.sql"
 run_sql contrats-postgres WAVY_CONTRATS_DB_USER "$WAVY_CONTRATS_DB_NAME" "$RECIPE_DIR/03_contrats_recette.sql"
 run_sql factures-postgres WAVY_FACTURES_DB_USER "$WAVY_FACTURES_DB_NAME" "$RECIPE_DIR/04_factures_recette.sql"
+run_sql factures-postgres WAVY_FACTURES_DB_USER "$WAVY_FACTURES_DB_NAME" "$RECIPE_DIR/06_factures_achats_recette.sql"
+run_sql factures-postgres WAVY_FACTURES_DB_USER "$WAVY_FACTURES_DB_NAME" "$RECIPE_DIR/07_salaires_recette.sql"
 
 cat <<EOF
 
@@ -71,6 +73,8 @@ echo "Nombre de tiers société 4 : $(run_query tiers-postgres WAVY_TIERS_DB_USE
 echo "Nombre de tiers société 5 : $(run_query tiers-postgres WAVY_TIERS_DB_USER "$WAVY_TIERS_DB_NAME" 'select count(*) from tiers where societe_interne_id = 5;')"
 echo "Nombre de contrats tenant 3 : $(run_query contrats-postgres WAVY_CONTRATS_DB_USER "$WAVY_CONTRATS_DB_NAME" 'select count(*) from contrat where tenant_id = 3;')"
 echo "Nombre de factures tenant 3 : $(run_query factures-postgres WAVY_FACTURES_DB_USER "$WAVY_FACTURES_DB_NAME" 'select count(*) from facture where tenant_id = 3;')"
+echo "Nombre de factures achat tenant 3 : $(run_query factures-postgres WAVY_FACTURES_DB_USER "$WAVY_FACTURES_DB_NAME" 'select count(*) from facture_achat where tenant_id = 3;')"
+echo "Paramètres lignes salaires tenant 3 : $(run_query factures-postgres WAVY_FACTURES_DB_USER "$WAVY_FACTURES_DB_NAME" 'select count(*) from parametre_ligne_salaire where tenant_id = 3;')"
 
 echo
  echo "Chargement terminé."

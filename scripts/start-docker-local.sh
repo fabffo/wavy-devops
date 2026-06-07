@@ -56,6 +56,8 @@ load_demo_sql socle-postgres socle_user wavy_socle_db 01_socle_demo.sql
 load_demo_sql tiers-postgres tiers_user wavy_tiers_db 02_tiers_demo.sql
 load_demo_sql contrats-postgres contrats_user wavy_contrats_db 03_contrats_demo.sql
 load_demo_sql factures-postgres factures_user wavy_factures_db 04_factures_demo.sql
+load_demo_sql factures-postgres factures_user wavy_factures_db 06_factures_achats_demo.sql
+load_demo_sql factures-postgres factures_user wavy_factures_db 07_salaires_demo.sql
 
 echo
 echo "Environnement Docker local Wavy demarre."
