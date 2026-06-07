@@ -193,9 +193,11 @@ services:
       WAVY_ROUTES_SOCLE_URI: http://wavy-socle-api-local:8080
       WAVY_TIERS_API_URI: http://wavy-tiers-api-local:8081
       WAVY_CONTRATS_API_URI: http://wavy-contrats-api-local:8082
-      WAVY_FACTURES_API_URL: http://wavy-factures-api-local:8083
+      WAVY_FACTURES_API_URL: http://host.docker.internal:18083
     ports:
       - "${WAVY_GATEWAY_HOST_PORT}:8088"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       wavy-socle-api-local:
         condition: service_started
