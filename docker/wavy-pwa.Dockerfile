@@ -7,7 +7,14 @@ RUN npm ci
 
 COPY . .
 ARG API_BASE_URL=http://localhost:8088/api
-RUN sed -i "s|apiBaseUrl: 'http://localhost:8088/api'|apiBaseUrl: '${API_BASE_URL}'|" src/environments/environment.ts src/environments/environment.local.ts src/environments/environment.prod.ts
+RUN sed -i -E \
+    -e "s|apiBaseUrl:[[:space:]]*'http://localhost:8088/api'|apiBaseUrl: '${API_BASE_URL}'|g" \
+    -e "s|apiBaseUrl:[[:space:]]*\"http://localhost:8088/api\"|apiBaseUrl: '${API_BASE_URL}'|g" \
+    -e "s|apiBaseUrl:[[:space:]]*'http://localhost:18088/api'|apiBaseUrl: '${API_BASE_URL}'|g" \
+    -e "s|apiBaseUrl:[[:space:]]*\"http://localhost:18088/api\"|apiBaseUrl: '${API_BASE_URL}'|g" \
+    -e "s|apiBaseUrl:[[:space:]]*' */api *'|apiBaseUrl: '${API_BASE_URL}'|g" \
+    -e "s|apiBaseUrl:[[:space:]]*\" */api *\"|apiBaseUrl: '${API_BASE_URL}'|g" \
+    src/environments/environment.ts src/environments/environment.local.ts src/environments/environment.prod.ts
 RUN npm run build
 
 FROM nginx:1.29-alpine
