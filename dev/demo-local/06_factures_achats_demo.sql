@@ -1,11 +1,60 @@
-delete from ventilation_tva_facture_achat where facture_achat_id in (200, 201);
-delete from ligne_facture_achat where facture_achat_id in (200, 201);
-delete from facture_achat where id in (200, 201);
+begin;
+
+with factures_demo as (
+    select id
+    from facture_achat
+    where id in (200, 201)
+       or (
+            tenant_id = 100
+            and societe_interne_id = 100
+            and numero_facture_fournisseur in ('PRESTA-2026-001', 'OVH-2026-001')
+        )
+       or (
+            tenant_id = 100
+            and societe_interne_id = 100
+            and numero_interne_achat in ('ACH-2026-100-000001', 'ACH-2026-100-000002')
+        )
+)
+delete from ventilation_tva_facture_achat
+where facture_achat_id in (select id from factures_demo)
+   or id in (200, 201);
+
+with factures_demo as (
+    select id
+    from facture_achat
+    where id in (200, 201)
+       or (
+            tenant_id = 100
+            and societe_interne_id = 100
+            and numero_facture_fournisseur in ('PRESTA-2026-001', 'OVH-2026-001')
+        )
+       or (
+            tenant_id = 100
+            and societe_interne_id = 100
+            and numero_interne_achat in ('ACH-2026-100-000001', 'ACH-2026-100-000002')
+        )
+)
+delete from ligne_facture_achat
+where facture_achat_id in (select id from factures_demo)
+   or id in (200, 201);
+
+delete from facture_achat
+where id in (200, 201)
+   or (
+        tenant_id = 100
+        and societe_interne_id = 100
+        and numero_facture_fournisseur in ('PRESTA-2026-001', 'OVH-2026-001')
+    )
+   or (
+        tenant_id = 100
+        and societe_interne_id = 100
+        and numero_interne_achat in ('ACH-2026-100-000001', 'ACH-2026-100-000002')
+    );
 
 insert into facture_achat (
     id, tenant_id, societe_interne_id, utilisateur_createur_id,
     tiers_id, contrat_id,
-    categorie_achat, statut_facture_achat, statut_paiement,
+    categorie_achat, statut_facture_achat, origine_facture_achat, statut_paiement,
     numero_facture_fournisseur, numero_interne_achat,
     date_facture, date_emission, date_reception, date_echeance,
     fournisseur_nom, libelle, devise, regime_tva, option_tva_sur_les_debits, mode_paiement,
@@ -15,7 +64,7 @@ insert into facture_achat (
 (
     200, 100, 100, 100,
     101, null,
-    'ACHAT_EXPLOITATION', 'BROUILLON', 'NON_PAYEE',
+    'ACHAT_EXPLOITATION', 'BROUILLON', 'MANUELLE', 'NON_PAYEE',
     'PRESTA-2026-001', 'ACH-2026-100-000001',
     '2026-01-10', '2026-01-10', '2026-01-11', '2026-02-10',
     'Prestataire Demo SAS', 'Sous-traitance mission client', 'EUR', 'TVA_STANDARD', false, 'VIREMENT',
@@ -25,7 +74,7 @@ insert into facture_achat (
 (
     201, 100, 100, 100,
     null, null,
-    'FRAIS_GENERAUX', 'BROUILLON', 'NON_PAYEE',
+    'FRAIS_GENERAUX', 'BROUILLON', 'MANUELLE', 'NON_PAYEE',
     'OVH-2026-001', 'ACH-2026-100-000002',
     '2026-01-15', '2026-01-15', '2026-01-16', '2026-02-15',
     'OVH', 'Hébergement cloud', 'EUR', 'TVA_STANDARD', false, 'VIREMENT',
@@ -50,3 +99,5 @@ insert into ventilation_tva_facture_achat (
 select setval(pg_get_serial_sequence('facture_achat', 'id'), greatest((select max(id) from facture_achat), 201), true);
 select setval(pg_get_serial_sequence('ligne_facture_achat', 'id'), greatest((select max(id) from ligne_facture_achat), 201), true);
 select setval(pg_get_serial_sequence('ventilation_tva_facture_achat', 'id'), greatest((select max(id) from ventilation_tva_facture_achat), 201), true);
+
+commit;

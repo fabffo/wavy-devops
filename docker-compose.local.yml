@@ -183,21 +183,19 @@ services:
       - wavy-local
 
   wavy-gateway-local:
-    container_name: wavy-gateway-global-local
     build:
       context: ../wavy-gateway
       dockerfile: Dockerfile
     environment:
       SPRING_PROFILES_ACTIVE: ${WAVY_GATEWAY_SPRING_PROFILES_ACTIVE}
+      WAVY_GATEWAY_ADDRESS: 0.0.0.0
       WAVY_GATEWAY_PORT: 8088
       WAVY_ROUTES_SOCLE_URI: http://wavy-socle-api-local:8080
       WAVY_TIERS_API_URI: http://wavy-tiers-api-local:8081
       WAVY_CONTRATS_API_URI: http://wavy-contrats-api-local:8082
-      WAVY_FACTURES_API_URL: http://host.docker.internal:18083
+      WAVY_FACTURES_API_URL: http://wavy-factures-api-local:8083
     ports:
       - "${WAVY_GATEWAY_HOST_PORT}:8088"
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
     depends_on:
       wavy-socle-api-local:
         condition: service_started
@@ -208,7 +206,8 @@ services:
       wavy-factures-api-local:
         condition: service_started
     networks:
-      - wavy-local
+      wavy-local:
+        ipv4_address: 172.23.0.50
 
   wavy-socle-front-local:
     container_name: wavy-socle-front-global-local
@@ -270,9 +269,27 @@ services:
     networks:
       - wavy-local
 
+  wavy-pwa-local:
+    container_name: wavy-pwa-local
+    build:
+      context: ../wavy-pwa
+      dockerfile: ../wavy-devops/docker/wavy-pwa.Dockerfile
+      args:
+        API_BASE_URL: http://localhost:${WAVY_GATEWAY_HOST_PORT}/api
+    ports:
+      - "${WAVY_PWA_HOST_PORT}:80"
+    depends_on:
+      wavy-gateway-local:
+        condition: service_started
+    networks:
+      - wavy-local
+
 networks:
   wavy-local:
     name: wavy-local
+    ipam:
+      config:
+        - subnet: 172.23.0.0/16
 
 volumes:
   socle-postgres-data:
