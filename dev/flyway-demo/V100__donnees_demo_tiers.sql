@@ -5,13 +5,15 @@ insert into tiers (
 ) values
     (100, 100, 100, 'ORGANISATION', 'ENTREPRISE', 'ACTIF', 'Alpha Industrie SAS', 'Alpha Industrie', '910000001', '91000000100010', 'FR00910000001', 'contact@alpha.example', '0101010101', true, now(), now()),
     (101, 100, 100, 'ORGANISATION', 'ENTREPRISE', 'ACTIF', 'Beta Distribution SAS', 'Beta Distribution', '910000002', '91000000200020', 'FR00910000002', 'contact@beta.example', '0102020202', true, now(), now()),
-    (102, 100, 100, 'ORGANISATION', 'ENTREPRISE', 'ACTIF', 'Gamma Services SARL', 'Gamma Services', '910000003', '91000000300030', 'FR00910000003', 'contact@gamma.example', '0103030303', true, now(), now())
+    (102, 100, 100, 'ORGANISATION', 'ENTREPRISE', 'ACTIF', 'Gamma Services SARL', 'Gamma Services', '910000003', '91000000300030', 'FR00910000003', 'contact@gamma.example', '0103030303', true, now(), now()),
+    (103, 100, 100, 'PERSONNE_PHYSIQUE', null, 'ACTIF', null, null, null, null, null, 'camille.candidat@example', '0104040404', true, now(), now())
 on conflict (id) do update set raison_sociale = excluded.raison_sociale, actif = true, date_modification = now();
 
 insert into tiers_roles (tiers_id, role_tiers) values
     (100, 'CLIENT'),
     (101, 'CLIENT'),
-    (102, 'FOURNISSEUR_SERVICES')
+    (102, 'FOURNISSEUR_SERVICES'),
+    (103, 'CANDIDAT')
 on conflict (tiers_id, role_tiers) do nothing;
 
 insert into adresse_tiers (
@@ -32,6 +34,6 @@ insert into contact_tiers (
     (102, 102, 'COMMERCIAL', 'MADAME', 'Petit', 'Claire', 'Commerciale', 'commercial@gamma.example', '0103030304', true, true, now(), now())
 on conflict (id) do update set email = excluded.email, actif = true, date_modification = now();
 
-select setval(pg_get_serial_sequence('tiers', 'id'), greatest((select max(id) from tiers), 102), true);
+select setval(pg_get_serial_sequence('tiers', 'id'), greatest((select max(id) from tiers), 103), true);
 select setval(pg_get_serial_sequence('adresse_tiers', 'id'), greatest((select max(id) from adresse_tiers), 102), true);
 select setval(pg_get_serial_sequence('contact_tiers', 'id'), greatest((select max(id) from contact_tiers), 102), true);

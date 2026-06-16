@@ -29,6 +29,19 @@ compose() {
   docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" "$@"
 }
 
+env_value() {
+  local key="$1"
+  awk -F= -v key="$key" '$1 == key { value=$0; sub(/^[^=]*=/, "", value); print value }' "$ENV_FILE" | tail -n 1
+}
+
+env_value_or_default() {
+  local key="$1"
+  local default_value="$2"
+  local value
+  value="$(env_value "$key")"
+  printf '%s\n' "${value:-$default_value}"
+}
+
 echo "Construction du jar wavy-gateway utilisé par son Dockerfile..."
 (cd "$ROOT_DIR/../wavy-gateway" && ./mvnw -q -DskipTests package)
 
@@ -36,12 +49,20 @@ echo "Démarrage de la pile Docker recette..."
 compose up -d --build
 
 echo
+GATEWAY_PORT="$(env_value_or_default WAVY_GATEWAY_HOST_PORT 28088)"
+SOCLE_FRONT_PORT="$(env_value_or_default WAVY_SOCLE_FRONT_HOST_PORT 24200)"
+TIERS_FRONT_PORT="$(env_value_or_default WAVY_TIERS_FRONT_HOST_PORT 24201)"
+CONTRATS_FRONT_PORT="$(env_value_or_default WAVY_CONTRATS_FRONT_HOST_PORT 24202)"
+FACTURES_FRONT_PORT="$(env_value_or_default WAVY_FACTURES_FRONT_HOST_PORT 24203)"
+PWA_PORT="$(env_value_or_default WAVY_PWA_HOST_PORT 24204)"
+PUBLIC_GATEWAY_URL="$(env_value_or_default WAVY_PUBLIC_GATEWAY_URL "http://localhost:${GATEWAY_PORT}")"
 cat <<EOF
 Pile Docker recette démarrée.
 URLs :
-- Gateway : http://localhost:28088
-- Socle   : http://localhost:24200
-- Tiers   : http://localhost:24201
-- Contrats: http://localhost:24202
-- Factures: http://localhost:24203
+- Gateway : ${PUBLIC_GATEWAY_URL}
+- Socle   : http://localhost:${SOCLE_FRONT_PORT}
+- Tiers   : http://localhost:${TIERS_FRONT_PORT}
+- Contrats: http://localhost:${CONTRATS_FRONT_PORT}
+- Factures: http://localhost:${FACTURES_FRONT_PORT}
+- PWA     : http://localhost:${PWA_PORT}
 EOF

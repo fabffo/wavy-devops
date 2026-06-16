@@ -19,7 +19,8 @@ insert into tiers (
     (14, 3, 5, 'ORGANISATION', 'ENTREPRISE', 'ACTIF', 'Client Immo Patrimoine SAS', 'Client Immo Patrimoine SAS', null, null, '910000007', null, null, 'contact@immo-patrimoine.fr', null, true, now(), now()),
     (15, 3, 5, 'ORGANISATION', 'ENTREPRISE', 'ACTIF', 'Maintenance Immo Recette SAS', 'Maintenance Immo Recette SAS', null, null, '910000008', null, null, 'contact@maintenance-immo.fr', null, true, now(), now()),
     (16, 3, 5, 'ORGANISATION', 'ENTREPRISE', 'ACTIF', 'Banque Immo Recette', 'Banque Immo Recette', null, null, '910000009', null, null, 'agence@banque-immo-recette.fr', null, true, now(), now()),
-    (17, 3, 5, 'PERSONNE_PHYSIQUE', null, 'ACTIF', null, null, 'Camille', 'Leroy', null, null, null, 'camille.leroy@recette.fr', null, true, now(), now())
+    (17, 3, 5, 'PERSONNE_PHYSIQUE', null, 'ACTIF', null, null, 'Camille', 'Leroy', null, null, null, 'camille.leroy@recette.fr', null, true, now(), now()),
+    (18, 3, 4, 'PERSONNE_PHYSIQUE', null, 'ACTIF', null, null, 'Emma', 'Candidate', null, null, null, 'emma.candidate@recette.fr', null, true, now(), now())
 on conflict (id) do update set
     tenant_id = excluded.tenant_id,
     societe_interne_id = excluded.societe_interne_id,
@@ -53,10 +54,11 @@ insert into tiers_roles (tiers_id, role_tiers) values
     (14, 'CLIENT'),
     (15, 'FOURNISSEUR_GENERAL'),
     (16, 'BANQUE'),
-    (17, 'PRESTATAIRE')
+    (17, 'PRESTATAIRE'),
+    (18, 'CANDIDAT')
 on conflict do nothing;
 
-select setval(pg_get_serial_sequence('tiers', 'id'), greatest((select max(id) from tiers), 17), true);
-select setval(pg_get_serial_sequence('tiers_roles', 'tiers_id'), greatest((select max(tiers_id) from tiers_roles), 17), true);
+select setval(pg_get_serial_sequence('tiers', 'id'), greatest((select max(id) from tiers), 18), true);
+select setval(pg_get_serial_sequence('tiers_roles', 'tiers_id'), greatest((select max(tiers_id) from tiers_roles), 18), true);
 
 commit;

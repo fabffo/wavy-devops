@@ -1,17 +1,19 @@
+name: ${COMPOSE_PROJECT_NAME:-wavy-recette}
+
 services:
   socle-postgres:
     image: postgres:16-alpine
     container_name: socle-db-recette
     environment:
-      POSTGRES_DB: ${WAVY_SOCLE_DB_NAME}
-      POSTGRES_USER: ${WAVY_SOCLE_DB_USERNAME}
-      POSTGRES_PASSWORD: ${WAVY_SOCLE_DB_PASSWORD}
+      POSTGRES_DB: ${WAVY_SOCLE_DB_NAME:-wavy_socle_db}
+      POSTGRES_USER: ${WAVY_SOCLE_DB_USERNAME:-socle_user}
+      POSTGRES_PASSWORD: ${WAVY_SOCLE_DB_PASSWORD:-motdepasse_recette}
     ports:
-      - "${WAVY_SOCLE_DB_HOST_PORT}:5432"
+      - "${WAVY_SOCLE_DB_HOST_PORT:-25432}:5432"
     volumes:
       - socle-postgres-recette-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${WAVY_SOCLE_DB_USERNAME} -d ${WAVY_SOCLE_DB_NAME}"]
+      test: ["CMD-SHELL", "pg_isready -U ${WAVY_SOCLE_DB_USERNAME:-socle_user} -d ${WAVY_SOCLE_DB_NAME:-wavy_socle_db}"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -22,15 +24,15 @@ services:
     image: postgres:16-alpine
     container_name: tiers-db-recette
     environment:
-      POSTGRES_DB: ${WAVY_TIERS_DB_NAME}
-      POSTGRES_USER: ${WAVY_TIERS_DB_USER}
-      POSTGRES_PASSWORD: ${WAVY_TIERS_DB_PASSWORD}
+      POSTGRES_DB: ${WAVY_TIERS_DB_NAME:-wavy_tiers_db}
+      POSTGRES_USER: ${WAVY_TIERS_DB_USER:-tiers_user}
+      POSTGRES_PASSWORD: ${WAVY_TIERS_DB_PASSWORD:-motdepasse_recette}
     ports:
-      - "${WAVY_TIERS_DB_HOST_PORT}:5432"
+      - "${WAVY_TIERS_DB_HOST_PORT:-25433}:5432"
     volumes:
       - tiers-postgres-recette-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${WAVY_TIERS_DB_USER} -d ${WAVY_TIERS_DB_NAME}"]
+      test: ["CMD-SHELL", "pg_isready -U ${WAVY_TIERS_DB_USER:-tiers_user} -d ${WAVY_TIERS_DB_NAME:-wavy_tiers_db}"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -41,15 +43,15 @@ services:
     image: postgres:16-alpine
     container_name: contrats-db-recette
     environment:
-      POSTGRES_DB: ${WAVY_CONTRATS_DB_NAME}
-      POSTGRES_USER: ${WAVY_CONTRATS_DB_USER}
-      POSTGRES_PASSWORD: ${WAVY_CONTRATS_DB_PASSWORD}
+      POSTGRES_DB: ${WAVY_CONTRATS_DB_NAME:-wavy_contrats_db}
+      POSTGRES_USER: ${WAVY_CONTRATS_DB_USER:-contrats_user}
+      POSTGRES_PASSWORD: ${WAVY_CONTRATS_DB_PASSWORD:-motdepasse_recette}
     ports:
-      - "${WAVY_CONTRATS_DB_HOST_PORT}:5432"
+      - "${WAVY_CONTRATS_DB_HOST_PORT:-25434}:5432"
     volumes:
       - contrats-postgres-recette-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${WAVY_CONTRATS_DB_USER} -d ${WAVY_CONTRATS_DB_NAME}"]
+      test: ["CMD-SHELL", "pg_isready -U ${WAVY_CONTRATS_DB_USER:-contrats_user} -d ${WAVY_CONTRATS_DB_NAME:-wavy_contrats_db}"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -60,15 +62,15 @@ services:
     image: postgres:16-alpine
     container_name: factures-db-recette
     environment:
-      POSTGRES_DB: ${WAVY_FACTURES_DB_NAME}
-      POSTGRES_USER: ${WAVY_FACTURES_DB_USER}
-      POSTGRES_PASSWORD: ${WAVY_FACTURES_DB_PASSWORD}
+      POSTGRES_DB: ${WAVY_FACTURES_DB_NAME:-wavy_factures_db}
+      POSTGRES_USER: ${WAVY_FACTURES_DB_USER:-factures_user}
+      POSTGRES_PASSWORD: ${WAVY_FACTURES_DB_PASSWORD:-motdepasse_recette}
     ports:
-      - "${WAVY_FACTURES_DB_HOST_PORT}:5432"
+      - "${WAVY_FACTURES_DB_HOST_PORT:-25435}:5432"
     volumes:
       - factures-postgres-recette-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${WAVY_FACTURES_DB_USER} -d ${WAVY_FACTURES_DB_NAME}"]
+      test: ["CMD-SHELL", "pg_isready -U ${WAVY_FACTURES_DB_USER:-factures_user} -d ${WAVY_FACTURES_DB_NAME:-wavy_factures_db}"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -81,21 +83,21 @@ services:
       context: ../wavy-socle-api
       dockerfile: Dockerfile
     environment:
-      SPRING_PROFILES_ACTIVE: local
+      SPRING_PROFILES_ACTIVE: ${WAVY_SOCLE_SPRING_PROFILES_ACTIVE:-local}
       WAVY_SOCLE_DB_HOST: socle-db-recette
       WAVY_SOCLE_DB_PORT: 5432
-      WAVY_SOCLE_DB_NAME: ${WAVY_SOCLE_DB_NAME}
-      WAVY_SOCLE_DB_USERNAME: ${WAVY_SOCLE_DB_USERNAME}
-      WAVY_SOCLE_DB_USER: ${WAVY_SOCLE_DB_USERNAME}
-      WAVY_SOCLE_DB_PASSWORD: ${WAVY_SOCLE_DB_PASSWORD}
-      WAVY_SOCLE_DB_URL: jdbc:postgresql://socle-db-recette:5432/${WAVY_SOCLE_DB_NAME}
+      WAVY_SOCLE_DB_NAME: ${WAVY_SOCLE_DB_NAME:-wavy_socle_db}
+      WAVY_SOCLE_DB_USERNAME: ${WAVY_SOCLE_DB_USERNAME:-socle_user}
+      WAVY_SOCLE_DB_USER: ${WAVY_SOCLE_DB_USERNAME:-socle_user}
+      WAVY_SOCLE_DB_PASSWORD: ${WAVY_SOCLE_DB_PASSWORD:-motdepasse_recette}
+      WAVY_SOCLE_DB_URL: jdbc:postgresql://socle-db-recette:5432/${WAVY_SOCLE_DB_NAME:-wavy_socle_db}
       WAVY_SOCLE_API_PORT: 8080
-      SPRING_DATASOURCE_URL: jdbc:postgresql://socle-db-recette:5432/${WAVY_SOCLE_DB_NAME}
-      SPRING_DATASOURCE_USERNAME: ${WAVY_SOCLE_DB_USERNAME}
-      SPRING_DATASOURCE_PASSWORD: ${WAVY_SOCLE_DB_PASSWORD}
+      SPRING_DATASOURCE_URL: jdbc:postgresql://socle-db-recette:5432/${WAVY_SOCLE_DB_NAME:-wavy_socle_db}
+      SPRING_DATASOURCE_USERNAME: ${WAVY_SOCLE_DB_USERNAME:-socle_user}
+      SPRING_DATASOURCE_PASSWORD: ${WAVY_SOCLE_DB_PASSWORD:-motdepasse_recette}
       SPRING_DATASOURCE_DRIVER_CLASS_NAME: org.postgresql.Driver
     ports:
-      - "${WAVY_SOCLE_API_HOST_PORT}:8080"
+      - "${WAVY_SOCLE_API_HOST_PORT:-28080}:8080"
     depends_on:
       socle-postgres:
         condition: service_healthy
@@ -108,16 +110,16 @@ services:
       context: ../wavy-tiers-api
       dockerfile: Dockerfile
     environment:
-      SPRING_PROFILES_ACTIVE: local
+      SPRING_PROFILES_ACTIVE: ${WAVY_TIERS_SPRING_PROFILES_ACTIVE:-local}
       WAVY_TIERS_DB_HOST: tiers-db-recette
       WAVY_TIERS_DB_PORT: 5432
-      WAVY_TIERS_DB_NAME: ${WAVY_TIERS_DB_NAME}
-      WAVY_TIERS_DB_USER: ${WAVY_TIERS_DB_USER}
-      WAVY_TIERS_DB_USERNAME: ${WAVY_TIERS_DB_USER}
-      WAVY_TIERS_DB_PASSWORD: ${WAVY_TIERS_DB_PASSWORD}
+      WAVY_TIERS_DB_NAME: ${WAVY_TIERS_DB_NAME:-wavy_tiers_db}
+      WAVY_TIERS_DB_USER: ${WAVY_TIERS_DB_USER:-tiers_user}
+      WAVY_TIERS_DB_USERNAME: ${WAVY_TIERS_DB_USER:-tiers_user}
+      WAVY_TIERS_DB_PASSWORD: ${WAVY_TIERS_DB_PASSWORD:-motdepasse_recette}
       WAVY_TIERS_API_PORT: 8081
     ports:
-      - "${WAVY_TIERS_API_HOST_PORT}:8081"
+      - "${WAVY_TIERS_API_HOST_PORT:-28081}:8081"
     depends_on:
       tiers-postgres:
         condition: service_healthy
@@ -130,17 +132,17 @@ services:
       context: ../wavy-contrats-api
       dockerfile: Dockerfile
     environment:
-      SPRING_PROFILES_ACTIVE: recette
+      SPRING_PROFILES_ACTIVE: ${WAVY_CONTRATS_SPRING_PROFILES_ACTIVE:-recette}
       WAVY_CONTRATS_DB_HOST: contrats-db-recette
       WAVY_CONTRATS_DB_PORT: 5432
-      WAVY_CONTRATS_DB_NAME: ${WAVY_CONTRATS_DB_NAME}
-      WAVY_CONTRATS_DB_USER: ${WAVY_CONTRATS_DB_USER}
-      WAVY_CONTRATS_DB_USERNAME: ${WAVY_CONTRATS_DB_USER}
-      WAVY_CONTRATS_DB_PASSWORD: ${WAVY_CONTRATS_DB_PASSWORD}
+      WAVY_CONTRATS_DB_NAME: ${WAVY_CONTRATS_DB_NAME:-wavy_contrats_db}
+      WAVY_CONTRATS_DB_USER: ${WAVY_CONTRATS_DB_USER:-contrats_user}
+      WAVY_CONTRATS_DB_USERNAME: ${WAVY_CONTRATS_DB_USER:-contrats_user}
+      WAVY_CONTRATS_DB_PASSWORD: ${WAVY_CONTRATS_DB_PASSWORD:-motdepasse_recette}
       WAVY_CONTRATS_API_PORT: 8082
       WAVY_CONTRATS_STOCKAGE_PIECES_JOINTES: /app/data/contrats/pieces-jointes
     ports:
-      - "${WAVY_CONTRATS_API_HOST_PORT}:8082"
+      - "${WAVY_CONTRATS_API_HOST_PORT:-28082}:8082"
     volumes:
       - contrats-pieces-jointes-recette:/app/data/contrats/pieces-jointes
     depends_on:
@@ -155,18 +157,18 @@ services:
       context: ../wavy-factures-api
       dockerfile: Dockerfile
     environment:
-      SPRING_PROFILES_ACTIVE: recette
+      SPRING_PROFILES_ACTIVE: ${WAVY_FACTURES_SPRING_PROFILES_ACTIVE:-recette}
       WAVY_FACTURES_DB_HOST: factures-db-recette
       WAVY_FACTURES_DB_PORT: 5432
-      WAVY_FACTURES_DB_NAME: ${WAVY_FACTURES_DB_NAME}
-      WAVY_FACTURES_DB_USER: ${WAVY_FACTURES_DB_USER}
-      WAVY_FACTURES_DB_USERNAME: ${WAVY_FACTURES_DB_USER}
-      WAVY_FACTURES_DB_PASSWORD: ${WAVY_FACTURES_DB_PASSWORD}
+      WAVY_FACTURES_DB_NAME: ${WAVY_FACTURES_DB_NAME:-wavy_factures_db}
+      WAVY_FACTURES_DB_USER: ${WAVY_FACTURES_DB_USER:-factures_user}
+      WAVY_FACTURES_DB_USERNAME: ${WAVY_FACTURES_DB_USER:-factures_user}
+      WAVY_FACTURES_DB_PASSWORD: ${WAVY_FACTURES_DB_PASSWORD:-motdepasse_recette}
       WAVY_FACTURES_API_PORT: 8083
       WAVY_TIERS_API_URL: http://wavy-tiers-api-recette:8081
-      SPRING_DATASOURCE_URL: jdbc:postgresql://factures-db-recette:5432/${WAVY_FACTURES_DB_NAME}
-      SPRING_DATASOURCE_USERNAME: ${WAVY_FACTURES_DB_USER}
-      SPRING_DATASOURCE_PASSWORD: ${WAVY_FACTURES_DB_PASSWORD}
+      SPRING_DATASOURCE_URL: jdbc:postgresql://factures-db-recette:5432/${WAVY_FACTURES_DB_NAME:-wavy_factures_db}
+      SPRING_DATASOURCE_USERNAME: ${WAVY_FACTURES_DB_USER:-factures_user}
+      SPRING_DATASOURCE_PASSWORD: ${WAVY_FACTURES_DB_PASSWORD:-motdepasse_recette}
       SPRING_DATASOURCE_DRIVER_CLASS_NAME: org.postgresql.Driver
       SPRING_JPA_DATABASE_PLATFORM: org.hibernate.dialect.PostgreSQLDialect
       WAVY_AI_PROVIDER: ${WAVY_AI_PROVIDER:-anthropic}
@@ -174,8 +176,9 @@ services:
       WAVY_AI_API_KEY: ${WAVY_AI_API_KEY:-}
       WAVY_AI_TIMEOUT_SECONDS: ${WAVY_AI_TIMEOUT_SECONDS:-60}
       WAVY_AI_MAX_FILE_SIZE_MB: ${WAVY_AI_MAX_FILE_SIZE_MB:-10}
+      WAVY_CORS_ALLOWED_ORIGIN_PATTERNS: ${WAVY_CORS_ALLOWED_ORIGIN_PATTERNS:-}
     ports:
-      - "${WAVY_FACTURES_API_HOST_PORT}:8083"
+      - "${WAVY_FACTURES_API_HOST_PORT:-28083}:8083"
     depends_on:
       factures-postgres:
         condition: service_healthy
@@ -188,14 +191,15 @@ services:
       context: ../wavy-gateway
       dockerfile: Dockerfile
     environment:
-      SPRING_PROFILES_ACTIVE: recette
+      SPRING_PROFILES_ACTIVE: ${WAVY_GATEWAY_SPRING_PROFILES_ACTIVE:-recette}
       WAVY_GATEWAY_PORT: 8088
       WAVY_ROUTES_SOCLE_URI: http://wavy-socle-api-recette:8080
       WAVY_TIERS_API_URI: http://wavy-tiers-api-recette:8081
       WAVY_CONTRATS_API_URI: http://wavy-contrats-api-recette:8082
       WAVY_FACTURES_API_URL: http://wavy-factures-api-recette:8083
+      WAVY_CORS_ALLOWED_ORIGIN_PATTERNS: ${WAVY_CORS_ALLOWED_ORIGIN_PATTERNS:-}
     ports:
-      - "${WAVY_GATEWAY_HOST_PORT}:8088"
+      - "${WAVY_GATEWAY_HOST_PORT:-28088}:8088"
     depends_on:
       wavy-socle-api-recette:
         condition: service_started
@@ -216,7 +220,7 @@ services:
     environment:
       API_UPSTREAM: http://wavy-gateway-recette:8088
     ports:
-      - "${WAVY_SOCLE_FRONT_HOST_PORT}:80"
+      - "${WAVY_SOCLE_FRONT_HOST_PORT:-24200}:80"
     depends_on:
       wavy-gateway-recette:
         condition: service_started
@@ -229,9 +233,9 @@ services:
       context: ../wavy-tiers-front
       dockerfile: Dockerfile
       args:
-        API_BASE_URL: http://localhost:${WAVY_GATEWAY_HOST_PORT}
+        API_BASE_URL: ${WAVY_PUBLIC_GATEWAY_URL:-http://localhost:${WAVY_GATEWAY_HOST_PORT:-28088}}
     ports:
-      - "${WAVY_TIERS_FRONT_HOST_PORT}:80"
+      - "${WAVY_TIERS_FRONT_HOST_PORT:-24201}:80"
     depends_on:
       wavy-gateway-recette:
         condition: service_started
@@ -244,9 +248,9 @@ services:
       context: ../wavy-contrats-front
       dockerfile: Dockerfile
       args:
-        API_BASE_URL: http://localhost:${WAVY_GATEWAY_HOST_PORT}
+        API_BASE_URL: ${WAVY_PUBLIC_GATEWAY_URL:-http://localhost:${WAVY_GATEWAY_HOST_PORT:-28088}}
     ports:
-      - "${WAVY_CONTRATS_FRONT_HOST_PORT}:80"
+      - "${WAVY_CONTRATS_FRONT_HOST_PORT:-24202}:80"
     depends_on:
       wavy-gateway-recette:
         condition: service_started
@@ -259,9 +263,24 @@ services:
       context: ../wavy-factures-front
       dockerfile: Dockerfile
       args:
-        API_GATEWAY_BASE_URL: http://localhost:${WAVY_GATEWAY_HOST_PORT}/api
+        API_GATEWAY_BASE_URL: ${WAVY_PUBLIC_GATEWAY_URL:-http://localhost:${WAVY_GATEWAY_HOST_PORT:-28088}}/api
     ports:
-      - "${WAVY_FACTURES_FRONT_HOST_PORT}:80"
+      - "${WAVY_FACTURES_FRONT_HOST_PORT:-24203}:80"
+    depends_on:
+      wavy-gateway-recette:
+        condition: service_started
+    networks:
+      - wavy-recette
+
+  wavy-pwa-recette:
+    container_name: wavy-pwa-recette
+    build:
+      context: ../wavy-pwa
+      dockerfile: ../wavy-devops/docker/wavy-pwa.Dockerfile
+      args:
+        API_BASE_URL: ${WAVY_PUBLIC_GATEWAY_URL:-http://localhost:${WAVY_GATEWAY_HOST_PORT:-28088}}/api
+    ports:
+      - "${WAVY_PWA_HOST_PORT:-24204}:80"
     depends_on:
       wavy-gateway-recette:
         condition: service_started
