@@ -1,4 +1,35 @@
 services:
+  wavy-erp-shell-local:
+    container_name: wavy-erp-shell-local
+    build:
+      context: ../wavy-erp-shell
+      dockerfile: Dockerfile
+    ports:
+      - "${WAVY_ERP_SHELL_HOST_PORT:-14207}:80"
+    environment:
+      NGINX_ENVSUBST_FILTER: _UPSTREAM$
+      API_UPSTREAM: http://wavy-gateway-local:8088
+      SOCLE_FRONT_UPSTREAM: http://wavy-socle-front-local/
+      TIERS_FRONT_UPSTREAM: http://wavy-tiers-front-local/
+      CONTRATS_FRONT_UPSTREAM: http://wavy-contrats-front-local/
+      FACTURES_FRONT_UPSTREAM: http://wavy-factures-front-local/
+      TRESORERIE_FRONT_UPSTREAM: http://wavy-tresorerie-front-local/
+    depends_on:
+      wavy-gateway-local:
+        condition: service_started
+      wavy-socle-front-local:
+        condition: service_started
+      wavy-tiers-front-local:
+        condition: service_started
+      wavy-contrats-front-local:
+        condition: service_started
+      wavy-factures-front-local:
+        condition: service_started
+      wavy-tresorerie-front-local:
+        condition: service_started
+    networks:
+      - wavy-local
+
   socle-postgres:
     image: postgres:16-alpine
     container_name: socle-db-local
@@ -69,6 +100,25 @@ services:
       - factures-postgres-data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${WAVY_FACTURES_DB_USER} -d ${WAVY_FACTURES_DB_NAME}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - wavy-local
+
+  tresorerie-postgres:
+    image: postgres:16-alpine
+    container_name: tresorerie-db-local
+    environment:
+      POSTGRES_DB: ${WAVY_TRESORERIE_DB_NAME}
+      POSTGRES_USER: ${WAVY_TRESORERIE_DB_USER}
+      POSTGRES_PASSWORD: ${WAVY_TRESORERIE_DB_PASSWORD}
+    ports:
+      - "${WAVY_TRESORERIE_DB_HOST_PORT}:5432"
+    volumes:
+      - tresorerie-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${WAVY_TRESORERIE_DB_USER} -d ${WAVY_TRESORERIE_DB_NAME}"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -164,6 +214,8 @@ services:
       WAVY_FACTURES_DB_PASSWORD: ${WAVY_FACTURES_DB_PASSWORD}
       WAVY_FACTURES_API_PORT: 8083
       WAVY_TIERS_API_URL: http://wavy-tiers-api-local:8081
+      WAVY_CONTRATS_API_URL: http://wavy-contrats-api-local:8082
+      WAVY_SOCLE_API_URL: http://wavy-socle-api-local:8080
       SPRING_DATASOURCE_URL: jdbc:postgresql://factures-postgres:5432/${WAVY_FACTURES_DB_NAME}
       SPRING_DATASOURCE_USERNAME: ${WAVY_FACTURES_DB_USER}
       SPRING_DATASOURCE_PASSWORD: ${WAVY_FACTURES_DB_PASSWORD}
@@ -174,11 +226,39 @@ services:
       WAVY_AI_API_KEY: ${WAVY_AI_API_KEY:-}
       WAVY_AI_TIMEOUT_SECONDS: ${WAVY_AI_TIMEOUT_SECONDS:-60}
       WAVY_AI_MAX_FILE_SIZE_MB: ${WAVY_AI_MAX_FILE_SIZE_MB:-10}
+      WAVY_AI_ACHAT_AUTO_CREATION_ENABLED: ${WAVY_AI_ACHAT_AUTO_CREATION_ENABLED:-true}
+      WAVY_AI_ACHAT_MINIMUM_CONFIDENCE: ${WAVY_AI_ACHAT_MINIMUM_CONFIDENCE:-0.90}
     ports:
       - "${WAVY_FACTURES_API_HOST_PORT}:8083"
     depends_on:
       factures-postgres:
         condition: service_healthy
+      wavy-socle-api-local:
+        condition: service_started
+    networks:
+      - wavy-local
+
+  wavy-tresorerie-api-local:
+    container_name: wavy-tresorerie-api-local
+    build:
+      context: ../wavy-tresorerie-api
+      dockerfile: Dockerfile
+    environment:
+      SPRING_PROFILES_ACTIVE: ${WAVY_TRESORERIE_SPRING_PROFILES_ACTIVE}
+      WAVY_TRESORERIE_DB_HOST: tresorerie-postgres
+      WAVY_TRESORERIE_DB_PORT: 5432
+      WAVY_TRESORERIE_DB_NAME: ${WAVY_TRESORERIE_DB_NAME}
+      WAVY_TRESORERIE_DB_USER: ${WAVY_TRESORERIE_DB_USER}
+      WAVY_TRESORERIE_DB_PASSWORD: ${WAVY_TRESORERIE_DB_PASSWORD}
+      WAVY_TRESORERIE_API_PORT: 8086
+      WAVY_FACTURES_API_URL: http://wavy-factures-api-local:8083
+    ports:
+      - "${WAVY_TRESORERIE_API_HOST_PORT}:8086"
+    depends_on:
+      tresorerie-postgres:
+        condition: service_healthy
+      wavy-factures-api-local:
+        condition: service_started
     networks:
       - wavy-local
 
@@ -194,6 +274,7 @@ services:
       WAVY_TIERS_API_URI: http://wavy-tiers-api-local:8081
       WAVY_CONTRATS_API_URI: http://wavy-contrats-api-local:8082
       WAVY_FACTURES_API_URL: http://wavy-factures-api-local:8083
+      WAVY_TRESORERIE_API_URL: http://wavy-tresorerie-api-local:8086
     ports:
       - "${WAVY_GATEWAY_HOST_PORT}:8088"
     depends_on:
@@ -205,9 +286,12 @@ services:
         condition: service_started
       wavy-factures-api-local:
         condition: service_started
+      wavy-tresorerie-api-local:
+        condition: service_started
     networks:
       wavy-local:
         ipv4_address: 172.23.0.50
+        aliases: [wavy-gateway]
 
   wavy-socle-front-local:
     container_name: wavy-socle-front-global-local
@@ -216,13 +300,15 @@ services:
       dockerfile: Dockerfile
     environment:
       API_UPSTREAM: http://wavy-gateway-local:8088
+      SOCLE_API_UPSTREAM: http://wavy-socle-api-local:8080
     ports:
       - "${WAVY_SOCLE_FRONT_HOST_PORT}:80"
     depends_on:
       wavy-gateway-local:
         condition: service_started
     networks:
-      - wavy-local
+      wavy-local:
+        aliases: [wavy-socle-front]
 
   wavy-tiers-front-local:
     container_name: wavy-tiers-front-global-local
@@ -230,14 +316,17 @@ services:
       context: ../wavy-tiers-front
       dockerfile: Dockerfile
       args:
-        API_BASE_URL: http://localhost:${WAVY_GATEWAY_HOST_PORT}
+        # Même origine que le Shell : les appels deviennent /api/** et sont
+        # relayés par nginx vers le Gateway, sans exposer son port au navigateur.
+        API_BASE_URL: ""
     ports:
       - "${WAVY_TIERS_FRONT_HOST_PORT}:80"
     depends_on:
       wavy-gateway-local:
         condition: service_started
     networks:
-      - wavy-local
+      wavy-local:
+        aliases: [wavy-tiers-front]
 
   wavy-contrats-front-local:
     container_name: wavy-contrats-front-global-local
@@ -245,14 +334,15 @@ services:
       context: ../wavy-contrats-front
       dockerfile: Dockerfile
       args:
-        API_BASE_URL: http://localhost:${WAVY_GATEWAY_HOST_PORT}
+        API_BASE_URL: ""
     ports:
       - "${WAVY_CONTRATS_FRONT_HOST_PORT}:80"
     depends_on:
       wavy-gateway-local:
         condition: service_started
     networks:
-      - wavy-local
+      wavy-local:
+        aliases: [wavy-contrats-front]
 
   wavy-factures-front-local:
     container_name: wavy-factures-front-global-local
@@ -260,14 +350,31 @@ services:
       context: ../wavy-factures-front
       dockerfile: Dockerfile
       args:
-        API_GATEWAY_BASE_URL: http://localhost:${WAVY_GATEWAY_HOST_PORT}/api
+        API_GATEWAY_BASE_URL: /api
     ports:
       - "${WAVY_FACTURES_FRONT_HOST_PORT}:80"
     depends_on:
       wavy-gateway-local:
         condition: service_started
     networks:
-      - wavy-local
+      wavy-local:
+        aliases: [wavy-factures-front]
+
+  wavy-tresorerie-front-local:
+    container_name: wavy-tresorerie-front-global-local
+    build:
+      context: ../wavy-tresorerie-front
+      dockerfile: Dockerfile
+      args:
+        API_BASE_URL: ""
+    ports:
+      - "${WAVY_TRESORERIE_FRONT_HOST_PORT}:80"
+    depends_on:
+      wavy-gateway-local:
+        condition: service_started
+    networks:
+      wavy-local:
+        aliases: [wavy-tresorerie-front]
 
   wavy-pwa-local:
     container_name: wavy-pwa-local
@@ -296,4 +403,5 @@ volumes:
   tiers-postgres-data:
   contrats-postgres-data:
   factures-postgres-data:
+  tresorerie-postgres-data:
   contrats-pieces-jointes:

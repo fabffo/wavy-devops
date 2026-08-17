@@ -1,0 +1,467 @@
+#!/usr/bin/env bash
+# Point d'entrée CLI Wavy.
+# Il orchestre les scripts existants et les fonctions communes sans dupliquer
+# la configuration Docker Compose portée par scripts/_common.sh.
+set -euo pipefail
+
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/scripts/_common.sh"
+
+APP_LOGICAL_SERVICES=(
+  socle-api
+  tiers-api
+  contrats-api
+  factures-api
+  tresorerie-api
+  gateway
+  socle-front
+  tiers-front
+  contrats-front
+  factures-front
+  tresorerie-front
+  pwa
+  erp-shell
+)
+
+API_AND_GATEWAY_SERVICES=(
+  socle-api
+  tiers-api
+  contrats-api
+  factures-api
+  tresorerie-api
+  gateway
+)
+
+FRONT_SERVICES=(
+  socle-front
+  tiers-front
+  contrats-front
+  factures-front
+  tresorerie-front
+  pwa
+  erp-shell
+)
+
+usage() {
+  cat <<EOF
+Wavy CLI
+
+Usage :
+  ./wavy
+  ./wavy help
+  ./wavy doctor
+  ./wavy start local|recette|preprod
+  ./wavy status|health local|recette|preprod
+  ./wavy build local|recette|preprod all|service
+  ./wavy restart local|recette|preprod all|service
+  ./wavy logs local|recette|preprod [service]
+  ./wavy backup|restore local|recette|preprod
+  ./wavy stop local|recette|preprod
+  ./wavy clean
+  ./wavy ai recette
+
+Services logiques :
+  socle-api tiers-api contrats-api factures-api tresorerie-api gateway
+  socle-front tiers-front contrats-front factures-front tresorerie-front pwa erp-shell
+
+Exemples :
+  ./wavy doctor
+  ./wavy status recette
+  ./wavy build recette factures-api
+  ./wavy restart recette gateway
+  ./wavy logs recette factures-api
+  ./wavy ai recette
+EOF
+}
+
+validate_env_arg() {
+  local env="$1"
+  case "$env" in
+    local|recette|preprod) ;;
+    *) die "Environnement invalide : $env. Valeurs attendues : local, recette, preprod." ;;
+  esac
+}
+
+is_known_service() {
+  local service="$1"
+  local known
+  for known in "${APP_LOGICAL_SERVICES[@]}"; do
+    [[ "$service" == "$known" ]] && return 0
+  done
+  return 1
+}
+
+validate_service_arg() {
+  local service="$1"
+  is_known_service "$service" || die "Service logique inconnu : $service"
+}
+
+run_with_env() {
+  local env="$1"
+  shift
+  validate_env_arg "$env"
+  WAVY_ENV="$env" "$@"
+}
+
+app_service_names() {
+  local env="$1"
+  local logical
+  for logical in "${APP_LOGICAL_SERVICES[@]}"; do
+    service_name "$logical" "$env"
+  done
+}
+
+show_status() {
+  local env="$1"
+  validate_env_arg "$env"
+  require_docker
+
+  info "Statut Docker Wavy ($env)"
+  printf "%-30s %-36s %-18s %-18s %s\n" "Composant" "Conteneur" "Etat" "Health" "Ports"
+  printf "%-30s %-36s %-18s %-18s %s\n" "---------" "---------" "----" "------" "-----"
+
+  local logical container status health ports db
+  for logical in "${APP_LOGICAL_SERVICES[@]}"; do
+    container="$(service_name "$logical" "$env")"
+    status="$(docker inspect -f '{{.State.Status}}' "$container" 2>/dev/null || printf 'absent')"
+    health="$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}-{{end}}' "$container" 2>/dev/null || printf '-')"
+    ports="$(docker port "$container" 2>/dev/null | tr '\n' ' ' | sed 's/[[:space:]]*$//')"
+    [[ -n "$ports" ]] || ports="-"
+    printf "%-30s %-36s %-18s %-18s %s\n" "$logical" "$container" "$status" "$health" "$ports"
+  done
+
+  for db in socle tiers contrats factures tresorerie; do
+    container="$(db_container "$db" "$env")"
+    status="$(docker inspect -f '{{.State.Status}}' "$container" 2>/dev/null || printf 'absent')"
+    health="$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}-{{end}}' "$container" 2>/dev/null || printf '-')"
+    ports="$(docker port "$container" 2>/dev/null | tr '\n' ' ' | sed 's/[[:space:]]*$//')"
+    [[ -n "$ports" ]] || ports="-"
+    printf "%-30s %-36s %-18s %-18s %s\n" "$db-db" "$container" "$status" "$health" "$ports"
+  done
+}
+
+build_cmd() {
+  local env="$1"
+  local target="${2:-all}"
+  validate_env_arg "$env"
+  require_docker
+
+  if [[ "$target" == "all" ]]; then
+    case "$env" in
+      local) "$SCRIPT_DIR/build-local.sh" ;;
+      recette) "$SCRIPT_DIR/build-recette.sh" ;;
+      preprod) compose preprod pull ;;
+    esac
+    return
+  fi
+
+  validate_service_arg "$target"
+  info "Build de $(service_name "$target" "$env") ($env)..."
+  if [[ "$env" == "preprod" ]]; then
+    compose "$env" pull "$(service_name "$target" "$env")"
+  else
+    compose "$env" build "$(service_name "$target" "$env")"
+  fi
+  success " Image reconstruite : $(service_name "$target" "$env")"
+}
+
+restart_all_cmd() {
+  local env="$1"
+  validate_env_arg "$env"
+  require_docker
+
+  if [[ "$env" == "recette" ]]; then
+    "$SCRIPT_DIR/restart-all.sh"
+    return
+  fi
+
+  if [[ "$env" == "preprod" ]]; then
+    info "Récupération des images préproduction immuables..."
+    compose preprod pull
+    compose preprod up -d --force-recreate
+    health_cmd preprod
+    return
+  fi
+
+  mapfile -t services < <(app_service_names "$env")
+  info "Reconstruction de toutes les images applicatives $env..."
+  compose "$env" build "${services[@]}"
+  info "Redémarrage des services applicatifs $env, bases PostgreSQL conservées..."
+  compose "$env" up -d --force-recreate "${services[@]}"
+  success " Services applicatifs $env redémarrés."
+}
+
+start_cmd() {
+  local env="$1"
+  validate_env_arg "$env"
+  require_docker
+  if [[ "$env" == "preprod" ]]; then
+    "$SCRIPT_DIR/validate-preprod-config.sh"
+  fi
+  compose "$env" up -d --wait
+  health_cmd "$env"
+}
+
+health_cmd() {
+  local env="$1" failed=0 logical container status
+  validate_env_arg "$env"
+  require_docker
+  for logical in "${APP_LOGICAL_SERVICES[@]}"; do
+    container="$(service_name "$logical" "$env")"
+    status="$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$container" 2>/dev/null || printf 'absent')"
+    printf '%-24s %s\n' "$logical" "$status"
+    [[ "$status" == "healthy" || "$status" == "running" ]] || failed=1
+  done
+  [[ "$failed" -eq 0 ]] || die "Au moins un service $env n'est pas disponible."
+}
+
+restart_cmd() {
+  local env="$1"
+  local target="${2:-}"
+  validate_env_arg "$env"
+  [[ -n "$target" ]] || die "Service manquant. Exemple : ./wavy restart recette factures-api"
+
+  if [[ "$target" == "all" ]]; then
+    restart_all_cmd "$env"
+    return
+  fi
+
+  validate_service_arg "$target"
+  if [[ "$env" == "preprod" ]]; then
+    compose preprod pull "$(service_name "$target" preprod)"
+    compose preprod up -d --no-deps --force-recreate "$(service_name "$target" preprod)"
+    return
+  fi
+  run_with_env "$env" "$SCRIPT_DIR/restart-$target.sh"
+}
+
+logs_cmd() {
+  local env="$1"
+  local service="${2:-}"
+  validate_env_arg "$env"
+  if [[ -z "$service" ]]; then
+    compose "$env" logs --tail="${LOG_LINES:-200}" -f
+    return
+  fi
+  validate_service_arg "$service"
+  run_with_env "$env" "$SCRIPT_DIR/logs.sh" "$service"
+}
+
+backup_cmd() {
+  local env="$1"
+  if [[ "$env" == "preprod" ]]; then
+    "$SCRIPT_DIR/backup-preprod.sh"
+    return
+  fi
+  run_with_env "$env" "$SCRIPT_DIR/backup-db.sh"
+}
+
+restore_cmd() {
+  local env="$1"
+  local backup="${2:-}"
+  if [[ "$env" == "preprod" ]]; then
+    [[ -n "$backup" ]] || die "Usage : ./wavy restore preprod backups/preprod/<horodatage>"
+    "$SCRIPT_DIR/restore-preprod.sh" "$backup"
+    return
+  fi
+  run_with_env "$env" "$SCRIPT_DIR/restore-db.sh"
+}
+
+stop_cmd() {
+  local env="$1"
+  run_with_env "$env" "$SCRIPT_DIR/stop-all.sh"
+}
+
+ai_cmd() {
+  local env="$1"
+  validate_env_arg "$env"
+  require_docker
+
+  local container
+  container="$(service_name factures-api "$env")"
+  ensure_container_running "$container"
+
+  info "Variables IA dans $container"
+  local key value
+  for key in WAVY_AI_PROVIDER WAVY_AI_MODEL WAVY_AI_API_KEY WAVY_AI_TIMEOUT_SECONDS WAVY_AI_MAX_FILE_SIZE_MB; do
+    value="$(docker exec "$container" printenv "$key" 2>/dev/null || true)"
+    if [[ "$key" == "WAVY_AI_API_KEY" ]]; then
+      if [[ -n "$value" ]]; then
+        printf "%-32s : ${GREEN}configurée${NC}\n" "$key"
+      else
+        printf "%-32s : ${RED}absente${NC}\n" "$key"
+      fi
+    else
+      if [[ -n "$value" ]]; then
+        printf "%-32s : %s\n" "$key" "$value"
+      else
+        printf "%-32s : ${RED}absente${NC}\n" "$key"
+      fi
+    fi
+  done
+}
+
+pause_menu() {
+  printf "\n"
+  read -r -p "Appuyer sur Entrée pour continuer..." _
+}
+
+run_menu_action() {
+  local env="$1"
+  local choice="$2"
+
+  case "$choice" in
+    1) run_with_env "$env" "$SCRIPT_DIR/doctor.sh" ;;
+    2) show_status "$env" ;;
+    3) build_cmd "$env" all ;;
+    4) restart_cmd "$env" all ;;
+    5) restart_cmd "$env" socle-api ;;
+    6) restart_cmd "$env" tiers-api ;;
+    7) restart_cmd "$env" contrats-api ;;
+    8) restart_cmd "$env" factures-api ;;
+    9) restart_cmd "$env" tresorerie-api ;;
+    10) restart_cmd "$env" gateway ;;
+    11) restart_cmd "$env" socle-front ;;
+    12) restart_cmd "$env" tiers-front ;;
+    13) restart_cmd "$env" contrats-front ;;
+    14) restart_cmd "$env" factures-front ;;
+    15) restart_cmd "$env" tresorerie-front ;;
+    16) restart_cmd "$env" pwa ;;
+    17) restart_cmd "$env" erp-shell ;;
+    18) run_with_env "$env" "$SCRIPT_DIR/logs.sh" ;;
+    19) backup_cmd "$env" ;;
+    20) restore_cmd "$env" ;;
+    21) stop_cmd "$env" ;;
+    22) "$SCRIPT_DIR/clean.sh" ;;
+    23)
+      [[ "$env" == "recette" ]] || die "Option réservée à l'environnement recette."
+      ai_cmd recette
+      ;;
+    24)
+      [[ "$env" == "recette" ]] || die "Option réservée à l'environnement recette."
+      restart_cmd recette factures-api
+      ;;
+    25)
+      [[ "$env" == "recette" ]] || die "Option réservée à l'environnement recette."
+      logs_cmd recette factures-api
+      ;;
+    *) warn "Choix inconnu : $choice" ;;
+  esac
+}
+
+environment_menu() {
+  local env="$1"
+  local title choice
+  validate_env_arg "$env"
+
+  if [[ "$env" == "local" ]]; then
+    title="WAVY CLI - LOCAL"
+  else
+    title="WAVY CLI - ${env^^}"
+  fi
+
+  while true; do
+    clear || true
+    printf "${BLUE}==============================${NC}\n"
+    printf "${BLUE}%22s${NC}\n" "$title"
+    printf "${BLUE}==============================${NC}\n\n"
+    cat <<EOF
+1  - Doctor
+2  - Statut Docker
+3  - Build all $env
+4  - Rebuild image + restart all $env
+
+5  - Rebuild image + restart Socle API
+6  - Rebuild image + restart Tiers API
+7  - Rebuild image + restart Contrats API
+8  - Rebuild image + restart Factures API
+9  - Rebuild image + restart Trésorerie API
+10 - Rebuild image + restart Gateway
+
+11 - Rebuild bundle/image + restart Socle Front
+12 - Rebuild bundle/image + restart Tiers Front
+13 - Rebuild bundle/image + restart Contrats Front
+14 - Rebuild bundle/image + restart Factures Front
+15 - Rebuild bundle/image + restart Trésorerie Front
+16 - Rebuild bundle/image + restart PWA
+17 - Rebuild bundle/image + restart Wavy ERP Shell ($env)
+
+18 - Logs
+19 - Backup DB $env
+20 - Restore DB $env
+21 - Stop $env
+22 - Clean Docker
+EOF
+    if [[ "$env" == "recette" ]]; then
+      cat <<EOF
+
+23 - Vérifier variables IA
+24 - Rebuild image + restart Factures API avec .env.recette
+25 - Logs Factures API
+EOF
+    fi
+    cat <<EOF
+
+0  - Retour
+
+EOF
+    read -r -p "Choix : " choice
+    [[ "$choice" == "0" ]] && return
+    run_menu_action "$env" "$choice"
+    pause_menu
+  done
+}
+
+interactive_menu() {
+  local choice
+  while true; do
+    clear || true
+    printf "${BLUE}==============================${NC}\n"
+    printf "${BLUE}          WAVY CLI${NC}\n"
+    printf "${BLUE}==============================${NC}\n\n"
+    cat <<EOF
+Choisir un environnement :
+
+1 - Local
+2 - Recette
+3 - Préproduction
+0 - Quitter
+
+EOF
+    read -r -p "Choix : " choice
+    case "$choice" in
+      1) environment_menu local ;;
+      2) environment_menu recette ;;
+      3) environment_menu preprod ;;
+      0) exit 0 ;;
+      *) warn "Choix inconnu : $choice"; pause_menu ;;
+    esac
+  done
+}
+
+main() {
+  local command="${1:-}"
+  if [[ -z "$command" ]]; then
+    interactive_menu
+    return
+  fi
+  shift || true
+
+  case "$command" in
+    help|-h|--help) usage ;;
+    doctor) "$SCRIPT_DIR/doctor.sh" ;;
+    start) start_cmd "${1:-}" ;;
+    status) show_status "${1:-recette}" ;;
+    health) health_cmd "${1:-}" ;;
+    build) build_cmd "${1:-}" "${2:-all}" ;;
+    restart) restart_cmd "${1:-}" "${2:-}" ;;
+    logs) logs_cmd "${1:-}" "${2:-}" ;;
+    backup) backup_cmd "${1:-}" ;;
+    restore) restore_cmd "${1:-}" "${2:-}" ;;
+    stop) stop_cmd "${1:-}" ;;
+    clean) "$SCRIPT_DIR/clean.sh" ;;
+    ai) ai_cmd "${1:-}" ;;
+    *) usage; die "Commande inconnue : $command" ;;
+  esac
+}
+
+main "$@"

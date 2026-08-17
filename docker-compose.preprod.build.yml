@@ -1,0 +1,24 @@
+# Override de build CI : les images produites gardent le tag immuable défini
+# dans .env.preprod, puis docker-compose.preprod.yml les consomme sans rebuild.
+services:
+  wavy-socle-api-preprod: {build: {context: ../wavy-socle-api}}
+  wavy-tiers-api-preprod: {build: {context: ../wavy-tiers-api}}
+  wavy-contrats-api-preprod: {build: {context: ../wavy-contrats-api}}
+  wavy-factures-api-preprod: {build: {context: ../wavy-factures-api}}
+  wavy-tresorerie-api-preprod: {build: {context: ../wavy-tresorerie-api}}
+  wavy-gateway-preprod: {build: {context: ../wavy-gateway}}
+  wavy-socle-front-preprod: {build: {context: ../wavy-socle-front}}
+  wavy-tiers-front-preprod:
+    build: {context: ../wavy-tiers-front, args: {API_BASE_URL: ""}}
+  wavy-contrats-front-preprod:
+    build: {context: ../wavy-contrats-front, args: {API_BASE_URL: ""}}
+  wavy-factures-front-preprod:
+    build: {context: ../wavy-factures-front, args: {API_GATEWAY_BASE_URL: /api}}
+  wavy-tresorerie-front-preprod:
+    build: {context: ../wavy-tresorerie-front, args: {API_BASE_URL: ""}}
+  wavy-pwa-preprod:
+    build:
+      context: ../wavy-pwa
+      dockerfile: ../wavy-devops/docker/wavy-pwa.Dockerfile
+      args: {API_BASE_URL: /api}
+  wavy-erp-shell-preprod: {build: {context: ../wavy-erp-shell}}

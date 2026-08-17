@@ -1,6 +1,37 @@
 name: ${COMPOSE_PROJECT_NAME:-wavy-recette}
 
 services:
+  wavy-erp-shell-recette:
+    container_name: wavy-erp-shell-recette
+    build:
+      context: ../wavy-erp-shell
+      dockerfile: Dockerfile
+    ports:
+      - "${WAVY_ERP_SHELL_HOST_PORT:-24207}:80"
+    environment:
+      NGINX_ENVSUBST_FILTER: _UPSTREAM$
+      API_UPSTREAM: http://wavy-gateway-recette:8088
+      SOCLE_FRONT_UPSTREAM: http://wavy-socle-front-recette/
+      TIERS_FRONT_UPSTREAM: http://wavy-tiers-front-recette/
+      CONTRATS_FRONT_UPSTREAM: http://wavy-contrats-front-recette/
+      FACTURES_FRONT_UPSTREAM: http://wavy-factures-front-recette/
+      TRESORERIE_FRONT_UPSTREAM: http://wavy-tresorerie-front-recette/
+    depends_on:
+      wavy-gateway-recette:
+        condition: service_started
+      wavy-socle-front-recette:
+        condition: service_started
+      wavy-tiers-front-recette:
+        condition: service_started
+      wavy-contrats-front-recette:
+        condition: service_started
+      wavy-factures-front-recette:
+        condition: service_started
+      wavy-tresorerie-front-recette:
+        condition: service_started
+    networks:
+      - wavy-recette
+
   socle-postgres:
     image: postgres:16-alpine
     container_name: socle-db-recette
@@ -77,6 +108,25 @@ services:
     networks:
       - wavy-recette
 
+  tresorerie-postgres:
+    image: postgres:16-alpine
+    container_name: tresorerie-db-recette
+    environment:
+      POSTGRES_DB: ${WAVY_TRESORERIE_DB_NAME:-wavy_tresorerie_db}
+      POSTGRES_USER: ${WAVY_TRESORERIE_DB_USER:-tresorerie_user}
+      POSTGRES_PASSWORD: ${WAVY_TRESORERIE_DB_PASSWORD:-motdepasse_recette}
+    ports:
+      - "${WAVY_TRESORERIE_DB_HOST_PORT:-25436}:5432"
+    volumes:
+      - tresorerie-postgres-recette-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${WAVY_TRESORERIE_DB_USER:-tresorerie_user} -d ${WAVY_TRESORERIE_DB_NAME:-wavy_tresorerie_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - wavy-recette
+
   wavy-socle-api-recette:
     container_name: wavy-socle-api-recette
     build:
@@ -92,6 +142,7 @@ services:
       WAVY_SOCLE_DB_PASSWORD: ${WAVY_SOCLE_DB_PASSWORD:-motdepasse_recette}
       WAVY_SOCLE_DB_URL: jdbc:postgresql://socle-db-recette:5432/${WAVY_SOCLE_DB_NAME:-wavy_socle_db}
       WAVY_SOCLE_API_PORT: 8080
+      WAVY_TIERS_API_URL: ${WAVY_TIERS_API_URL:-http://wavy-tiers-api-recette:8081}
       SPRING_DATASOURCE_URL: jdbc:postgresql://socle-db-recette:5432/${WAVY_SOCLE_DB_NAME:-wavy_socle_db}
       SPRING_DATASOURCE_USERNAME: ${WAVY_SOCLE_DB_USERNAME:-socle_user}
       SPRING_DATASOURCE_PASSWORD: ${WAVY_SOCLE_DB_PASSWORD:-motdepasse_recette}
@@ -100,6 +151,8 @@ services:
       - "${WAVY_SOCLE_API_HOST_PORT:-28080}:8080"
     depends_on:
       socle-postgres:
+        condition: service_healthy
+      wavy-tiers-api-recette:
         condition: service_healthy
     networks:
       - wavy-recette
@@ -123,6 +176,12 @@ services:
     depends_on:
       tiers-postgres:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8081/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
     networks:
       - wavy-recette
 
@@ -166,6 +225,8 @@ services:
       WAVY_FACTURES_DB_PASSWORD: ${WAVY_FACTURES_DB_PASSWORD:-motdepasse_recette}
       WAVY_FACTURES_API_PORT: 8083
       WAVY_TIERS_API_URL: http://wavy-tiers-api-recette:8081
+      WAVY_CONTRATS_API_URL: http://wavy-contrats-api-recette:8082
+      WAVY_SOCLE_API_URL: http://wavy-socle-api-recette:8080
       SPRING_DATASOURCE_URL: jdbc:postgresql://factures-db-recette:5432/${WAVY_FACTURES_DB_NAME:-wavy_factures_db}
       SPRING_DATASOURCE_USERNAME: ${WAVY_FACTURES_DB_USER:-factures_user}
       SPRING_DATASOURCE_PASSWORD: ${WAVY_FACTURES_DB_PASSWORD:-motdepasse_recette}
@@ -176,11 +237,43 @@ services:
       WAVY_AI_API_KEY: ${WAVY_AI_API_KEY:-}
       WAVY_AI_TIMEOUT_SECONDS: ${WAVY_AI_TIMEOUT_SECONDS:-60}
       WAVY_AI_MAX_FILE_SIZE_MB: ${WAVY_AI_MAX_FILE_SIZE_MB:-10}
+      WAVY_AI_ACHAT_AUTO_CREATION_ENABLED: ${WAVY_AI_ACHAT_AUTO_CREATION_ENABLED:-true}
+      WAVY_AI_ACHAT_MINIMUM_CONFIDENCE: ${WAVY_AI_ACHAT_MINIMUM_CONFIDENCE:-0.90}
       WAVY_CORS_ALLOWED_ORIGIN_PATTERNS: ${WAVY_CORS_ALLOWED_ORIGIN_PATTERNS:-}
     ports:
       - "${WAVY_FACTURES_API_HOST_PORT:-28083}:8083"
     depends_on:
       factures-postgres:
+        condition: service_healthy
+      wavy-socle-api-recette:
+        condition: service_started
+    networks:
+      - wavy-recette
+
+  wavy-tresorerie-api-recette:
+    container_name: wavy-tresorerie-api-recette
+    build:
+      context: ../wavy-tresorerie-api
+      dockerfile: Dockerfile
+    environment:
+      SPRING_PROFILES_ACTIVE: ${WAVY_TRESORERIE_SPRING_PROFILES_ACTIVE:-recette}
+      WAVY_TRESORERIE_DB_HOST: tresorerie-db-recette
+      WAVY_TRESORERIE_DB_PORT: 5432
+      WAVY_TRESORERIE_DB_NAME: ${WAVY_TRESORERIE_DB_NAME:-wavy_tresorerie_db}
+      WAVY_TRESORERIE_DB_USER: ${WAVY_TRESORERIE_DB_USER:-tresorerie_user}
+      WAVY_TRESORERIE_DB_PASSWORD: ${WAVY_TRESORERIE_DB_PASSWORD:-motdepasse_recette}
+      WAVY_TRESORERIE_API_PORT: 8086
+      WAVY_FACTURES_API_URL: http://wavy-factures-api-recette:8083
+      WAVY_TIERS_API_URL: http://wavy-tiers-api-recette:8081
+      WAVY_CORS_ALLOWED_ORIGIN_PATTERNS: ${WAVY_CORS_ALLOWED_ORIGIN_PATTERNS:-}
+    ports:
+      - "${WAVY_TRESORERIE_API_HOST_PORT:-28086}:8086"
+    depends_on:
+      tresorerie-postgres:
+        condition: service_healthy
+      wavy-factures-api-recette:
+        condition: service_started
+      wavy-tiers-api-recette:
         condition: service_healthy
     networks:
       - wavy-recette
@@ -197,6 +290,7 @@ services:
       WAVY_TIERS_API_URI: http://wavy-tiers-api-recette:8081
       WAVY_CONTRATS_API_URI: http://wavy-contrats-api-recette:8082
       WAVY_FACTURES_API_URL: http://wavy-factures-api-recette:8083
+      WAVY_TRESORERIE_API_URL: http://wavy-tresorerie-api-recette:8086
       WAVY_CORS_ALLOWED_ORIGIN_PATTERNS: ${WAVY_CORS_ALLOWED_ORIGIN_PATTERNS:-}
     ports:
       - "${WAVY_GATEWAY_HOST_PORT:-28088}:8088"
@@ -209,8 +303,11 @@ services:
         condition: service_started
       wavy-factures-api-recette:
         condition: service_started
+      wavy-tresorerie-api-recette:
+        condition: service_started
     networks:
-      - wavy-recette
+      wavy-recette:
+        aliases: [wavy-gateway]
 
   wavy-socle-front-recette:
     container_name: wavy-socle-front-recette
@@ -219,13 +316,15 @@ services:
       dockerfile: Dockerfile
     environment:
       API_UPSTREAM: http://wavy-gateway-recette:8088
+      SOCLE_API_UPSTREAM: http://wavy-socle-api-recette:8080
     ports:
       - "${WAVY_SOCLE_FRONT_HOST_PORT:-24200}:80"
     depends_on:
       wavy-gateway-recette:
         condition: service_started
     networks:
-      - wavy-recette
+      wavy-recette:
+        aliases: [wavy-socle-front]
 
   wavy-tiers-front-recette:
     container_name: wavy-tiers-front-recette
@@ -233,14 +332,15 @@ services:
       context: ../wavy-tiers-front
       dockerfile: Dockerfile
       args:
-        API_BASE_URL: ${WAVY_PUBLIC_GATEWAY_URL:-http://localhost:${WAVY_GATEWAY_HOST_PORT:-28088}}
+        API_BASE_URL: ""
     ports:
       - "${WAVY_TIERS_FRONT_HOST_PORT:-24201}:80"
     depends_on:
       wavy-gateway-recette:
         condition: service_started
     networks:
-      - wavy-recette
+      wavy-recette:
+        aliases: [wavy-tiers-front]
 
   wavy-contrats-front-recette:
     container_name: wavy-contrats-front-recette
@@ -248,14 +348,15 @@ services:
       context: ../wavy-contrats-front
       dockerfile: Dockerfile
       args:
-        API_BASE_URL: ${WAVY_PUBLIC_GATEWAY_URL:-http://localhost:${WAVY_GATEWAY_HOST_PORT:-28088}}
+        API_BASE_URL: ""
     ports:
       - "${WAVY_CONTRATS_FRONT_HOST_PORT:-24202}:80"
     depends_on:
       wavy-gateway-recette:
         condition: service_started
     networks:
-      - wavy-recette
+      wavy-recette:
+        aliases: [wavy-contrats-front]
 
   wavy-factures-front-recette:
     container_name: wavy-factures-front-recette
@@ -263,14 +364,31 @@ services:
       context: ../wavy-factures-front
       dockerfile: Dockerfile
       args:
-        API_GATEWAY_BASE_URL: ${WAVY_PUBLIC_GATEWAY_URL:-http://localhost:${WAVY_GATEWAY_HOST_PORT:-28088}}/api
+        API_GATEWAY_BASE_URL: /api
     ports:
       - "${WAVY_FACTURES_FRONT_HOST_PORT:-24203}:80"
     depends_on:
       wavy-gateway-recette:
         condition: service_started
     networks:
-      - wavy-recette
+      wavy-recette:
+        aliases: [wavy-factures-front]
+
+  wavy-tresorerie-front-recette:
+    container_name: wavy-tresorerie-front-recette
+    build:
+      context: ../wavy-tresorerie-front
+      dockerfile: Dockerfile
+      args:
+        API_BASE_URL: ""
+    ports:
+      - "${WAVY_TRESORERIE_FRONT_HOST_PORT:-24206}:80"
+    depends_on:
+      wavy-gateway-recette:
+        condition: service_started
+    networks:
+      wavy-recette:
+        aliases: [wavy-tresorerie-front]
 
   wavy-pwa-recette:
     container_name: wavy-pwa-recette
@@ -296,4 +414,5 @@ volumes:
   tiers-postgres-recette-data:
   contrats-postgres-recette-data:
   factures-postgres-recette-data:
+  tresorerie-postgres-recette-data:
   contrats-pieces-jointes-recette:

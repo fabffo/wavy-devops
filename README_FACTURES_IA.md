@@ -1,6 +1,6 @@
 # Extraction IA des factures de vente et d'achat
 
-Le module `wavy-factures-api` expose des prévisualisations IA séparées, sans création automatique.
+Le module `wavy-factures-api` expose des flux d'extraction IA séparés pour les ventes et les achats.
 
 En pur local, via le gateway lancé par `./scripts/start-local-tmux.sh` :
 
@@ -48,6 +48,8 @@ WAVY_AI_MODEL=
 WAVY_AI_API_KEY=
 WAVY_AI_TIMEOUT_SECONDS=60
 WAVY_AI_MAX_FILE_SIZE_MB=10
+WAVY_AI_ACHAT_AUTO_CREATION_ENABLED=true
+WAVY_AI_ACHAT_MINIMUM_CONFIDENCE=0.90
 ```
 
 Ne jamais committer de vraie clé API. Si la clé ou le modèle est absent, l’endpoint répond avec une erreur de prévisualisation contrôlée et ne tente aucun appel externe.
@@ -73,9 +75,12 @@ curl -i -X POST http://localhost:8088/api/factures/achats/extraction-ia \
   -F "fichier=@/tmp/facture-invalide.txt"
 ```
 
-La création reste manuelle :
+Comportement après extraction :
 
 - Vente : l’utilisateur valide la prévisualisation, choisit un tiers avec le rôle `CLIENT`, puis déclenche le `POST /api/factures/ventes`.
-- Achat : l’utilisateur valide la prévisualisation et la catégorie, confirme un fournisseur sans rôle `CLIENT`, puis déclenche le `POST /api/factures/achats`.
+- Achat : les extractions entièrement valides sont créées automatiquement ; les autres restent modifiables et peuvent être créées manuellement par `POST /api/factures/achats`.
 
-Le front ne crée jamais automatiquement un tiers ni une facture après l'extraction.
+Pour les achats, le backend crée et valide automatiquement la facture lorsque le fournisseur Wavy est rapproché,
+que les champs et montants sont cohérents, qu'aucun doublon n'est détecté et que le score de confiance atteint le seuil.
+Sinon, la réponse contient `creationAutomatiquePossible=false`, `factureCreeeAutomatiquement=false` et la liste `anomalies` ;
+le front conserve alors la validation manuelle. La création automatique ne crée jamais de tiers.

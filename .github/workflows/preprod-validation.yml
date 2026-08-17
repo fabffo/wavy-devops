@@ -1,0 +1,31 @@
+name: Preproduction validation
+
+on:
+  push:
+    paths:
+      - docker-compose.preprod.yml
+      - .env.preprod.example
+      - scripts/**
+      - .github/workflows/preprod-validation.yml
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  configuration:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate shell scripts
+        run: bash -n wavy scripts/*.sh
+      - name: Validate Compose rendering
+        run: docker compose --env-file .env.preprod.example -f docker-compose.preprod.yml config --quiet
+      - name: Reject mutable image tags and published database ports
+        run: |
+          ! grep -Eq 'image:.*:latest([[:space:]]|$)' docker-compose.preprod.yml
+          ! sed -n '/^[[:space:]]*[a-z]*-postgres:/,/^[[:space:]]*[^[:space:]].*:/p' docker-compose.preprod.yml | grep -q 'ports:'
+      - name: Check tracked files for obvious secrets
+        run: |
+          ! git grep -I -E '(PASSWORD|SECRET|API_KEY)="?[^$[:space:]"{]' -- ':!*.example' ':!dev/**' ':!README*'

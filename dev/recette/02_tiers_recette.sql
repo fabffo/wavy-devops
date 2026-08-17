@@ -20,7 +20,12 @@ insert into tiers (
     (15, 3, 5, 'ORGANISATION', 'ENTREPRISE', 'ACTIF', 'Maintenance Immo Recette SAS', 'Maintenance Immo Recette SAS', null, null, '910000008', null, null, 'contact@maintenance-immo.fr', null, true, now(), now()),
     (16, 3, 5, 'ORGANISATION', 'ENTREPRISE', 'ACTIF', 'Banque Immo Recette', 'Banque Immo Recette', null, null, '910000009', null, null, 'agence@banque-immo-recette.fr', null, true, now(), now()),
     (17, 3, 5, 'PERSONNE_PHYSIQUE', null, 'ACTIF', null, null, 'Camille', 'Leroy', null, null, null, 'camille.leroy@recette.fr', null, true, now(), now()),
-    (18, 3, 4, 'PERSONNE_PHYSIQUE', null, 'ACTIF', null, null, 'Emma', 'Candidate', null, null, null, 'emma.candidate@recette.fr', null, true, now(), now())
+    (18, 3, 4, 'PERSONNE_PHYSIQUE', null, 'ACTIF', null, null, 'Emma', 'Candidate', null, null, null, 'emma.candidate@recette.fr', null, true, now(), now()),
+    (19, 3, 4, 'ORGANISATION', 'ENTREPRISE', 'ACTIF', 'OVH Recette SAS', 'OVHcloud Recette', null, null, '910000010', null, null, 'facturation@ovh-recette.fr', null, true, now(), now()),
+    (20, 3, 4, 'ORGANISATION', 'ENTREPRISE', 'ACTIF', 'Microsoft Recette SAS', 'Microsoft 365 Recette', null, null, '910000011', null, null, 'billing@microsoft-recette.fr', null, true, now(), now()),
+    (21, 3, 4, 'ORGANISATION', 'ENTREPRISE', 'ACTIF', 'Assurance Recette SA', 'Assurance Recette', null, null, '910000012', null, null, 'contrats@assurance-recette.fr', null, true, now(), now()),
+    (22, 3, 4, 'ORGANISATION', 'ENTREPRISE', 'ACTIF', 'Telecom Recette SAS', 'Telecom Recette', null, null, '910000013', null, null, 'factures@telecom-recette.fr', null, true, now(), now()),
+    (23, 3, 4, 'ORGANISATION', 'ENTREPRISE', 'ACTIF', 'Talent Recruit Recette SAS', 'Talent Recruit Recette', null, null, '910000014', null, null, 'billing@talent-recette.fr', null, true, now(), now())
 on conflict (id) do update set
     tenant_id = excluded.tenant_id,
     societe_interne_id = excluded.societe_interne_id,
@@ -55,10 +60,15 @@ insert into tiers_roles (tiers_id, role_tiers) values
     (15, 'FOURNISSEUR_GENERAL'),
     (16, 'BANQUE'),
     (17, 'PRESTATAIRE'),
-    (18, 'CANDIDAT')
+    (18, 'CANDIDAT'),
+    (19, 'FOURNISSEUR_GENERAL'),
+    (20, 'FOURNISSEUR_GENERAL'),
+    (21, 'FOURNISSEUR_GENERAL'),
+    (22, 'FOURNISSEUR_GENERAL'),
+    (23, 'FOURNISSEUR_GENERAL')
 on conflict do nothing;
 
-select setval(pg_get_serial_sequence('tiers', 'id'), greatest((select max(id) from tiers), 18), true);
-select setval(pg_get_serial_sequence('tiers_roles', 'tiers_id'), greatest((select max(tiers_id) from tiers_roles), 18), true);
+select setval(pg_get_serial_sequence('tiers', 'id'), greatest((select max(id) from tiers), 23), true);
+select setval(pg_get_serial_sequence('tiers_roles', 'tiers_id'), greatest((select max(tiers_id) from tiers_roles), 23), true);
 
 commit;
