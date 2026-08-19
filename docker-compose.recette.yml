@@ -364,11 +364,7 @@ services:
 
   wavy-contrats-front-recette:
     container_name: wavy-contrats-front-recette
-    build:
-      context: ../wavy-contrats-front
-      dockerfile: Dockerfile
-      args:
-        API_BASE_URL: ""
+    image: ${WAVY_IMAGE_REGISTRY}/wavy-contrats-front:${CONTRATS_FRONT_VERSION}
     ports:
       - "${WAVY_CONTRATS_FRONT_HOST_PORT:-24202}:80"
     depends_on:
