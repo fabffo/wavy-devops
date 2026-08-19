@@ -81,7 +81,7 @@ component_key() {
 deployment_mode() {
   local env="$1" component="$2"
   case "$env/$component" in
-    recette/tresorerie-api) printf 'IMAGE\n' ;;
+    recette/tresorerie-api|recette/gateway) printf 'IMAGE\n' ;;
     *) printf 'SOURCE\n' ;;
   esac
 }

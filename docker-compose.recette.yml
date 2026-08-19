@@ -302,9 +302,7 @@ services:
 
   wavy-gateway-recette:
     container_name: wavy-gateway-recette
-    build:
-      context: ../wavy-gateway
-      dockerfile: Dockerfile
+    image: ${WAVY_IMAGE_REGISTRY}/wavy-gateway:${GATEWAY_VERSION}
     environment:
       SPRING_PROFILES_ACTIVE: ${WAVY_GATEWAY_SPRING_PROFILES_ACTIVE:-recette}
       WAVY_GATEWAY_PORT: 8088
