@@ -337,9 +337,7 @@ services:
 
   wavy-socle-front-recette:
     container_name: wavy-socle-front-recette
-    build:
-      context: ../wavy-socle-front
-      dockerfile: Dockerfile
+    image: ${WAVY_IMAGE_REGISTRY}/wavy-socle-front:${SOCLE_FRONT_VERSION}
     environment:
       API_UPSTREAM: http://wavy-gateway-recette:8088
       SOCLE_API_UPSTREAM: http://wavy-socle-api-recette:8080
