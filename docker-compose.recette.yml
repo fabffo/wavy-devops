@@ -402,11 +402,7 @@ services:
 
   wavy-tresorerie-front-recette:
     container_name: wavy-tresorerie-front-recette
-    build:
-      context: ../wavy-tresorerie-front
-      dockerfile: Dockerfile
-      args:
-        API_BASE_URL: ""
+    image: ${WAVY_IMAGE_REGISTRY}/wavy-tresorerie-front:${TRESORERIE_FRONT_VERSION}
     ports:
       - "${WAVY_TRESORERIE_FRONT_HOST_PORT:-24206}:80"
     depends_on:

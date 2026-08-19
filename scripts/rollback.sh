@@ -186,6 +186,26 @@ for ((attempt = 1; attempt <= attempts; attempt++)); do
 done
 success " $component disponible ($status)"
 
+if [[ "$is_api" == false ]]; then
+  case "$component" in
+    socle-front) front_port="$(env_value "$env" WAVY_SOCLE_FRONT_HOST_PORT "$([[ "$env" == recette ]] && echo 24200 || echo 14200)")" ;;
+    tiers-front) front_port="$(env_value "$env" WAVY_TIERS_FRONT_HOST_PORT "$([[ "$env" == recette ]] && echo 24201 || echo 14201)")" ;;
+    contrats-front) front_port="$(env_value "$env" WAVY_CONTRATS_FRONT_HOST_PORT "$([[ "$env" == recette ]] && echo 24202 || echo 14202)")" ;;
+    factures-front) front_port="$(env_value "$env" WAVY_FACTURES_FRONT_HOST_PORT "$([[ "$env" == recette ]] && echo 24203 || echo 14203)")" ;;
+    pwa) front_port="$(env_value "$env" WAVY_PWA_HOST_PORT "$([[ "$env" == recette ]] && echo 24204 || echo 14204)")" ;;
+    tresorerie-front) front_port="$(env_value "$env" WAVY_TRESORERIE_FRONT_HOST_PORT "$([[ "$env" == recette ]] && echo 24206 || echo 14206)")" ;;
+    erp-shell) front_port="$(env_value "$env" WAVY_ERP_SHELL_HOST_PORT "$([[ "$env" == recette ]] && echo 24207 || echo 14207)")" ;;
+  esac
+  front_url="http://localhost:${front_port}/"
+  front_ok=false
+  for attempt in {1..30}; do
+    if curl -fsS --max-time 5 "$front_url" >/dev/null 2>&1; then front_ok=true; break; fi
+    ((attempt < 30)) && sleep 2
+  done
+  $front_ok || die "$component ne répond pas sur $front_url."
+  success " $component répond sur $front_url"
+fi
+
 if $has_database; then
   recent_logs="$(compose "$env" logs --no-color --since "$started_at" "$service" 2>&1 || true)"
   if printf '%s\n' "$recent_logs" | grep -Eqi 'checksum mismatch|Validate failed|migration failed|FlywayValidateException|FlywayMigrateException'; then
@@ -195,8 +215,10 @@ if $has_database; then
   fi
   success " Aucune erreur Flyway ciblée détectée"
 fi
-"$SCRIPT_DIR/healthcheck.sh" "$env"
-"$SCRIPT_DIR/smoke-test.sh" "$env"
+if $is_api || [[ "$mode" == IMAGE ]]; then
+  "$SCRIPT_DIR/healthcheck.sh" "$env"
+  "$SCRIPT_DIR/smoke-test.sh" "$env"
+fi
 
 if [[ "$mode" == IMAGE ]]; then
   [[ "$(docker inspect -f '{{.Image}}' "$service")" == "$target_image_id" ]] || die "Le conteneur n'exécute pas l'image cible."

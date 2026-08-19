@@ -189,6 +189,10 @@ else
   for attempt in {1..30}; do curl -fsS --max-time 5 "$url" >/dev/null 2>&1 && break; ((attempt < 30)) && sleep 2; done
   curl -fsS --max-time 5 "$url" >/dev/null || die "$component ne répond pas sur $url."
   success " $component répond sur $url"
+  if [[ "$mode" == IMAGE ]]; then
+    "$SCRIPT_DIR/healthcheck.sh" "$env"
+    "$SCRIPT_DIR/smoke-test.sh" "$env"
+  fi
 fi
 
 if [[ "$mode" == IMAGE ]]; then
