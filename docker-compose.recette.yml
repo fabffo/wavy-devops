@@ -352,11 +352,7 @@ services:
 
   wavy-tiers-front-recette:
     container_name: wavy-tiers-front-recette
-    build:
-      context: ../wavy-tiers-front
-      dockerfile: Dockerfile
-      args:
-        API_BASE_URL: ""
+    image: ${WAVY_IMAGE_REGISTRY}/wavy-tiers-front:${TIERS_FRONT_VERSION}
     ports:
       - "${WAVY_TIERS_FRONT_HOST_PORT:-24201}:80"
     depends_on:
