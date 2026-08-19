@@ -1,12 +1,17 @@
 #!/usr/bin/env bash
-# Sauvegarde les bases PostgreSQL Wavy dans backups/AAAA-MM-JJ_HHMM/.
+# Sauvegarde les bases PostgreSQL Wavy dans un répertoire horodaté unique.
 set -euo pipefail
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/_common.sh"
 
 require_docker
 env="$(env_name)"
-timestamp="$(date +%F_%H%M)"
+timestamp="$(date +%F_%H%M%S)"
 backup_dir="$ROOT_DIR/backups/$timestamp"
+suffix=0
+while [[ -e "$backup_dir" ]]; do
+  suffix=$((suffix + 1))
+  backup_dir="$ROOT_DIR/backups/${timestamp}-$(printf '%02d' "$suffix")"
+done
 mkdir -p "$backup_dir"
 
 info "Sauvegarde des bases $env dans $backup_dir"
@@ -26,6 +31,15 @@ Date: $(date -Is)
 Environment: $env
 Format: pg_dump custom (-Fc)
 Databases: socle tiers contrats factures tresorerie
+EOF
+
+cat > "$backup_dir/metadata.txt" <<EOF
+date=$(date -Is)
+environnement=$env
+composant=${WAVY_BACKUP_COMPONENT:-indisponible}
+version=${WAVY_BACKUP_VERSION:-indisponible}
+utilisateur=$(id -un)
+bases=socle tiers contrats factures tresorerie
 EOF
 
 success " Sauvegarde complète : $backup_dir"

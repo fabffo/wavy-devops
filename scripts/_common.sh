@@ -57,6 +57,109 @@ env_file() {
   printf '%s/.env.%s\n' "$ROOT_DIR" "$env"
 }
 
+versions_file() {
+  local env="$1"
+  printf '%s/versions/%s.env\n' "$ROOT_DIR" "$env"
+}
+
+digests_file() {
+  local env="$1"
+  printf '%s/versions/%s.digests\n' "$ROOT_DIR" "$env"
+}
+
+manifest_value() {
+  local file="$1" key="$2" default_value="${3:-}"
+  local value
+  value="$(awk -F= -v key="$key" '$1 == key { value=$0; sub(/^[^=]*=/, "", value); print value }' "$file" 2>/dev/null | tail -n 1)"
+  printf '%s\n' "${value:-$default_value}"
+}
+
+component_key() {
+  printf '%s' "$1" | tr '[:lower:]-' '[:upper:]_'
+}
+
+deployment_mode() {
+  local env="$1" component="$2"
+  case "$env/$component" in
+    recette/tresorerie-api) printf 'IMAGE\n' ;;
+    *) printf 'SOURCE\n' ;;
+  esac
+}
+
+component_version() {
+  local env="$1" component="$2"
+  manifest_value "$(versions_file "$env")" "$(component_key "$component")_VERSION"
+}
+
+component_digest() {
+  local env="$1" component="$2"
+  manifest_value "$(digests_file "$env")" "$(component_key "$component")_DIGEST"
+}
+
+validated_history_file() {
+  local env="$1" component="$2"
+  [[ "$env" =~ ^[a-z0-9-]+$ ]] || die "Environnement invalide pour l'historique : $env"
+  [[ "$component" =~ ^[a-z0-9-]+$ ]] || die "Composant invalide pour l'historique : $component"
+  printf '%s/versions/history/%s/%s.tsv\n' "$ROOT_DIR" "$env" "$component"
+}
+
+get_validated_digest() {
+  local env="$1" component="$2" version="$3" file digest conflicts
+  file="$(validated_history_file "$env" "$component")"
+  [[ -f "$file" ]] || die "Historique de versions validées introuvable : $file"
+  digest="$(awk -F '\t' -v version="$version" 'NR > 1 && $1 == version {print $2}' "$file" | head -n 1)"
+  [[ -n "$digest" ]] || die "Aucun digest validé pour $env/$component version $version."
+  conflicts="$(awk -F '\t' -v version="$version" -v digest="$digest" 'NR > 1 && $1 == version && $2 != digest {print $2}' "$file")"
+  [[ -z "$conflicts" ]] || die "Historique incohérent : plusieurs digests pour $env/$component version $version."
+  printf '%s\n' "$digest"
+}
+
+record_validated_image() {
+  local env="$1" component="$2" version="$3" digest="$4" commit="${5:-indisponible}"
+  local file existing
+  [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]] || die "Digest OCI invalide : $digest"
+  file="$(validated_history_file "$env" "$component")"
+  mkdir -p "$(dirname "$file")"
+  exec {history_lock_fd}>>"$file"
+  flock "$history_lock_fd"
+  if [[ ! -s "$file" ]]; then
+    printf 'version\tdigest\tcommit\tdate_validation\n' >> "$file"
+  fi
+  existing="$(awk -F '\t' -v version="$version" 'NR > 1 && $1 == version {print $2; exit}' "$file")"
+  if [[ -n "$existing" ]]; then
+    [[ "$existing" == "$digest" ]] || die "Version $version déjà validée avec un digest différent : $existing"
+    flock -u "$history_lock_fd"
+    return 0
+  fi
+  printf '%s\t%s\t%s\t%s\n' "$version" "$digest" "${commit:-indisponible}" "$(date -Is)" >> "$file"
+  flock -u "$history_lock_fd"
+}
+
+component_image() {
+  local env="$1" component="$2" version="$3"
+  local registry
+  registry="$(manifest_value "$(versions_file "$env")" WAVY_IMAGE_REGISTRY)"
+  [[ -n "$registry" ]] || die "WAVY_IMAGE_REGISTRY est vide dans $(versions_file "$env")."
+  printf '%s/wavy-%s:%s\n' "${registry%/}" "$component" "$version"
+}
+
+image_repo_digest() {
+  local image="$1" repository="${1%:*}" repo_digest
+  repo_digest="$(docker image inspect "$image" --format '{{range .RepoDigests}}{{println .}}{{end}}' 2>/dev/null \
+    | awk -F@ -v repository="$repository" '$1 == repository {print $2; exit}')"
+  [[ -n "$repo_digest" ]] || die "Aucun RepoDigest trouvé pour $image."
+  printf '%s\n' "$repo_digest"
+}
+
+verify_image_digest() {
+  local image="$1" expected_digest="$2" actual_digest
+  actual_digest="$(image_repo_digest "$image")"
+  if [[ -n "$expected_digest" && "$actual_digest" != "$expected_digest" ]]; then
+    die "Digest refusé pour $image : attendu=$expected_digest obtenu=$actual_digest"
+  fi
+  printf '%s\n' "$actual_digest"
+}
+
 project_name() {
   local env="$1"
   env_value "$env" COMPOSE_PROJECT_NAME "wavy-$env"
@@ -64,12 +167,16 @@ project_name() {
 
 compose() {
   local env="$1"
-  local env_file_path compose_file_path
+  local env_file_path compose_file_path versions_file_path
+  local -a env_args
   env_file_path="$(env_file "$env")"
+  versions_file_path="$(versions_file "$env")"
   compose_file_path="$(compose_file "$env")"
   [[ -f "$compose_file_path" ]] || die "Fichier compose introuvable : $compose_file_path"
   [[ -f "$env_file_path" ]] || die "Fichier d'environnement introuvable : $env_file_path"
-  docker compose --env-file "$env_file_path" -p "$(project_name "$env")" -f "$compose_file_path" "${@:2}"
+  env_args=(--env-file "$env_file_path")
+  [[ ! -f "$versions_file_path" ]] || env_args+=(--env-file "$versions_file_path")
+  docker compose "${env_args[@]}" -p "$(project_name "$env")" -f "$compose_file_path" "${@:2}"
 }
 
 current_compose() {

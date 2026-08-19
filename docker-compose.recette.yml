@@ -149,6 +149,12 @@ services:
       SPRING_DATASOURCE_DRIVER_CLASS_NAME: org.postgresql.Driver
     ports:
       - "${WAVY_SOCLE_API_HOST_PORT:-28080}:8080"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
     depends_on:
       socle-postgres:
         condition: service_healthy
@@ -181,7 +187,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
-      start_period: 20s
+      start_period: 30s
     networks:
       - wavy-recette
 
@@ -204,6 +210,12 @@ services:
       - "${WAVY_CONTRATS_API_HOST_PORT:-28082}:8082"
     volumes:
       - contrats-pieces-jointes-recette:/app/data/contrats/pieces-jointes
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8082/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
     depends_on:
       contrats-postgres:
         condition: service_healthy
@@ -242,6 +254,12 @@ services:
       WAVY_CORS_ALLOWED_ORIGIN_PATTERNS: ${WAVY_CORS_ALLOWED_ORIGIN_PATTERNS:-}
     ports:
       - "${WAVY_FACTURES_API_HOST_PORT:-28083}:8083"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8083/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
     depends_on:
       factures-postgres:
         condition: service_healthy
@@ -252,9 +270,7 @@ services:
 
   wavy-tresorerie-api-recette:
     container_name: wavy-tresorerie-api-recette
-    build:
-      context: ../wavy-tresorerie-api
-      dockerfile: Dockerfile
+    image: ${WAVY_IMAGE_REGISTRY}/wavy-tresorerie-api:${TRESORERIE_API_VERSION}
     environment:
       SPRING_PROFILES_ACTIVE: ${WAVY_TRESORERIE_SPRING_PROFILES_ACTIVE:-recette}
       WAVY_TRESORERIE_DB_HOST: tresorerie-db-recette
@@ -268,6 +284,12 @@ services:
       WAVY_CORS_ALLOWED_ORIGIN_PATTERNS: ${WAVY_CORS_ALLOWED_ORIGIN_PATTERNS:-}
     ports:
       - "${WAVY_TRESORERIE_API_HOST_PORT:-28086}:8086"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8086/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
     depends_on:
       tresorerie-postgres:
         condition: service_healthy
@@ -294,6 +316,12 @@ services:
       WAVY_CORS_ALLOWED_ORIGIN_PATTERNS: ${WAVY_CORS_ALLOWED_ORIGIN_PATTERNS:-}
     ports:
       - "${WAVY_GATEWAY_HOST_PORT:-28088}:8088"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8088/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
     depends_on:
       wavy-socle-api-recette:
         condition: service_started
