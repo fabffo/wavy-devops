@@ -3,9 +3,7 @@ name: ${COMPOSE_PROJECT_NAME:-wavy-recette}
 services:
   wavy-erp-shell-recette:
     container_name: wavy-erp-shell-recette
-    build:
-      context: ../wavy-erp-shell
-      dockerfile: Dockerfile
+    image: ${WAVY_IMAGE_REGISTRY}/wavy-erp-shell:${ERP_SHELL_VERSION}
     ports:
       - "${WAVY_ERP_SHELL_HOST_PORT:-24207}:80"
     environment:
