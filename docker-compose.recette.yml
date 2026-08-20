@@ -376,11 +376,7 @@ services:
 
   wavy-factures-front-recette:
     container_name: wavy-factures-front-recette
-    build:
-      context: ../wavy-factures-front
-      dockerfile: Dockerfile
-      args:
-        API_GATEWAY_BASE_URL: /api
+    image: ${WAVY_IMAGE_REGISTRY}/wavy-factures-front:${FACTURES_FRONT_VERSION}
     ports:
       - "${WAVY_FACTURES_FRONT_HOST_PORT:-24203}:80"
     depends_on:

@@ -81,7 +81,7 @@ component_key() {
 deployment_mode() {
   local env="$1" component="$2"
   case "$env/$component" in
-    recette/tresorerie-api|recette/gateway|recette/tresorerie-front|recette/socle-front|recette/tiers-front|recette/contrats-front) printf 'IMAGE\n' ;;
+    recette/tresorerie-api|recette/gateway|recette/tresorerie-front|recette/socle-front|recette/tiers-front|recette/contrats-front|recette/factures-front) printf 'IMAGE\n' ;;
     *) printf 'SOURCE\n' ;;
   esac
 }
