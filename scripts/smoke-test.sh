@@ -34,7 +34,7 @@ services=(socle tiers contrats factures tresorerie gateway)
 labels=(Socle Tiers Contrats Factures Tresorerie Gateway)
 internal_ports=(8080 8081 8082 8083 8086 8088)
 paths=(
-  /api/socle/compteurs/ping
+  /actuator/health
   /api/tiers/referentiels/natures-personne
   /api/contrats
   /api/factures
@@ -127,7 +127,7 @@ is_json_array() {
 validate_response() {
   local service="$1"
   case "$service" in
-    socle) [[ "$response_body" == compteurs-ok ]] ;;
+    socle) [[ "$response_body" == *'"status":"UP"'* ]] ;;
     tiers) is_json_array && [[ "$response_body" == *'"SALARIE_INTERNE"'* ]] ;;
     contrats|factures|tresorerie) is_json_array ;;
     gateway)

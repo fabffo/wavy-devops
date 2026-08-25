@@ -127,9 +127,7 @@ services:
 
   wavy-socle-api-recette:
     container_name: wavy-socle-api-recette
-    build:
-      context: ../wavy-socle-api
-      dockerfile: Dockerfile
+    image: ${WAVY_IMAGE_REGISTRY}/wavy-socle-api:${SOCLE_API_VERSION}
     environment:
       SPRING_PROFILES_ACTIVE: ${WAVY_SOCLE_SPRING_PROFILES_ACTIVE:-local}
       WAVY_SOCLE_DB_HOST: socle-db-recette
