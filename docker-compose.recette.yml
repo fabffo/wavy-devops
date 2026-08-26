@@ -139,6 +139,8 @@ services:
       WAVY_SOCLE_DB_URL: jdbc:postgresql://socle-db-recette:5432/${WAVY_SOCLE_DB_NAME:-wavy_socle_db}
       WAVY_SOCLE_API_PORT: 8080
       WAVY_TIERS_API_URL: ${WAVY_TIERS_API_URL:-http://wavy-tiers-api-recette:8081}
+      WAVY_TIERS_SERVICE_USERNAME: ${WAVY_TIERS_SERVICE_USERNAME}
+      WAVY_TIERS_SERVICE_PASSWORD: ${WAVY_TIERS_SERVICE_PASSWORD}
       SPRING_DATASOURCE_URL: jdbc:postgresql://socle-db-recette:5432/${WAVY_SOCLE_DB_NAME:-wavy_socle_db}
       SPRING_DATASOURCE_USERNAME: ${WAVY_SOCLE_DB_USERNAME:-socle_user}
       SPRING_DATASOURCE_PASSWORD: ${WAVY_SOCLE_DB_PASSWORD:-motdepasse_recette}
@@ -161,11 +163,9 @@ services:
 
   wavy-tiers-api-recette:
     container_name: wavy-tiers-api-recette
-    build:
-      context: ../wavy-tiers-api
-      dockerfile: Dockerfile
+    image: ${WAVY_IMAGE_REGISTRY}/wavy-tiers-api:${TIERS_API_VERSION}
     environment:
-      SPRING_PROFILES_ACTIVE: ${WAVY_TIERS_SPRING_PROFILES_ACTIVE:-local}
+      SPRING_PROFILES_ACTIVE: ${WAVY_TIERS_SPRING_PROFILES_ACTIVE:-recette}
       WAVY_TIERS_DB_HOST: tiers-db-recette
       WAVY_TIERS_DB_PORT: 5432
       WAVY_TIERS_DB_NAME: ${WAVY_TIERS_DB_NAME:-wavy_tiers_db}
@@ -173,6 +173,8 @@ services:
       WAVY_TIERS_DB_USERNAME: ${WAVY_TIERS_DB_USER:-tiers_user}
       WAVY_TIERS_DB_PASSWORD: ${WAVY_TIERS_DB_PASSWORD:-motdepasse_recette}
       WAVY_TIERS_API_PORT: 8081
+      WAVY_TIERS_SERVICE_USERNAME: ${WAVY_TIERS_SERVICE_USERNAME}
+      WAVY_TIERS_SERVICE_PASSWORD: ${WAVY_TIERS_SERVICE_PASSWORD}
     ports:
       - "${WAVY_TIERS_API_HOST_PORT:-28081}:8081"
     depends_on:
