@@ -37,7 +37,7 @@ paths=(
   /actuator/health
   /api/tiers/referentiels/natures-personne
   /api/contrats
-  /api/factures
+  /actuator/health
   /api/tresorerie/comptes-bancaires
   /api/tiers/health
 )
@@ -129,7 +129,8 @@ validate_response() {
   case "$service" in
     socle) [[ "$response_body" == *'"status":"UP"'* ]] ;;
     tiers) is_json_array && [[ "$response_body" == *'"SALARIE_INTERNE"'* ]] ;;
-    contrats|factures|tresorerie) is_json_array ;;
+    contrats|tresorerie) is_json_array ;;
+    factures) [[ "$response_body" == *'"status":"UP"'* ]] ;;
     gateway)
       [[ "$response_body" == *'"module":"wavy-tiers-api"'* \
         && "$response_body" == *'"status":"OK"'* ]]

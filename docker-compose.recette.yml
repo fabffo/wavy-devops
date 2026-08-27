@@ -222,9 +222,7 @@ services:
 
   wavy-factures-api-recette:
     container_name: wavy-factures-api-recette
-    build:
-      context: ../wavy-factures-api
-      dockerfile: Dockerfile
+    image: ${WAVY_IMAGE_REGISTRY}/wavy-factures-api:${FACTURES_API_VERSION}
     environment:
       SPRING_PROFILES_ACTIVE: ${WAVY_FACTURES_SPRING_PROFILES_ACTIVE:-recette}
       WAVY_FACTURES_DB_HOST: factures-db-recette
