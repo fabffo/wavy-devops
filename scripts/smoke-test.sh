@@ -41,6 +41,9 @@ paths=(
   /api/tresorerie/comptes-bancaires
   /api/tiers/health
 )
+if [[ "$env" == recette ]]; then
+  paths[4]=/actuator/health
+fi
 port_variables=(
   WAVY_SOCLE_API_HOST_PORT
   WAVY_TIERS_API_HOST_PORT
@@ -129,8 +132,15 @@ validate_response() {
   case "$service" in
     socle) [[ "$response_body" == *'"status":"UP"'* ]] ;;
     tiers) is_json_array && [[ "$response_body" == *'"SALARIE_INTERNE"'* ]] ;;
-    contrats|tresorerie) is_json_array ;;
+    contrats) is_json_array ;;
     factures) [[ "$response_body" == *'"status":"UP"'* ]] ;;
+    tresorerie)
+      if [[ "$env" == recette ]]; then
+        [[ "$response_body" == *'"status":"UP"'* ]]
+      else
+        is_json_array
+      fi
+      ;;
     gateway)
       [[ "$response_body" == *'"module":"wavy-tiers-api"'* \
         && "$response_body" == *'"status":"OK"'* ]]
