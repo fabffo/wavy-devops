@@ -42,6 +42,7 @@ paths=(
   /api/tiers/health
 )
 if [[ "$env" == recette ]]; then
+  paths[2]=/actuator/health
   paths[4]=/actuator/health
 fi
 port_variables=(
@@ -124,6 +125,10 @@ fetch_service() {
     response_body="$(curl -fsS --max-time 10 "$url")" || return 1
     return
   fi
+  if [[ "$env" == recette && "${services[$index]}" == contrats && "${paths[$index]}" == /actuator/health ]]; then
+    response_body="$(curl -fsS --max-time 10 "$url")" || return 1
+    return
+  fi
   fetch_from_host "$url"
 }
 
@@ -136,7 +141,13 @@ validate_response() {
   case "$service" in
     socle) [[ "$response_body" == *'"status":"UP"'* ]] ;;
     tiers) is_json_array && [[ "$response_body" == *'"SALARIE_INTERNE"'* ]] ;;
-    contrats) is_json_array ;;
+    contrats)
+      if [[ "$env" == recette ]]; then
+        [[ "$response_body" == *'"status":"UP"'* ]]
+      else
+        is_json_array
+      fi
+      ;;
     factures) [[ "$response_body" == *'"status":"UP"'* ]] ;;
     tresorerie)
       if [[ "$env" == recette ]]; then

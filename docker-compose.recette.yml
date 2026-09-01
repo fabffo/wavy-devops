@@ -191,9 +191,7 @@ services:
 
   wavy-contrats-api-recette:
     container_name: wavy-contrats-api-recette
-    build:
-      context: ../wavy-contrats-api
-      dockerfile: Dockerfile
+    image: ${WAVY_IMAGE_REGISTRY}/wavy-contrats-api:${CONTRATS_API_VERSION}
     environment:
       SPRING_PROFILES_ACTIVE: ${WAVY_CONTRATS_SPRING_PROFILES_ACTIVE:-recette}
       WAVY_CONTRATS_DB_HOST: contrats-db-recette
