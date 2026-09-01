@@ -307,7 +307,7 @@ services:
       WAVY_CONTRATS_API_URI: http://wavy-contrats-api-recette:8082
       WAVY_FACTURES_API_URL: http://wavy-factures-api-recette:8083
       WAVY_TRESORERIE_API_URL: http://wavy-tresorerie-api-recette:8086
-      WAVY_CORS_ALLOWED_ORIGIN_PATTERNS: ${WAVY_CORS_ALLOWED_ORIGIN_PATTERNS:-}
+      WAVY_CORS_ALLOWED_ORIGIN_PATTERNS: ${WAVY_GATEWAY_CORS_ALLOWED_ORIGIN_PATTERNS:-}
     ports:
       - "${WAVY_GATEWAY_HOST_PORT:-28088}:8088"
     healthcheck:

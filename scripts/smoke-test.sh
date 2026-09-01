@@ -120,6 +120,10 @@ fetch_service() {
     host_port="$(env_value "$env" "${port_variables[$index]}" "${default_host_ports_recette[$index]}")"
   fi
   url="http://localhost:${host_port}${paths[$index]}"
+  if [[ "$env" == recette && "${services[$index]}" == socle && "${paths[$index]}" == /actuator/health ]]; then
+    response_body="$(curl -fsS --max-time 10 "$url")" || return 1
+    return
+  fi
   fetch_from_host "$url"
 }
 
