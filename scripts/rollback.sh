@@ -6,11 +6,17 @@ source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/_common.sh"
 
 usage() {
   cat >&2 <<EOF
-Usage : $0 <local|recette> <composant> <commit-ou-version-cible> [--yes]
+Usage : $0 <local|recette|preprod> <composant> <commit-ou-version-cible> [--yes]
 
 En mode SOURCE, la cible est un commit Git. En mode IMAGE, la cible est un tag versionné.
 EOF
 }
+
+# Chemin PREPROD isolé : les comportements LOCAL/RECETTE sont conservés.
+if [[ "${1:-}" == preprod ]]; then
+  shift
+  exec "$SCRIPT_DIR/release-preprod.sh" ROLLBACK "$@"
+fi
 
 started_at="$(date -Is)"
 result=KO
@@ -57,7 +63,6 @@ if [[ "$#" -eq 4 ]]; then
 fi
 case "$env" in
   local|recette) ;;
-  preprod) die "Le rollback préproduction reste volontairement désactivé pendant cette étape." ;;
   *) usage; die "Environnement invalide : $env" ;;
 esac
 case "$component" in

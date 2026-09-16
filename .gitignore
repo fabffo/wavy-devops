@@ -10,3 +10,7 @@ backups/
 !.env.local.example
 !.env.recette.example
 !.env.preprod.example
+
+# Journaux et verrous PREPROD produits uniquement sur la VM
+deployments/preprod*.tsv
+deployments/preprod.lock

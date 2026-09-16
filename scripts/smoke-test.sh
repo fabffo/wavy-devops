@@ -80,31 +80,16 @@ fetch_from_host() {
 fetch_from_preprod() {
   local service="$1" port="$2" path="$3" container output
   container="wavy-${service}-api-preprod"
-  [[ "$service" == gateway ]] && container=wavy-gateway-preprod
-
-  if [[ "$service" == socle ]]; then
-    local -a curl_args=(
-      -fsS --max-time 10
-      -H "X-Tenant-Id: $tenant_id"
-      -H "X-Utilisateur-Id: $user_id"
-      -H "X-Societe-Courante-Id: $company_id"
-    )
-    if [[ -n "$smoke_user" && -n "$smoke_password" ]]; then
-      curl_args+=(-u "$smoke_user:$smoke_password")
-    fi
-    output="$(docker exec "$container" curl "${curl_args[@]}" "http://localhost:${port}${path}")" || return 1
-  else
-    local -a wget_args=(
-      -qO- -T 10
-      --header="X-Tenant-Id: $tenant_id"
-      --header="X-Utilisateur-Id: $user_id"
-      --header="X-Societe-Courante-Id: $company_id"
-    )
-    if [[ -n "$smoke_user" && -n "$smoke_password" ]]; then
-      wget_args+=(--user="$smoke_user" --password="$smoke_password")
-    fi
-    output="$(docker exec "$container" wget "${wget_args[@]}" "http://localhost:${port}${path}")" || return 1
+  [[ "$service" != gateway ]] || container=wavy-gateway-preprod
+  # Curl installé dans Socle ; évite les options Basic absentes du wget BusyBox.
+  local -a args=(-fsS --max-time 10
+    -H "X-Tenant-Id: $tenant_id"
+    -H "X-Utilisateur-Id: $user_id"
+    -H "X-Societe-Courante-Id: $company_id")
+  if [[ -n "$smoke_user" && -n "$smoke_password" ]]; then
+    args+=(-u "$smoke_user:$smoke_password")
   fi
+  output="$(docker exec wavy-socle-api-preprod curl "${args[@]}" "http://${container}:${port}${path}")" || return 1
   response_body="$output"
 }
 
@@ -174,7 +159,7 @@ needs_context() {
 needs_preprod_auth() {
   [[ "$env" == preprod ]] || return 1
   case "$1" in
-    socle|contrats) return 0 ;;
+    contrats|tresorerie) return 0 ;;
     *) return 1 ;;
   esac
 }

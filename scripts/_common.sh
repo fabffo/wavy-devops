@@ -81,6 +81,7 @@ component_key() {
 deployment_mode() {
   local env="$1" component="$2"
   case "$env/$component" in
+    preprod/*) printf 'IMAGE\n' ;;
     recette/socle-api|recette/tiers-api|recette/contrats-api|recette/factures-api|recette/tresorerie-api|recette/gateway|recette/tresorerie-front|recette/socle-front|recette/tiers-front|recette/contrats-front|recette/factures-front|recette/pwa|recette/erp-shell) printf 'IMAGE\n' ;;
     *) printf 'SOURCE\n' ;;
   esac
@@ -167,6 +168,10 @@ project_name() {
 
 compose() {
   local env="$1"
+  if [[ "$env" == preprod ]]; then
+    python3 "$SCRIPT_DIR/preprod_config.py" compose "$ROOT_DIR/.env.preprod" "${@:2}"
+    return
+  fi
   local env_file_path compose_file_path versions_file_path
   local -a env_args
   env_file_path="$(env_file "$env")"
@@ -249,6 +254,11 @@ env_value() {
   local default_value="$3"
   local file value
   file="$(env_file "$env")"
+  if [[ "$env" == preprod ]]; then
+    value="$(python3 "$SCRIPT_DIR/preprod_config.py" value "$file" "$key")"
+    printf '%s\n' "${value:-$default_value}"
+    return
+  fi
   value="$(awk -F= -v key="$key" '$1 == key { value=$0; sub(/^[^=]*=/, "", value); print value }' "$file" 2>/dev/null | tail -n 1)"
   printf '%s\n' "${value:-$default_value}"
 }
@@ -264,6 +274,10 @@ restart_service() {
   local env="${2:-$(env_name)}"
   local service
   service="$(service_name "$logical" "$env")"
+  if [[ "$env" == preprod ]]; then
+    "$SCRIPT_DIR/deploy.sh" preprod "$logical"
+    return
+  fi
   require_docker
   info "Reconstruction de l'image $service ($env)..."
   compose "$env" build "$service"

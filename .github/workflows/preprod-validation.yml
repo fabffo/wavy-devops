@@ -3,9 +3,12 @@ name: Preproduction validation
 on:
   push:
     paths:
-      - docker-compose.preprod.yml
+      - docker-compose.preprod*.yml
       - .env.preprod.example
+      - versions/preprod.*
+      - versions/history/preprod/**
       - scripts/**
+      - wavy
       - .github/workflows/preprod-validation.yml
   pull_request:
   workflow_dispatch:
@@ -18,14 +21,21 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Validate shell scripts
-        run: bash -n wavy scripts/*.sh
-      - name: Validate Compose rendering
-        run: docker compose --env-file .env.preprod.example -f docker-compose.preprod.yml config --quiet
-      - name: Reject mutable image tags and published database ports
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate every shell script
         run: |
-          ! grep -Eq 'image:.*:latest([[:space:]]|$)' docker-compose.preprod.yml
-          ! sed -n '/^[[:space:]]*[a-z]*-postgres:/,/^[[:space:]]*[^[:space:]].*:/p' docker-compose.preprod.yml | grep -q 'ports:'
-      - name: Check tracked files for obvious secrets
+          bash -n wavy
+          for script in scripts/*.sh; do bash -n "$script"; done
+      - name: Static PREPROD tests with fictional secrets outside repository
         run: |
-          ! git grep -I -E '(PASSWORD|SECRET|API_KEY)="?[^$[:space:]"{]' -- ':!*.example' ':!dev/**' ':!README*'
+          python3 scripts/test-preprod-config.py
+          python3 scripts/test-preprod-guards.py
+      - name: Version history tests (temporary directory only)
+        run: bash scripts/test-version-history.sh
+      - name: Reject tracked PREPROD secrets and whitespace errors
+        run: |
+          test -z "$(git ls-files -- .env.preprod backups/preprod)"
+          git check-ignore .env.preprod
+          git diff --check

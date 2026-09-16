@@ -12,10 +12,13 @@ jamais le mode d'un tag présent dans le cache Docker.
 - **SOURCE** est transitoire. Le script conserve le build depuis le
   `build.context` Compose et le contrôle du dépôt Git local.
 
-À ce stade, seul `recette/tresorerie-api` est en mode IMAGE. Les douze autres
-composants et tous les composants locaux restent en mode SOURCE. PREPROD reste
-désactivée dans les scripts : la logique commune sait charger ses deux manifests
-mais aucune bascule ni aucun déploiement PREPROD n'est réalisé.
+LOCAL conserve le mode SOURCE. Les treize composants RECETTE sont déjà en
+mode IMAGE. PREPROD possède désormais un chemin IMAGE contrôlé distinct, dans
+`release-preprod.sh`, appelé par deploy/rollback. Aucun déploiement n’est effectué
+pendant cette préparation. Le [guide PREPROD](../README_PREPROD.md) décrit le
+provisionnement initial séparé, les secrets, le tunnel HTTP puis HTTPS, les
+backups chiffrés et le journal PREPROD. Les sections RECETTE ci-dessous décrivent
+ses conventions ; ses fichiers de configuration et son comportement sont conservés.
 
 ## Configuration et secrets
 
@@ -79,7 +82,7 @@ jamais être écrit dans Git, un manifest, une commande historisée ou les logs.
 ## Déploiement SOURCE
 
 ```bash
-./scripts/deploy.sh recette factures-api
+./scripts/deploy.sh local factures-api
 ```
 
 Le dépôt source doit être propre, sauf utilisation explicite de
@@ -109,7 +112,7 @@ Pour un composant SOURCE, la cible reste un commit Git et le mécanisme worktree
 temporaire reste disponible :
 
 ```bash
-./scripts/rollback.sh recette factures-api <commit>
+./scripts/rollback.sh local factures-api <commit>
 ```
 
 Pour un composant IMAGE, la cible est un tag explicite :

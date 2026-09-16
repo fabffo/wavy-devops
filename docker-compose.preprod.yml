@@ -7,11 +7,30 @@ x-api: &api
   tmpfs: [/tmp]
   networks: [wavy-preprod]
   healthcheck: &api-health
-    test: [CMD-SHELL, "port=$$(printf '%04X' \"$${SERVER_PORT}\"); grep -qi \":$${port} \" /proc/net/tcp /proc/net/tcp6"]
-    interval: 15s
+    test: ["CMD", "wget", "-qO-", "http://localhost:8080/actuator/health"]
+    interval: 10s
     timeout: 5s
-    retries: 12
-    start_period: 45s
+    retries: 10
+    start_period: 30s
+
+x-backend-environment: &backend-environment
+  SPRING_JPA_HIBERNATE_DDL_AUTO: validate
+  SPRING_JPA_SHOW_SQL: "false"
+  SERVER_SHUTDOWN: graceful
+  SPRING_LIFECYCLE_TIMEOUT_PER_SHUTDOWN_PHASE: 45s
+  SPRINGDOC_API_DOCS_ENABLED: "false"
+  SPRINGDOC_SWAGGER_UI_ENABLED: "false"
+  SERVER_SERVLET_SESSION_COOKIE_HTTP_ONLY: "true"
+  SERVER_SERVLET_SESSION_COOKIE_SECURE: ${WAVY_COOKIE_SECURE:?required}
+  SERVER_SERVLET_SESSION_COOKIE_SAME_SITE: Strict
+  SPRING_SQL_INIT_MODE: never
+  SPRING_FLYWAY_ENABLED: "true"
+  SPRING_FLYWAY_VALIDATE_ON_MIGRATE: "true"
+  SPRING_FLYWAY_CLEAN_DISABLED: "true"
+  MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: health,info
+  MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS: never
+  WAVY_CORS_ALLOWED_ORIGIN_PATTERNS: ${WAVY_CORS_ALLOWED_ORIGIN_PATTERNS:?required}
+  WAVY_SOCLE_API_URL: http://wavy-socle-api-preprod:8080
 
 x-front: &front
   restart: unless-stopped
@@ -25,7 +44,7 @@ x-front: &front
 
 services:
   socle-postgres:
-    image: postgres:16-alpine
+    image: postgres:16-alpine@sha256:93d55776e04376e19adb2733e3ccebb4392ee7dd86d8ff238503b30fe719c84f
     container_name: socle-db-preprod
     restart: unless-stopped
     environment:
@@ -36,7 +55,7 @@ services:
     healthcheck: {test: [CMD-SHELL, "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"], interval: 10s, timeout: 5s, retries: 12}
     networks: [wavy-preprod]
   tiers-postgres:
-    image: postgres:16-alpine
+    image: postgres:16-alpine@sha256:93d55776e04376e19adb2733e3ccebb4392ee7dd86d8ff238503b30fe719c84f
     container_name: tiers-db-preprod
     restart: unless-stopped
     environment: {POSTGRES_DB: "${WAVY_TIERS_DB_NAME:?required}", POSTGRES_USER: "${WAVY_TIERS_DB_USER:?required}", POSTGRES_PASSWORD: "${WAVY_TIERS_DB_PASSWORD:?required}"}
@@ -44,7 +63,7 @@ services:
     healthcheck: {test: [CMD-SHELL, "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"], interval: 10s, timeout: 5s, retries: 12}
     networks: [wavy-preprod]
   contrats-postgres:
-    image: postgres:16-alpine
+    image: postgres:16-alpine@sha256:93d55776e04376e19adb2733e3ccebb4392ee7dd86d8ff238503b30fe719c84f
     container_name: contrats-db-preprod
     restart: unless-stopped
     environment: {POSTGRES_DB: "${WAVY_CONTRATS_DB_NAME:?required}", POSTGRES_USER: "${WAVY_CONTRATS_DB_USER:?required}", POSTGRES_PASSWORD: "${WAVY_CONTRATS_DB_PASSWORD:?required}"}
@@ -52,7 +71,7 @@ services:
     healthcheck: {test: [CMD-SHELL, "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"], interval: 10s, timeout: 5s, retries: 12}
     networks: [wavy-preprod]
   factures-postgres:
-    image: postgres:16-alpine
+    image: postgres:16-alpine@sha256:93d55776e04376e19adb2733e3ccebb4392ee7dd86d8ff238503b30fe719c84f
     container_name: factures-db-preprod
     restart: unless-stopped
     environment: {POSTGRES_DB: "${WAVY_FACTURES_DB_NAME:?required}", POSTGRES_USER: "${WAVY_FACTURES_DB_USER:?required}", POSTGRES_PASSWORD: "${WAVY_FACTURES_DB_PASSWORD:?required}"}
@@ -60,7 +79,7 @@ services:
     healthcheck: {test: [CMD-SHELL, "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"], interval: 10s, timeout: 5s, retries: 12}
     networks: [wavy-preprod]
   tresorerie-postgres:
-    image: postgres:16-alpine
+    image: postgres:16-alpine@sha256:93d55776e04376e19adb2733e3ccebb4392ee7dd86d8ff238503b30fe719c84f
     container_name: tresorerie-db-preprod
     restart: unless-stopped
     environment: {POSTGRES_DB: "${WAVY_TRESORERIE_DB_NAME:?required}", POSTGRES_USER: "${WAVY_TRESORERIE_DB_USER:?required}", POSTGRES_PASSWORD: "${WAVY_TRESORERIE_DB_PASSWORD:?required}"}
@@ -70,15 +89,22 @@ services:
 
   wavy-socle-api-preprod:
     <<: *api
-    image: ${WAVY_IMAGE_REGISTRY:?required}/wavy-socle-api:${WAVY_IMAGE_TAG:?required}
+    image: ${WAVY_IMAGE_REGISTRY:?required}/wavy-socle-api:${SOCLE_API_VERSION:?required}
     container_name: wavy-socle-api-preprod
+    healthcheck:
+      <<: *api-health
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/actuator/health"]
     environment:
+      <<: *backend-environment
       SERVER_PORT: 8080
       SPRING_PROFILES_ACTIVE: preprod,secure
       SPRING_DATASOURCE_URL: jdbc:postgresql://socle-postgres:5432/${WAVY_SOCLE_DB_NAME}
       SPRING_DATASOURCE_USERNAME: ${WAVY_SOCLE_DB_USERNAME}
       SPRING_DATASOURCE_PASSWORD: ${WAVY_SOCLE_DB_PASSWORD}
       WAVY_TIERS_API_URL: http://wavy-tiers-api-preprod:8081
+      WAVY_TIERS_SERVICE_USERNAME: ${WAVY_TIERS_SERVICE_USERNAME:-}
+      WAVY_TIERS_SERVICE_PASSWORD: ${WAVY_TIERS_SERVICE_PASSWORD:-}
+      WAVY_BOOTSTRAP_ENABLED: ${WAVY_BOOTSTRAP_ENABLED:-false}
       WAVY_BOOTSTRAP_TENANT_CODE: ${WAVY_BOOTSTRAP_TENANT_CODE:?required}
       WAVY_BOOTSTRAP_TENANT_NAME: ${WAVY_BOOTSTRAP_TENANT_NAME:?required}
       WAVY_BOOTSTRAP_COMPANY_NAME: ${WAVY_BOOTSTRAP_COMPANY_NAME:?required}
@@ -88,42 +114,55 @@ services:
     depends_on: {socle-postgres: {condition: service_healthy}}
   wavy-tiers-api-preprod:
     <<: *api
-    image: ${WAVY_IMAGE_REGISTRY:?required}/wavy-tiers-api:${WAVY_IMAGE_TAG:?required}
+    image: ${WAVY_IMAGE_REGISTRY:?required}/wavy-tiers-api:${TIERS_API_VERSION:?required}
     container_name: wavy-tiers-api-preprod
-    environment: {SERVER_PORT: 8081, SPRING_PROFILES_ACTIVE: "preprod,secure", SPRING_DATASOURCE_URL: "jdbc:postgresql://tiers-postgres:5432/${WAVY_TIERS_DB_NAME}", SPRING_DATASOURCE_USERNAME: "${WAVY_TIERS_DB_USER}", SPRING_DATASOURCE_PASSWORD: "${WAVY_TIERS_DB_PASSWORD}"}
+    healthcheck:
+      <<: *api-health
+      test: ["CMD", "wget", "-qO-", "http://localhost:8081/actuator/health"]
+    environment: {<<: *backend-environment, WAVY_TIERS_SERVICE_USERNAME: "${WAVY_TIERS_SERVICE_USERNAME:-}", WAVY_TIERS_SERVICE_PASSWORD: "${WAVY_TIERS_SERVICE_PASSWORD:-}", SERVER_PORT: 8081, SPRING_PROFILES_ACTIVE: "preprod,secure", SPRING_DATASOURCE_URL: "jdbc:postgresql://tiers-postgres:5432/${WAVY_TIERS_DB_NAME}", SPRING_DATASOURCE_USERNAME: "${WAVY_TIERS_DB_USER}", SPRING_DATASOURCE_PASSWORD: "${WAVY_TIERS_DB_PASSWORD}"}
     depends_on: {tiers-postgres: {condition: service_healthy}}
   wavy-contrats-api-preprod:
     <<: *api
-    image: ${WAVY_IMAGE_REGISTRY:?required}/wavy-contrats-api:${WAVY_IMAGE_TAG:?required}
+    image: ${WAVY_IMAGE_REGISTRY:?required}/wavy-contrats-api:${CONTRATS_API_VERSION:?required}
     container_name: wavy-contrats-api-preprod
-    environment: {SERVER_PORT: 8082, SPRING_PROFILES_ACTIVE: "preprod,secure", SPRING_DATASOURCE_URL: "jdbc:postgresql://contrats-postgres:5432/${WAVY_CONTRATS_DB_NAME}", SPRING_DATASOURCE_USERNAME: "${WAVY_CONTRATS_DB_USER}", SPRING_DATASOURCE_PASSWORD: "${WAVY_CONTRATS_DB_PASSWORD}", WAVY_CONTRATS_STOCKAGE_PIECES_JOINTES: /app/data/contrats}
+    healthcheck:
+      <<: *api-health
+      test: ["CMD", "wget", "-qO-", "http://localhost:8082/actuator/health"]
+    environment: {<<: *backend-environment, SERVER_PORT: 8082, SPRING_PROFILES_ACTIVE: "preprod,secure", SPRING_DATASOURCE_URL: "jdbc:postgresql://contrats-postgres:5432/${WAVY_CONTRATS_DB_NAME}", SPRING_DATASOURCE_USERNAME: "${WAVY_CONTRATS_DB_USER}", SPRING_DATASOURCE_PASSWORD: "${WAVY_CONTRATS_DB_PASSWORD}", WAVY_CONTRATS_STOCKAGE_PIECES_JOINTES: /app/data/contrats}
     volumes: [documents-preprod:/app/data]
     depends_on: {contrats-postgres: {condition: service_healthy}}
   wavy-factures-api-preprod:
     <<: *api
-    image: ${WAVY_IMAGE_REGISTRY:?required}/wavy-factures-api:${WAVY_IMAGE_TAG:?required}
+    image: ${WAVY_IMAGE_REGISTRY:?required}/wavy-factures-api:${FACTURES_API_VERSION:?required}
     container_name: wavy-factures-api-preprod
-    environment: {SERVER_PORT: 8083, SPRING_PROFILES_ACTIVE: "preprod,secure", SPRING_DATASOURCE_URL: "jdbc:postgresql://factures-postgres:5432/${WAVY_FACTURES_DB_NAME}", SPRING_DATASOURCE_USERNAME: "${WAVY_FACTURES_DB_USER}", SPRING_DATASOURCE_PASSWORD: "${WAVY_FACTURES_DB_PASSWORD}", WAVY_SOCLE_API_URL: "http://wavy-socle-api-preprod:8080", WAVY_TIERS_API_URL: "http://wavy-tiers-api-preprod:8081", WAVY_CONTRATS_API_URL: "http://wavy-contrats-api-preprod:8082", WAVY_AI_PROVIDER: "${WAVY_AI_PROVIDER:-anthropic}", WAVY_AI_MODEL: "${WAVY_AI_MODEL:-}", WAVY_AI_API_KEY: "${WAVY_AI_API_KEY:-}"}
-    volumes: [documents-preprod:/app/data]
+    healthcheck:
+      <<: *api-health
+      test: ["CMD", "wget", "-qO-", "http://localhost:8083/actuator/health"]
+    environment: {<<: *backend-environment, SERVER_PORT: 8083, SPRING_PROFILES_ACTIVE: "preprod,secure", SPRING_DATASOURCE_URL: "jdbc:postgresql://factures-postgres:5432/${WAVY_FACTURES_DB_NAME}", SPRING_DATASOURCE_USERNAME: "${WAVY_FACTURES_DB_USER}", SPRING_DATASOURCE_PASSWORD: "${WAVY_FACTURES_DB_PASSWORD}", WAVY_SOCLE_API_URL: "http://wavy-socle-api-preprod:8080", WAVY_TIERS_API_URL: "http://wavy-tiers-api-preprod:8081", WAVY_CONTRATS_API_URL: "http://wavy-contrats-api-preprod:8082", WAVY_AI_PROVIDER: "${WAVY_AI_PROVIDER:-}", WAVY_AI_MODEL: "${WAVY_AI_MODEL:-}", WAVY_AI_API_KEY: "${WAVY_AI_API_KEY:-}"}
     depends_on: {factures-postgres: {condition: service_healthy}}
   wavy-tresorerie-api-preprod:
     <<: *api
-    image: ${WAVY_IMAGE_REGISTRY:?required}/wavy-tresorerie-api:${WAVY_IMAGE_TAG:?required}
+    image: ${WAVY_IMAGE_REGISTRY:?required}/wavy-tresorerie-api:${TRESORERIE_API_VERSION:?required}
     container_name: wavy-tresorerie-api-preprod
-    environment: {SERVER_PORT: 8086, SPRING_PROFILES_ACTIVE: "preprod,secure", SPRING_DATASOURCE_URL: "jdbc:postgresql://tresorerie-postgres:5432/${WAVY_TRESORERIE_DB_NAME}", SPRING_DATASOURCE_USERNAME: "${WAVY_TRESORERIE_DB_USER}", SPRING_DATASOURCE_PASSWORD: "${WAVY_TRESORERIE_DB_PASSWORD}", WAVY_FACTURES_API_URL: "http://wavy-factures-api-preprod:8083", WAVY_TIERS_API_URL: "http://wavy-tiers-api-preprod:8081"}
-    volumes: [documents-preprod:/app/data]
+    healthcheck:
+      <<: *api-health
+      test: ["CMD", "wget", "-qO-", "http://localhost:8086/actuator/health"]
+    environment: {<<: *backend-environment, SERVER_PORT: 8086, SPRING_PROFILES_ACTIVE: "preprod,secure", SPRING_DATASOURCE_URL: "jdbc:postgresql://tresorerie-postgres:5432/${WAVY_TRESORERIE_DB_NAME}", SPRING_DATASOURCE_USERNAME: "${WAVY_TRESORERIE_DB_USER}", SPRING_DATASOURCE_PASSWORD: "${WAVY_TRESORERIE_DB_PASSWORD}", WAVY_FACTURES_API_URL: "http://wavy-factures-api-preprod:8083", WAVY_TIERS_API_URL: "http://wavy-tiers-api-preprod:8081"}
     depends_on: {tresorerie-postgres: {condition: service_healthy}}
 
   wavy-gateway-preprod:
     <<: *api
-    image: ${WAVY_IMAGE_REGISTRY:?required}/wavy-gateway:${WAVY_IMAGE_TAG:?required}
+    image: ${WAVY_IMAGE_REGISTRY:?required}/wavy-gateway:${GATEWAY_VERSION:?required}
     container_name: wavy-gateway-preprod
-    environment: {SERVER_PORT: 8088, SPRING_PROFILES_ACTIVE: "preprod,secure", WAVY_ROUTES_SOCLE_URI: "http://wavy-socle-api-preprod:8080", WAVY_TIERS_API_URI: "http://wavy-tiers-api-preprod:8081", WAVY_CONTRATS_API_URI: "http://wavy-contrats-api-preprod:8082", WAVY_FACTURES_API_URL: "http://wavy-factures-api-preprod:8083", WAVY_TRESORERIE_API_URL: "http://wavy-tresorerie-api-preprod:8086", WAVY_CORS_ALLOWED_ORIGIN_PATTERNS: "${WAVY_CORS_ALLOWED_ORIGIN_PATTERNS:?required}", WAVY_SESSION_SECRET: "${WAVY_SESSION_SECRET:?required}", SERVER_SERVLET_SESSION_COOKIE_HTTP_ONLY: "true", SERVER_SERVLET_SESSION_COOKIE_SECURE: "true", SERVER_SERVLET_SESSION_COOKIE_SAME_SITE: Strict}
+    healthcheck:
+      <<: *api-health
+      test: ["CMD", "wget", "-qO-", "http://localhost:8088/actuator/health"]
+    environment: {<<: *backend-environment, SERVER_PORT: 8088, SPRING_PROFILES_ACTIVE: "preprod,secure", WAVY_ROUTES_SOCLE_URI: "http://wavy-socle-api-preprod:8080", WAVY_TIERS_API_URI: "http://wavy-tiers-api-preprod:8081", WAVY_CONTRATS_API_URI: "http://wavy-contrats-api-preprod:8082", WAVY_FACTURES_API_URL: "http://wavy-factures-api-preprod:8083", WAVY_TRESORERIE_API_URL: "http://wavy-tresorerie-api-preprod:8086", WAVY_CORS_ALLOWED_ORIGIN_PATTERNS: "${WAVY_CORS_ALLOWED_ORIGIN_PATTERNS:?required}", WAVY_SESSION_SECRET: "${WAVY_SESSION_SECRET:?required}"}
     depends_on: {wavy-socle-api-preprod: {condition: service_healthy}, wavy-tiers-api-preprod: {condition: service_healthy}, wavy-contrats-api-preprod: {condition: service_healthy}, wavy-factures-api-preprod: {condition: service_healthy}, wavy-tresorerie-api-preprod: {condition: service_healthy}}
 
   wavy-socle-front-preprod:
     <<: *front
-    image: ${WAVY_IMAGE_REGISTRY:?required}/wavy-socle-front:${WAVY_IMAGE_TAG:?required}
+    image: ${WAVY_IMAGE_REGISTRY:?required}/wavy-socle-front:${SOCLE_FRONT_VERSION:?required}
     container_name: wavy-socle-front-preprod
     environment:
       NGINX_ENVSUBST_FILTER: _UPSTREAM$
@@ -131,17 +170,17 @@ services:
       SOCLE_API_UPSTREAM: http://wavy-socle-api-preprod:8080
     depends_on:
       wavy-gateway-preprod: {condition: service_healthy}
-  wavy-tiers-front-preprod: {<<: *front, image: "${WAVY_IMAGE_REGISTRY:?required}/wavy-tiers-front:${WAVY_IMAGE_TAG:?required}", container_name: wavy-tiers-front-preprod}
-  wavy-contrats-front-preprod: {<<: *front, image: "${WAVY_IMAGE_REGISTRY:?required}/wavy-contrats-front:${WAVY_IMAGE_TAG:?required}", container_name: wavy-contrats-front-preprod}
-  wavy-factures-front-preprod: {<<: *front, image: "${WAVY_IMAGE_REGISTRY:?required}/wavy-factures-front:${WAVY_IMAGE_TAG:?required}", container_name: wavy-factures-front-preprod}
-  wavy-tresorerie-front-preprod: {<<: *front, image: "${WAVY_IMAGE_REGISTRY:?required}/wavy-tresorerie-front:${WAVY_IMAGE_TAG:?required}", container_name: wavy-tresorerie-front-preprod}
-  wavy-pwa-preprod: {<<: *front, image: "${WAVY_IMAGE_REGISTRY:?required}/wavy-pwa:${WAVY_IMAGE_TAG:?required}", container_name: wavy-pwa-preprod}
+  wavy-tiers-front-preprod: {<<: *front, image: "${WAVY_IMAGE_REGISTRY:?required}/wavy-tiers-front:${TIERS_FRONT_VERSION:?required}", container_name: wavy-tiers-front-preprod}
+  wavy-contrats-front-preprod: {<<: *front, image: "${WAVY_IMAGE_REGISTRY:?required}/wavy-contrats-front:${CONTRATS_FRONT_VERSION:?required}", container_name: wavy-contrats-front-preprod}
+  wavy-factures-front-preprod: {<<: *front, image: "${WAVY_IMAGE_REGISTRY:?required}/wavy-factures-front:${FACTURES_FRONT_VERSION:?required}", container_name: wavy-factures-front-preprod}
+  wavy-tresorerie-front-preprod: {<<: *front, image: "${WAVY_IMAGE_REGISTRY:?required}/wavy-tresorerie-front:${TRESORERIE_FRONT_VERSION:?required}", container_name: wavy-tresorerie-front-preprod}
+  wavy-pwa-preprod: {<<: *front, image: "${WAVY_IMAGE_REGISTRY:?required}/wavy-pwa:${PWA_VERSION:?required}", container_name: wavy-pwa-preprod}
   wavy-erp-shell-preprod:
     <<: *front
-    image: ${WAVY_IMAGE_REGISTRY:?required}/wavy-erp-shell:${WAVY_IMAGE_TAG:?required}
+    image: ${WAVY_IMAGE_REGISTRY:?required}/wavy-erp-shell:${ERP_SHELL_VERSION:?required}
     container_name: wavy-erp-shell-preprod
-    ports: ["127.0.0.1:${WAVY_PUBLIC_HTTPS_PORT:-24443}:80"]
-    environment: {API_UPSTREAM: "http://wavy-gateway-preprod:8088", SOCLE_FRONT_UPSTREAM: "http://wavy-socle-front-preprod", TIERS_FRONT_UPSTREAM: "http://wavy-tiers-front-preprod", CONTRATS_FRONT_UPSTREAM: "http://wavy-contrats-front-preprod", FACTURES_FRONT_UPSTREAM: "http://wavy-factures-front-preprod", TRESORERIE_FRONT_UPSTREAM: "http://wavy-tresorerie-front-preprod"}
+    ports: ["127.0.0.1:${WAVY_PUBLIC_HTTP_PORT:-24443}:80"]
+    environment: {NGINX_ENVSUBST_FILTER: "_UPSTREAM$", API_UPSTREAM: "http://wavy-gateway-preprod:8088", SOCLE_FRONT_UPSTREAM: "http://wavy-socle-front-preprod/", TIERS_FRONT_UPSTREAM: "http://wavy-tiers-front-preprod/", CONTRATS_FRONT_UPSTREAM: "http://wavy-contrats-front-preprod/", FACTURES_FRONT_UPSTREAM: "http://wavy-factures-front-preprod/", TRESORERIE_FRONT_UPSTREAM: "http://wavy-tresorerie-front-preprod/"}
     depends_on: {wavy-gateway-preprod: {condition: service_healthy}, wavy-socle-front-preprod: {condition: service_healthy}, wavy-tiers-front-preprod: {condition: service_healthy}, wavy-contrats-front-preprod: {condition: service_healthy}, wavy-factures-front-preprod: {condition: service_healthy}, wavy-tresorerie-front-preprod: {condition: service_healthy}}
 
 networks:

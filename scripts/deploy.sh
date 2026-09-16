@@ -6,7 +6,7 @@ source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/_common.sh"
 
 usage() {
   cat >&2 <<EOF
-Usage : $0 <local|recette> <composant> [--allow-dirty]
+Usage : $0 <local|recette|preprod> <composant> [--allow-dirty]
 
 Composants :
   socle-api tiers-api contrats-api factures-api tresorerie-api gateway
@@ -14,6 +14,12 @@ Composants :
   pwa erp-shell
 EOF
 }
+
+# Chemin PREPROD isolé : les comportements LOCAL/RECETTE sont conservés.
+if [[ "${1:-}" == preprod ]]; then
+  shift
+  exec "$SCRIPT_DIR/release-preprod.sh" DEPLOY "$@"
+fi
 
 started_at="$(date -Is)"
 result=KO
@@ -51,7 +57,6 @@ fi
 
 case "$env" in
   local|recette) ;;
-  preprod) die "Le déploiement préproduction reste volontairement désactivé pendant cette étape." ;;
   *) usage; die "Environnement invalide : $env" ;;
 esac
 case "$component" in

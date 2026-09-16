@@ -49,9 +49,12 @@ Usage :
   ./wavy
   ./wavy help
   ./wavy doctor
-  ./wavy start local|recette|preprod
+  ./wavy start local|recette
+  ./scripts/initialize-preprod.sh --empty-installation
+  ./scripts/deploy.sh preprod <composant>
+  ./scripts/rollback.sh preprod <composant> <version>
   ./wavy status|health local|recette|preprod
-  ./wavy build local|recette|preprod all|service
+  ./wavy build local|recette all|service
   ./wavy restart local|recette|preprod all|service
   ./wavy logs local|recette|preprod [service]
   ./wavy backup|restore local|recette|preprod
@@ -143,24 +146,20 @@ build_cmd() {
   local env="$1"
   local target="${2:-all}"
   validate_env_arg "$env"
+  [[ "$env" != preprod ]] || die "PREPROD est IMAGE uniquement. Utiliser deploy.sh preprod <composant>."
   require_docker
 
   if [[ "$target" == "all" ]]; then
     case "$env" in
       local) "$SCRIPT_DIR/build-local.sh" ;;
       recette) "$SCRIPT_DIR/build-recette.sh" ;;
-      preprod) compose preprod pull ;;
     esac
     return
   fi
 
   validate_service_arg "$target"
   info "Build de $(service_name "$target" "$env") ($env)..."
-  if [[ "$env" == "preprod" ]]; then
-    compose "$env" pull "$(service_name "$target" "$env")"
-  else
-    compose "$env" build "$(service_name "$target" "$env")"
-  fi
+  compose "$env" build "$(service_name "$target" "$env")"
   success " Image reconstruite : $(service_name "$target" "$env")"
 }
 
@@ -175,11 +174,7 @@ restart_all_cmd() {
   fi
 
   if [[ "$env" == "preprod" ]]; then
-    info "Récupération des images préproduction immuables..."
-    compose preprod pull
-    compose preprod up -d --force-recreate
-    health_cmd preprod
-    return
+    die "Redémarrage global PREPROD interdit. Utiliser deploy.sh preprod <composant>."
   fi
 
   mapfile -t services < <(app_service_names "$env")
@@ -195,7 +190,7 @@ start_cmd() {
   validate_env_arg "$env"
   require_docker
   if [[ "$env" == "preprod" ]]; then
-    "$SCRIPT_DIR/validate-preprod-config.sh"
+    die "Provisionnement initial séparé requis : voir README_PREPROD.md. Pour une mise à jour : deploy.sh preprod <composant>."
   fi
   compose "$env" up -d --wait
   health_cmd "$env"
@@ -209,9 +204,14 @@ health_cmd() {
     container="$(service_name "$logical" "$env")"
     status="$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$container" 2>/dev/null || printf 'absent')"
     printf '%-24s %s\n' "$logical" "$status"
-    [[ "$status" == "healthy" || "$status" == "running" ]] || failed=1
+    if [[ "$env" == preprod ]]; then
+      [[ "$status" == healthy ]] || failed=1
+    else
+      [[ "$status" == "healthy" || "$status" == "running" ]] || failed=1
+    fi
   done
   [[ "$failed" -eq 0 ]] || die "Au moins un service $env n'est pas disponible."
+  [[ "$env" != preprod ]] || "$SCRIPT_DIR/healthcheck.sh" preprod
 }
 
 restart_cmd() {
@@ -227,8 +227,7 @@ restart_cmd() {
 
   validate_service_arg "$target"
   if [[ "$env" == "preprod" ]]; then
-    compose preprod pull "$(service_name "$target" preprod)"
-    compose preprod up -d --no-deps --force-recreate "$(service_name "$target" preprod)"
+    "$SCRIPT_DIR/deploy.sh" preprod "$target"
     return
   fi
   run_with_env "$env" "$SCRIPT_DIR/restart-$target.sh"
@@ -260,7 +259,7 @@ restore_cmd() {
   local backup="${2:-}"
   if [[ "$env" == "preprod" ]]; then
     [[ -n "$backup" ]] || die "Usage : ./wavy restore preprod backups/preprod/<horodatage>"
-    "$SCRIPT_DIR/restore-preprod.sh" "$backup"
+    "$SCRIPT_DIR/restore-preprod.sh" "$backup" "${3:-}"
     return
   fi
   run_with_env "$env" "$SCRIPT_DIR/restore-db.sh"
@@ -456,7 +455,7 @@ main() {
     restart) restart_cmd "${1:-}" "${2:-}" ;;
     logs) logs_cmd "${1:-}" "${2:-}" ;;
     backup) backup_cmd "${1:-}" ;;
-    restore) restore_cmd "${1:-}" "${2:-}" ;;
+    restore) restore_cmd "${1:-}" "${2:-}" "${3:-}" ;;
     stop) stop_cmd "${1:-}" ;;
     clean) "$SCRIPT_DIR/clean.sh" ;;
     ai) ai_cmd "${1:-}" ;;
