@@ -81,6 +81,7 @@ def validate(env_path):
                 'WAVY_BOOTSTRAP_COMPANY_SIREN', 'WAVY_BOOTSTRAP_ADMIN_EMAIL', 'WAVY_BOOTSTRAP_ADMIN_PASSWORD',
                 'WAVY_SESSION_SECRET', 'WAVY_BACKUP_ENCRYPTION_PASSPHRASE']
     required += ['WAVY_'+c+'_DB_PASSWORD' for c in ['SOCLE', 'TIERS', 'CONTRATS', 'FACTURES', 'TRESORERIE']]
+    required += ['WAVY_TIERS_SERVICE_USERNAME', 'WAVY_TIERS_SERVICE_PASSWORD']
     for key in required:
         check(bool(e.get(key)), f'Variable obligatoire absente : {key}')
     check(e['COMPOSE_PROJECT_NAME'] == 'wavy-preprod', 'Projet différent de wavy-preprod')
@@ -106,9 +107,7 @@ def validate(env_path):
     else:
         check(u.scheme == 'https' and u.hostname not in ('localhost', '127.0.0.1') and not u.hostname.endswith('.example.com'), 'HTTPS : domaine réel dédié requis')
     check(e['WAVY_CORS_ALLOWED_ORIGIN_PATTERNS'] == url, 'CORS doit correspondre uniquement à WAVY_PUBLIC_URL')
-    for left, right in [('WAVY_TIERS_SERVICE_USERNAME', 'WAVY_TIERS_SERVICE_PASSWORD')]:
-        check(bool(e.get(left)) == bool(e.get(right)), 'Credentials interservices incomplets')
-        check(not e.get(right) or len(e[right]) >= 12, 'Mot de passe interservice trop court')
+    check(len(e['WAVY_TIERS_SERVICE_PASSWORD']) >= 12, 'Mot de passe interservice trop court')
     config = render(env_path)
     services = config['services']
     expected = {'wavy-'+c+'-preprod' for c in COMPONENTS} | {c+'-postgres' for c in ['socle','tiers','contrats','factures','tresorerie']}
@@ -158,6 +157,31 @@ def validate(env_path):
     check(mount['target'] == '/app/data' and not mount.get('read_only'), 'Montage documentaire incorrect')
     check(services['wavy-contrats-api-preprod']['environment']['WAVY_CONTRATS_STOCKAGE_PIECES_JOINTES'] == '/app/data/contrats', 'Racine documentaire incorrecte')
     check(services['wavy-socle-api-preprod']['environment']['WAVY_BOOTSTRAP_ENABLED'] == e['WAVY_BOOTSTRAP_ENABLED'], 'Bootstrap non configurable')
+    for component in ('socle', 'tiers'):
+        se = services[f'wavy-{component}-api-preprod']['environment']
+        for key in ('WAVY_TIERS_SERVICE_USERNAME', 'WAVY_TIERS_SERVICE_PASSWORD'):
+            check(se.get(key) == e[key], f'Credential interservice incohérent : {component}/{key}')
+    endpoints = {'SOCLE': ('socle', 8080), 'TIERS': ('tiers', 8081),
+                 'CONTRATS': ('contrats', 8082), 'FACTURES': ('factures', 8083),
+                 'TRESORERIE': ('tresorerie', 8086)}
+    dependencies = {
+        'socle-api': {'WAVY_TIERS_API_URL': 'TIERS'},
+        'tiers-api': {'WAVY_SOCLE_API_URL': 'SOCLE'},
+        'contrats-api': {'WAVY_SOCLE_API_URL': 'SOCLE'},
+        'factures-api': {'WAVY_SOCLE_API_URL': 'SOCLE', 'WAVY_TIERS_API_URL': 'TIERS',
+                         'WAVY_CONTRATS_API_URL': 'CONTRATS'},
+        'tresorerie-api': {'WAVY_SOCLE_API_URL': 'SOCLE', 'WAVY_TIERS_API_URL': 'TIERS',
+                           'WAVY_FACTURES_API_URL': 'FACTURES'},
+        'gateway': {'WAVY_ROUTES_SOCLE_URI': 'SOCLE', 'WAVY_TIERS_API_URI': 'TIERS',
+                    'WAVY_CONTRATS_API_URI': 'CONTRATS', 'WAVY_FACTURES_API_URL': 'FACTURES',
+                    'WAVY_TRESORERIE_API_URL': 'TRESORERIE'},
+    }
+    for source, targets in dependencies.items():
+        se = services[f'wavy-{source}-preprod']['environment']
+        for key, target in targets.items():
+            name, target_port = endpoints[target]
+            check(se.get(key) == f'http://wavy-{name}-api-preprod:{target_port}',
+                  f'URL interservice incorrecte : {source}/{key}')
     print('OK Configuration PREPROD : 13 versions/digests, profils, secrets, CORS, isolation, Compose.')
 
 

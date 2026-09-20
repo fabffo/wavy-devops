@@ -62,6 +62,34 @@ class Validation(unittest.TestCase):
         self.change('WAVY_SESSION_SECRET=ci-fiction-only-wavy_session_secret-0000000000000000', 'WAVY_SESSION_SECRET=CHANGE_ME')
         with self.assertRaises(ValueError): self.valid()
 
+    def test_tiers_credentials_required_on_both_ends(self):
+        for key in ('WAVY_TIERS_SERVICE_USERNAME', 'WAVY_TIERS_SERVICE_PASSWORD'):
+            with self.subTest(key=key):
+                original = self.env.read_text()
+                self.change('ci-fiction-only-'+key.lower()+'-0000000000000000', '')
+                with self.assertRaisesRegex(ValueError, key): self.valid()
+                self.env.write_text(original)
+        self.valid()
+
+    def test_tiers_credentials_reject_placeholder_and_short_password(self):
+        for value in ('CHANGE_ME', 'short'):
+            with self.subTest(value=value):
+                original = self.env.read_text()
+                self.change('ci-fiction-only-wavy_tiers_service_password-0000000000000000', value)
+                with self.assertRaises(ValueError): self.valid()
+                self.env.write_text(original)
+
+    def test_tiers_credentials_must_reach_both_services(self):
+        p = self.root/'docker-compose.preprod.yml'
+        p.write_text(p.read_text().replace('WAVY_TIERS_SERVICE_PASSWORD: "${WAVY_TIERS_SERVICE_PASSWORD:?required}"', 'WAVY_TIERS_SERVICE_PASSWORD: "wrong"'))
+        with self.assertRaisesRegex(ValueError, 'Credential interservice incohérent'): self.valid()
+
+    def test_reject_wrong_interservice_route(self):
+        p = self.root/'docker-compose.preprod.yml'
+        p.write_text(p.read_text().replace('WAVY_FACTURES_API_URL: "http://wavy-factures-api-preprod:8083"',
+                                           'WAVY_FACTURES_API_URL: "http://wavy-factures-api-recette:8083"'))
+        with self.assertRaisesRegex(ValueError, 'URL interservice incorrecte'): self.valid()
+
     def test_reject_bad_digest(self):
         p = self.root/'versions/preprod.digests'
         p.write_text(p.read_text().replace('sha256:', 'sha512:', 1))
