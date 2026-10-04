@@ -14,8 +14,10 @@ Aucun vrai `.env.preprod` n’est créé dans cette revue.
 
 `versions/preprod.env` contient uniquement le registre et les 13 versions.
 `versions/preprod.digests` contient les 13 digests correspondants. Aucun tag global.
-Le Socle est **0.1.0-6570deb**, digest
-`sha256:77c66ff49cbc14e6b4b1e91d0ce687b6e9dc0063b1f8c3055f9bc37c208c9662`.
+Le Socle autorisé est **0.1.0-c59d62d**, digest
+`sha256:6e80466fd0194fdbe1df4ddb0d08a1ffa89b4c02e3fc10fd9e8d4e138981ef47`.
+Cette nouvelle image reste à déployer et à valider sur la VM PREPROD ; aucune
+entrée historique ne doit être ajoutée avant la réussite des contrôles runtime.
 Les 12 autres couples viennent des manifestes et historiques RECETTE, recoupés
 avec les RepoDigests et les trois labels OCI du cache MSI. Voir
 [la revue détaillée](docs/preprod-review.md), avec provenance et limites.
@@ -51,6 +53,18 @@ Les variables SMTP du modèle ne sont pas câblées aux images dans cette étape
 dotenv machine. Le premier démarrage peut utiliser `true` pour initialiser
 le tenant, la société et l’administrateur. Le passage ultérieur à `false`
 reste une décision opérateur, appliquée au prochain déploiement Socle.
+
+`WAVY_BOOTSTRAP_ADMIN_FIRST_NAME` et `WAVY_BOOTSTRAP_ADMIN_LAST_NAME`
+représentent le prénom et le nom de l'administrateur bootstrap. Les renseigner
+uniquement dans le vrai `.env.preprod` sur la VM ; aucune identité réelle dans
+Git. Compose transmet ces valeurs au Socle. Avec `WAVY_BOOTSTRAP_ENABLED=true`,
+elles sont obligatoires, non vides et ne peuvent pas contenir `CHANGE_ME`.
+Avec `false`, elles peuvent être absentes ou vides ; le refus global des
+placeholders reste actif, comme pour les autres variables.
+Le nouveau bootstrap retrouve l'administrateur existant, conserve son hash de
+mot de passe, applique cette identité, recherche ou crée son tiers et répare
+`utilisateur_tiers` de manière idempotente. Ces comportements applicatifs
+devront être confirmés lors de la validation runtime sur la VM.
 
 ## Accès A : bootstrap et tests par tunnel SSH
 

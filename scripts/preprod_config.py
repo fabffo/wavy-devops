@@ -87,6 +87,10 @@ def validate(env_path):
     check(e['COMPOSE_PROJECT_NAME'] == 'wavy-preprod', 'Projet différent de wavy-preprod')
     check('WAVY_IMAGE_TAG' not in e and 'WAVY_PUBLIC_HTTPS_PORT' not in e, 'Ancienne variable PREPROD interdite')
     check(e.get('WAVY_BOOTSTRAP_ENABLED') in ('true', 'false'), 'Bootstrap : true ou false requis')
+    bootstrap_names = ('WAVY_BOOTSTRAP_ADMIN_FIRST_NAME', 'WAVY_BOOTSTRAP_ADMIN_LAST_NAME')
+    if e['WAVY_BOOTSTRAP_ENABLED'] == 'true':
+        for key in bootstrap_names:
+            check(bool(e.get(key, '').strip()), f'Identité bootstrap obligatoire : {key}')
     check(re.fullmatch(r'\d{9}', e['WAVY_BOOTSTRAP_COMPANY_SIREN']), 'SIREN : 9 chiffres requis')
     check(re.fullmatch(r'[^\s@]+@[^\s@]+\.[^\s@]+', e['WAVY_BOOTSTRAP_ADMIN_EMAIL']), 'Email bootstrap invalide')
     for key, size in [('WAVY_BOOTSTRAP_ADMIN_PASSWORD', 12), ('WAVY_SESSION_SECRET', 32), ('WAVY_BACKUP_ENCRYPTION_PASSPHRASE', 32)]:
@@ -157,6 +161,9 @@ def validate(env_path):
     check(mount['target'] == '/app/data' and not mount.get('read_only'), 'Montage documentaire incorrect')
     check(services['wavy-contrats-api-preprod']['environment']['WAVY_CONTRATS_STOCKAGE_PIECES_JOINTES'] == '/app/data/contrats', 'Racine documentaire incorrecte')
     check(services['wavy-socle-api-preprod']['environment']['WAVY_BOOTSTRAP_ENABLED'] == e['WAVY_BOOTSTRAP_ENABLED'], 'Bootstrap non configurable')
+    for key in bootstrap_names:
+        check(services['wavy-socle-api-preprod']['environment'].get(key) == e.get(key, ''),
+              f'Identité bootstrap différente du dotenv : {key}')
     for component in ('socle', 'tiers'):
         se = services[f'wavy-{component}-api-preprod']['environment']
         for key in ('WAVY_TIERS_SERVICE_USERNAME', 'WAVY_TIERS_SERVICE_PASSWORD'):

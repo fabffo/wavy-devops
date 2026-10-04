@@ -7,6 +7,7 @@ import shutil
 import subprocess
 import tempfile
 import unittest
+from unittest.mock import patch
 import sys
 sys.dont_write_bytecode = True
 
@@ -61,6 +62,59 @@ class Validation(unittest.TestCase):
     def test_reject_secret_placeholder(self):
         self.change('WAVY_SESSION_SECRET=ci-fiction-only-wavy_session_secret-0000000000000000', 'WAVY_SESSION_SECRET=CHANGE_ME')
         with self.assertRaises(ValueError): self.valid()
+
+    def test_bootstrap_names_required_when_enabled(self):
+        self.change('WAVY_BOOTSTRAP_ENABLED=false', 'WAVY_BOOTSTRAP_ENABLED=true')
+        original = self.env.read_text()
+        for key in ('WAVY_BOOTSTRAP_ADMIN_FIRST_NAME', 'WAVY_BOOTSTRAP_ADMIN_LAST_NAME'):
+            line = key+'=ci-fiction-only-'+key.lower()+'-0000000000000000\n'
+            for value in (None, '', "'   '", 'CHANGE_ME'):
+                with self.subTest(key=key, value=value):
+                    replacement = '' if value is None else key+'='+value+'\n'
+                    self.env.write_text(original.replace(line, replacement))
+                    with self.assertRaisesRegex(ValueError, key): self.valid()
+        self.env.write_text(original)
+        self.valid()
+
+    def test_bootstrap_names_optional_when_disabled(self):
+        original = self.env.read_text()
+        for value in (None, ''):
+            with self.subTest(value=value):
+                text = original
+                for key in ('WAVY_BOOTSTRAP_ADMIN_FIRST_NAME', 'WAVY_BOOTSTRAP_ADMIN_LAST_NAME'):
+                    line = key+'=ci-fiction-only-'+key.lower()+'-0000000000000000\n'
+                    text = text.replace(line, '' if value is None else key+'=\n')
+                self.env.write_text(text)
+                self.valid()
+
+    def test_bootstrap_names_placeholders_rejected_when_disabled(self):
+        original = self.env.read_text()
+        for key in ('WAVY_BOOTSTRAP_ADMIN_FIRST_NAME', 'WAVY_BOOTSTRAP_ADMIN_LAST_NAME'):
+            with self.subTest(key=key):
+                self.env.write_text(original.replace('ci-fiction-only-'+key.lower()+'-0000000000000000', 'CHANGE_ME'))
+                with self.assertRaisesRegex(ValueError, key): self.valid()
+
+    def test_bootstrap_names_from_dotenv_ignore_inherited_values(self):
+        self.change('WAVY_BOOTSTRAP_ENABLED=false', 'WAVY_BOOTSTRAP_ENABLED=true')
+        names = {'WAVY_BOOTSTRAP_ADMIN_FIRST_NAME': 'CI Prénom fictif',
+                 'WAVY_BOOTSTRAP_ADMIN_LAST_NAME': 'CI Nom fictif'}
+        for key, value in names.items():
+            self.change('ci-fiction-only-'+key.lower()+'-0000000000000000', "'"+value+"'")
+        with patch.dict(os.environ, {key: 'inherited-fiction-only' for key in names}):
+            self.valid()
+            env = config.render(self.env)['services']['wavy-socle-api-preprod']['environment']
+        for key, value in names.items():
+            self.assertEqual(env[key], value)
+
+    def test_bootstrap_names_must_reach_socle(self):
+        self.change('WAVY_BOOTSTRAP_ENABLED=false', 'WAVY_BOOTSTRAP_ENABLED=true')
+        p = self.root/'docker-compose.preprod.yml'
+        original = p.read_text()
+        for key in ('WAVY_BOOTSTRAP_ADMIN_FIRST_NAME', 'WAVY_BOOTSTRAP_ADMIN_LAST_NAME'):
+            for replacement in (f'      {key}: "wrong"\n', ''):
+                with self.subTest(key=key, replacement=replacement):
+                    p.write_text(original.replace(f'      {key}: "${{{key}:-}}"\n', replacement))
+                    with self.assertRaisesRegex(ValueError, key): self.valid()
 
     def test_tiers_credentials_required_on_both_ends(self):
         for key in ('WAVY_TIERS_SERVICE_USERNAME', 'WAVY_TIERS_SERVICE_PASSWORD'):
