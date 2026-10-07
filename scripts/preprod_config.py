@@ -87,6 +87,9 @@ def validate(env_path):
     check(e['COMPOSE_PROJECT_NAME'] == 'wavy-preprod', 'Projet différent de wavy-preprod')
     check('WAVY_IMAGE_TAG' not in e and 'WAVY_PUBLIC_HTTPS_PORT' not in e, 'Ancienne variable PREPROD interdite')
     check(e.get('WAVY_BOOTSTRAP_ENABLED') in ('true', 'false'), 'Bootstrap : true ou false requis')
+    platform_admin_key = 'WAVY_BOOTSTRAP_PLATFORM_ADMIN_ENABLED'
+    platform_admin = e.get(platform_admin_key, 'false')
+    check(platform_admin in ('true', 'false'), f'{platform_admin_key} : true ou false requis')
     bootstrap_names = ('WAVY_BOOTSTRAP_ADMIN_FIRST_NAME', 'WAVY_BOOTSTRAP_ADMIN_LAST_NAME')
     if e['WAVY_BOOTSTRAP_ENABLED'] == 'true':
         for key in bootstrap_names:
@@ -161,6 +164,11 @@ def validate(env_path):
     check(mount['target'] == '/app/data' and not mount.get('read_only'), 'Montage documentaire incorrect')
     check(services['wavy-contrats-api-preprod']['environment']['WAVY_CONTRATS_STOCKAGE_PIECES_JOINTES'] == '/app/data/contrats', 'Racine documentaire incorrecte')
     check(services['wavy-socle-api-preprod']['environment']['WAVY_BOOTSTRAP_ENABLED'] == e['WAVY_BOOTSTRAP_ENABLED'], 'Bootstrap non configurable')
+    check(services['wavy-socle-api-preprod']['environment'].get(platform_admin_key) == platform_admin,
+          f'{platform_admin_key} différent du dotenv ou du défaut false')
+    check(all(platform_admin_key not in service.get('environment', {})
+              for name, service in services.items() if name != 'wavy-socle-api-preprod'),
+          f'{platform_admin_key} réservé au Socle')
     for key in bootstrap_names:
         check(services['wavy-socle-api-preprod']['environment'].get(key) == e.get(key, ''),
               f'Identité bootstrap différente du dotenv : {key}')

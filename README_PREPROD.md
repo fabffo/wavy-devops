@@ -14,8 +14,11 @@ Aucun vrai `.env.preprod` n’est créé dans cette revue.
 
 `versions/preprod.env` contient uniquement le registre et les 13 versions.
 `versions/preprod.digests` contient les 13 digests correspondants. Aucun tag global.
-Le Socle autorisé est **0.1.0-c59d62d**, digest
-`sha256:6e80466fd0194fdbe1df4ddb0d08a1ffa89b4c02e3fc10fd9e8d4e138981ef47`.
+Le Socle autorisé est **0.1.0-a9352ec**, digest
+`sha256:cc3af16eef10dbe0946e3dfafd80c1b30967396c81deaac54a8e64826e29b388`.
+Image validée et publiée selon les preuves fournies : labels OCI
+`revision=a9352ec`, `version=0.1.0`,
+`source=https://github.com/fabffo/wavy-socle-api`.
 Cette nouvelle image reste à déployer et à valider sur la VM PREPROD ; aucune
 entrée historique ne doit être ajoutée avant la réussite des contrôles runtime.
 Les 12 autres couples viennent des manifestes et historiques RECETTE, recoupés
@@ -53,6 +56,34 @@ Les variables SMTP du modèle ne sont pas câblées aux images dans cette étape
 dotenv machine. Le premier démarrage peut utiliser `true` pour initialiser
 le tenant, la société et l’administrateur. Le passage ultérieur à `false`
 reste une décision opérateur, appliquée au prochain déploiement Socle.
+
+`WAVY_BOOTSTRAP_PLATFORM_ADMIN_ENABLED=false` par défaut dans le modèle et
+Compose. Cette option peut être absente du dotenv existant : elle vaut alors
+`false`. Si elle est présente, seules les valeurs littérales `true` et `false`
+sont acceptées (une valeur vide, `TRUE` ou `1` est refusée). Elle est transmise
+uniquement au Socle ; une variable héritée du shell ne peut pas l'activer.
+
+Lorsque `WAVY_BOOTSTRAP_ENABLED=true` :
+
+- Option plateforme `false` : le bootstrap attribue `ADMIN_TENANT` uniquement.
+- Option plateforme `true` : l'administrateur bootstrap configuré conserve
+  `ADMIN_TENANT` et reçoit aussi `ADMIN_PLATEFORME`. Ce rôle permet notamment
+  la création de tenants et leur administration à l'échelle de la plateforme.
+
+Les deux options doivent être `true` pour amorcer ce privilège. Si le bootstrap
+est désactivé, l'option plateforme n'attribue aucun rôle. Le bootstrap reste
+idempotent : il crée le rôle ou l'association seulement si nécessaire, répare
+l'administrateur existant et conserve son ID, son hash et ses associations
+tiers/société. Il ne promeut pas les autres `ADMIN_TENANT` et ne leur permet
+toujours pas de s'élever via l'API normale. Remettre l'option à `false` ne
+révoque pas un rôle plateforme déjà attribué.
+
+L'activation est une décision explicite de l'opérateur dans le dotenv privé,
+à préparer lors d'une opération ultérieure. Aucune identité réelle ni secret
+ne doit être ajouté à Git. L'historique `versions/history/preprod/socle-api.tsv`
+reste inchangé jusqu'à une validation runtime réussie de cette nouvelle image.
+La prochaine release sera également la première validation runtime réelle
+du reload Nginx PREPROD introduit par `94fed00` ; ce correctif reste inchangé.
 
 `WAVY_BOOTSTRAP_ADMIN_FIRST_NAME` et `WAVY_BOOTSTRAP_ADMIN_LAST_NAME`
 représentent le prénom et le nom de l'administrateur bootstrap. Les renseigner

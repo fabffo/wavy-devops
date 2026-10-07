@@ -63,6 +63,58 @@ class Validation(unittest.TestCase):
         self.change('WAVY_SESSION_SECRET=ci-fiction-only-wavy_session_secret-0000000000000000', 'WAVY_SESSION_SECRET=CHANGE_ME')
         with self.assertRaises(ValueError): self.valid()
 
+    def test_platform_admin_absent_defaults_to_false(self):
+        key = 'WAVY_BOOTSTRAP_PLATFORM_ADMIN_ENABLED'
+        self.change(key+'=false\n', '')
+        # Une variable héritée ne doit pas activer le privilège à la place du dotenv.
+        with patch.dict(os.environ, {key: 'true'}):
+            self.valid()
+            services = config.render(self.env)['services']
+        self.assertEqual(services['wavy-socle-api-preprod']['environment'][key], 'false')
+
+    def test_platform_admin_false_and_true_reach_socle(self):
+        key = 'WAVY_BOOTSTRAP_PLATFORM_ADMIN_ENABLED'
+        original = self.env.read_text()
+        for bootstrap in ('false', 'true'):
+            for platform in ('false', 'true'):
+                with self.subTest(bootstrap=bootstrap, platform=platform):
+                    self.env.write_text(original.replace('WAVY_BOOTSTRAP_ENABLED=false',
+                                                        'WAVY_BOOTSTRAP_ENABLED='+bootstrap)
+                                       .replace(key+'=false', key+'='+platform))
+                    with patch.dict(os.environ, {key: 'true' if platform == 'false' else 'false'}):
+                        self.valid()
+                        services = config.render(self.env)['services']
+                    self.assertEqual(services['wavy-socle-api-preprod']['environment'][key], platform)
+                    self.assertEqual([name for name, svc in services.items()
+                                      if key in svc.get('environment', {})], ['wavy-socle-api-preprod'])
+
+    def test_platform_admin_rejects_non_boolean_values(self):
+        key = 'WAVY_BOOTSTRAP_PLATFORM_ADMIN_ENABLED'
+        original = self.env.read_text()
+        for value in ('', 'TRUE', 'False', '1', '0', 'yes', 'no', 'invalid', "' true '"):
+            with self.subTest(value=value):
+                self.env.write_text(original.replace(key+'=false', key+'='+value))
+                with patch.object(config, 'render') as render:
+                    with self.assertRaisesRegex(ValueError, key): self.valid()
+                    render.assert_not_called()
+
+    def test_platform_admin_must_reach_socle_unchanged(self):
+        key = 'WAVY_BOOTSTRAP_PLATFORM_ADMIN_ENABLED'
+        p = self.root/'docker-compose.preprod.yml'
+        original = p.read_text()
+        line = f'      {key}: "${{{key}:-false}}"\n'
+        for replacement in ('', f'      {key}: "true"\n'):
+            with self.subTest(replacement=replacement):
+                p.write_text(original.replace(line, replacement))
+                with self.assertRaisesRegex(ValueError, key): self.valid()
+
+    def test_platform_admin_cannot_be_sent_to_other_services(self):
+        key = 'WAVY_BOOTSTRAP_PLATFORM_ADMIN_ENABLED'
+        p = self.root/'docker-compose.preprod.yml'
+        p.write_text(p.read_text().replace('x-backend-environment: &backend-environment\n',
+                                          f'x-backend-environment: &backend-environment\n  {key}: "false"\n'))
+        with self.assertRaisesRegex(ValueError, 'réservé au Socle'): self.valid()
+
     def test_bootstrap_names_required_when_enabled(self):
         self.change('WAVY_BOOTSTRAP_ENABLED=false', 'WAVY_BOOTSTRAP_ENABLED=true')
         original = self.env.read_text()
