@@ -252,11 +252,109 @@ avant la phase de reprise ; il n’existe pas de transaction globale DB+fichiers
 Les anciens lots format 1 sans documents sont refusés, jamais acceptés comme
 restauration complète. Aucun backup/restore réel exécuté dans cette revue.
 
+## 502 Nginx malgré un Gateway healthy
+
+Symptôme rencontré : `POST /api/auth/session` via ERP Shell retourne
+`502 Bad Gateway nginx/1.27.5`, alors que les conteneurs sont healthy et les
+six smoke tests backend passent. Les workers Nginx peuvent conserver l'ancienne
+IP du Gateway après sa recréation. La résolution Docker courante et un appel
+direct réussi depuis ERP Shell ne prouvent pas que les workers utilisent cette IP.
+Le healthcheck ERP Shell ne teste que `/`, et les smoke tests historiques
+interrogent Gateway depuis Socle, sans passer par Nginx ERP Shell.
+
+Diagnostic sur la VM, à effectuer par l'opérateur :
+
+```bash
+docker inspect -f '{{.State.Health.Status}}' wavy-gateway-preprod
+docker exec wavy-erp-shell-preprod getent hosts wavy-gateway-preprod
+docker exec wavy-erp-shell-preprod \
+  wget -S -O /dev/null \
+  http://wavy-gateway-preprod:8088/actuator/health
+```
+
+Si Gateway est réellement indisponible, corriger cette panne avant tout reload.
+Correction d'urgence, seulement après un `nginx -t` réussi :
+
+```bash
+docker exec wavy-erp-shell-preprod nginx -t && \
+  docker exec wavy-erp-shell-preprod nginx -s reload
+docker exec wavy-erp-shell-preprod \
+  wget -S -O - http://127.0.0.1/api/tiers/health
+```
+
+Le processus DevOps effectue désormais cette protection automatiquement avec
+`preprod_reload_erp_shell_nginx` dans `scripts/_preprod.sh`. Il vérifie que
+ERP Shell et Gateway existent et tournent, attend Gateway healthy, contrôle
+sa résolution depuis ERP Shell et une réponse Actuator `UP`, puis exécute
+`nginx -t` avant `nginx -s reload`. Ensuite il contrôle ERP Shell healthy,
+revérifie Gateway et teste le proxy local `/api/tiers/health`, avec validation
+du module `wavy-tiers-api` et du statut `OK` (une page HTML SPA ne suffit pas).
+Cette route de santé est publique ; aucun secret supplémentaire n'est nécessaire.
+Le reload est asynchrone : le test du proxy effectue au plus 30 tentatives HTTP
+(timeout 5 s chacune), espacées de 2 s uniquement en cas d'échec. Les attentes
+Docker healthy ont au plus 30 tentatives espacées de 2 s pour l'état `starting` ;
+`unhealthy`, conteneur arrêté ou healthcheck absent provoquent une erreur explicite.
+Tout échec bloque la validation, les smoke tests finaux et l'enregistrement de
+l'image dans l'historique validé ; la release reste journalisée `KO`.
+
+### Flux audités et emplacement de la protection
+
+- `deploy.sh preprod` et `rollback.sh preprod` délèguent à
+  `release-preprod.sh`. Celui-ci utilise `up --no-deps --force-recreate`
+  pour le seul composant ciblé : Gateway est recréé si c'est la cible,
+  et les fronts des modules sont d'autres upstreams Nginx recréables.
+- Chaque release sauvegarde auparavant les bases et documents. Cette sauvegarde
+  arrête Gateway puis les cinq APIs et les redémarre en ordre inverse, avec
+  Gateway en dernier. Même `deploy.sh preprod socle-api` fait donc repartir
+  Gateway alors qu'ERP Shell reste actif. Un stop/start ne recrée pas le
+  conteneur ; la protection ne suppose cependant pas une IP inchangée.
+- `./wavy restart preprod <composant>` délègue à ce même déploiement ciblé,
+  donc bénéficie du même contrôle. `restart preprod all` reste interdit.
+- Un seul reload contrôlé est exécuté par release PREPROD, après le remplacement
+  et les contrôles du composant, avant `healthcheck.sh` et `smoke-test.sh`.
+  Le choix couvre tous les composants plutôt que seulement Gateway, puisque
+  toutes ces releases font repartir Gateway. Aucun reload périodique ni reload
+  ajouté aux simples commandes status/health/smoke, LOCAL ou RECETTE.
+- La première installation (`initialize-preprod.sh`) crée aussi réseau et
+  conteneurs, mais lance un ERP Shell neuf après ses dépendances healthy :
+  il n'y a pas de workers préexistants à rafraîchir. Le restore redémarre les
+  conteneurs existants sans recréer réseau ou images. Les commandes Docker
+  manuelles de recréation/reconnexion réseau contournent la protection des
+  releases : appliquer alors les contrôles et la correction d'urgence ci-dessus.
+
+### Alternative : DNS dynamique Docker
+
+Le template applicatif lu pour l'audit utilise `proxy_pass ${API_UPSTREAM}`
+sans URI pour `/api/` et des upstreams terminés par `/` pour les modules.
+`NGINX_ENVSUBST_FILTER=_UPSTREAM$` remplace ces variables d'environnement au
+démarrage : elles ne sont pas des variables Nginx évaluées à chaque requête.
+Ajouter seulement `resolver 127.0.0.11` ne rendrait pas ces destinations
+statiques dynamiques.
+
+Nginx OSS 1.27.5 supporte `server <hôte>:<port> resolve` dans un bloc `upstream`
+avec une `zone` partagée et un `resolver 127.0.0.11` : cette fonctionnalité est
+disponible depuis 1.27.3 ([documentation officielle upstream](https://nginx.org/en/docs/http/ngx_http_upstream_module.html#resolve)).
+Cette approche permettrait de suivre les changements d'IP hors des releases,
+mais demande une modification du template applicatif et une validation de
+l'image réellement exécutée, du DNS Docker et des routes des modules.
+Une autre approche utilise une variable Nginx dans `proxy_pass` avec le resolver,
+mais la gestion des URI change lorsqu'une URI est incluse dans la destination :
+il faut préserver explicitement les réécritures des préfixes `/modules/.../`
+([documentation officielle proxy_pass](https://nginx.org/en/docs/http/ngx_http_proxy_module.html#proxy_pass)).
+
+Le reload contrôlé est retenu pour ce correctif : il conserve les règles de
+routage et les images actuelles et reproduit la correction runtime confirmée.
+Sa limite est qu'il dépend du passage par les commandes DevOps protégées ;
+une résolution dynamique traiterait aussi les changements d'IP extérieurs à ces
+commandes, au prix d'une évolution applicative à tester séparément. Aucun
+template Nginx applicatif ni fichier Compose n'est modifié ici.
+
 ## Validation statique exécutée sur MSI
 
 ```bash
 python3 scripts/test-preprod-config.py
 python3 scripts/test-preprod-guards.py
+python3 scripts/test-preprod-nginx.py
 bash scripts/test-version-history.sh
 bash -n wavy
 for script in scripts/*.sh; do bash -n "$script"; done

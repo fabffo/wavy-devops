@@ -61,3 +61,75 @@ preprod_wait() {
   done
   die "Délai healthy dépassé : $service"
 }
+
+# Un reload est asynchrone : valider aussi une requête via les workers Nginx.
+# Retours explicites pour propager les erreurs même depuis un appel conditionnel.
+preprod_nginx_running() {
+  local container="$1" running
+  running="$(docker inspect -f '{{.State.Running}}' "$container" 2>/dev/null)" || {
+    error "Protection Nginx PREPROD : conteneur absent/inaccessible : $container"; return 1;
+  }
+  [[ "$running" == true ]] || {
+    error "Protection Nginx PREPROD : conteneur arrêté : $container"; return 1;
+  }
+}
+
+preprod_nginx_wait_healthy() {
+  local container="$1" attempt status
+  for ((attempt=1; attempt<=30; attempt++)); do
+    preprod_nginx_running "$container" || return 1
+    status="$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}missing{{end}}' "$container" 2>/dev/null)" || {
+      error "Protection Nginx PREPROD : état inaccessible : $container"; return 1;
+    }
+    [[ "$status" != healthy ]] || return 0
+    [[ "$status" == starting ]] || {
+      error "Protection Nginx PREPROD : $container non healthy ($status)"; return 1;
+    }
+    ((attempt == 30)) || sleep 2
+  done
+  error "Protection Nginx PREPROD : délai healthy dépassé : $container"
+  return 1
+}
+
+preprod_nginx_gateway_check() {
+  local shell=wavy-erp-shell-preprod gateway=wavy-gateway-preprod body
+  preprod_nginx_running "$shell" || return 1
+  preprod_nginx_wait_healthy "$gateway" || return 1
+  docker exec "$shell" getent hosts "$gateway" >/dev/null || {
+    error 'Protection Nginx PREPROD : résolution Gateway impossible depuis ERP Shell'; return 1;
+  }
+  body="$(docker exec "$shell" wget -qO- -T 5 "http://$gateway:8088/actuator/health")" || {
+    error 'Protection Nginx PREPROD : Gateway ne répond pas depuis ERP Shell'; return 1;
+  }
+  [[ "$body" =~ \"status\"[[:space:]]*:[[:space:]]*\"UP\" ]] || {
+    error 'Protection Nginx PREPROD : réponse health Gateway non UP'; return 1;
+  }
+}
+
+preprod_reload_erp_shell_nginx() {
+  local shell=wavy-erp-shell-preprod attempt body
+  info 'Protection Nginx PREPROD : contrôle Gateway puis reload ERP Shell'
+  preprod_nginx_gateway_check || return 1
+  docker exec "$shell" nginx -t || {
+    error 'Protection Nginx PREPROD : nginx -t KO, reload refusé'; return 1;
+  }
+  docker exec "$shell" nginx -s reload || {
+    error 'Protection Nginx PREPROD : nginx reload KO'; return 1;
+  }
+  preprod_nginx_wait_healthy "$shell" || return 1
+  preprod_nginx_gateway_check || return 1
+  # Le healthcheck du front ne couvre que / ; vérifier le vrai proxy /api/.
+  # Attente bornée de la prise en compte du reload, sans sleep inconditionnel.
+  for ((attempt=1; attempt<=30; attempt++)); do
+    body="$(docker exec "$shell" wget -qO- -T 5 http://127.0.0.1/api/tiers/health)" &&
+      [[ "$body" =~ \"module\"[[:space:]]*:[[:space:]]*\"wavy-tiers-api\" &&
+         "$body" =~ \"status\"[[:space:]]*:[[:space:]]*\"OK\" ]] && break
+    ((attempt == 30)) || sleep 2
+  done
+  if ((attempt > 30)); then
+    error 'Protection Nginx PREPROD : proxy ERP Shell vers Gateway indisponible après reload'; return 1
+  fi
+  preprod_nginx_wait_healthy "$shell" || return 1
+  preprod_nginx_gateway_check || return 1
+  success ' Nginx ERP Shell rechargé ; Gateway et proxy /api/ vérifiés'
+}

@@ -91,6 +91,9 @@ fi
 if [[ "$component" == *-front || "$component" == pwa || "$component" == erp-shell ]]; then
   docker exec "$service" wget -qO- -T 5 http://127.0.0.1/ >/dev/null || die 'Front indisponible.'
 fi
+# Tout composant : backup stop/start Gateway, et fronts upstream recréables.
+# Chemin partagé par DEPLOY, ROLLBACK et ./wavy restart preprod <composant>.
+preprod_reload_erp_shell_nginx || die 'Protection Nginx PREPROD en échec ; release non validée.'
 "$SCRIPT_DIR/healthcheck.sh" preprod
 "$SCRIPT_DIR/smoke-test.sh" preprod
 [[ "$(docker inspect -f '{{.Image}}' "$service")" == "$image_id" ]] || die 'ID de l’image active non conforme.'

@@ -32,6 +32,7 @@ jobs:
         run: |
           python3 scripts/test-preprod-config.py
           python3 scripts/test-preprod-guards.py
+          python3 scripts/test-preprod-nginx.py
       - name: Version history tests (temporary directory only)
         run: bash scripts/test-version-history.sh
       - name: Reject tracked PREPROD secrets and whitespace errors
