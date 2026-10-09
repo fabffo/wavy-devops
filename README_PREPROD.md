@@ -97,6 +97,58 @@ mot de passe, applique cette identité, recherche ou crée son tiers et répare
 `utilisateur_tiers` de manière idempotente. Ces comportements applicatifs
 devront être confirmés lors de la validation runtime sur la VM.
 
+## IA Factures PREPROD
+
+L'IA est facultative et les sept variables sont transmises uniquement à
+`wavy-factures-api-preprod`. Dans le dotenv privé, l'opérateur peut aligner
+provider et modèle sur RECETTE avec ces valeurs :
+
+```dotenv
+WAVY_AI_PROVIDER=anthropic
+WAVY_AI_MODEL=claude-sonnet-4-5-20250929
+WAVY_AI_API_KEY=
+WAVY_AI_TIMEOUT_SECONDS=60
+WAVY_AI_MAX_FILE_SIZE_MB=10
+WAVY_AI_ACHAT_AUTO_CREATION_ENABLED=false
+WAVY_AI_ACHAT_MINIMUM_CONFIDENCE=0.90
+```
+
+Renseigner la clé depuis le gestionnaire de secrets, avec une clé dédiée à
+PREPROD : la ligne vide ci-dessus n'est pas une configuration IA complète.
+Provider, modèle et clé doivent être renseignés ensemble ; pour conserver
+l'IA désactivée, laisser les trois vides ou absents. Les quatre autres défauts
+Compose sont respectivement `60`, `10`, `false`, `0.90`. Si ces paramètres sont
+présents dans le dotenv, ils doivent être valides et non vides : timeout et
+limite en Mo sont des entiers strictement positifs, création automatique vaut
+exactement `true` ou `false`, confiance est un nombre fini entre 0 et 1 inclus.
+La création automatique exige une configuration IA complète et reste à `false`
+jusqu'à une activation explicite après validation métier PREPROD.
+
+Conserver `.env.preprod` ignoré par Git, avec permissions `600`. Ne jamais
+copier la clé RECETTE, ajouter un secret au dépôt, afficher le dotenv ou le
+rendu `docker compose config` contenant la clé, ni activer une trace shell.
+Le validateur masque les sorties Compose et ne restitue aucune valeur IA.
+L'envoi de documents au fournisseur doit être autorisé pour les données de
+PREPROD ; utiliser des documents de test sans données sensibles pour valider
+l'extraction et le seuil avant d'activer la création automatique.
+
+Après synchronisation du changement DevOps revu et configuration du dotenv,
+l'opérateur exécutera uniquement sur la VM les commandes suivantes :
+
+```bash
+./scripts/validate-preprod-config.sh
+./wavy restart preprod factures-api
+```
+
+Le restart ciblé recrée Factures avec les nouvelles variables, à version et
+digest autorisés inchangés, via le flux de release protégé existant. Ce flux
+comprend la sauvegarde des cinq bases et des documents, une interruption des
+backends, les healthchecks, le contrôle Nginx et les smoke tests ; prévoir la
+fenêtre de maintenance décrite plus bas. Un simple `docker restart` ne recharge
+pas les variables. Vérifier ensuite sur des documents factices le provider,
+le modèle et le comportement métier sans exposer la clé dans les logs.
+Ces commandes ne sont pas exécutées pendant la préparation locale.
+
 ## Accès A : bootstrap et tests par tunnel SSH
 
 Le port `127.0.0.1:24443` du serveur aboutit au port **80 HTTP** du Nginx ERP

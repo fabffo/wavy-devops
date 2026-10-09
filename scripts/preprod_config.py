@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Validation PREPROD sans daemon, sans exécution du dotenv, sans sortie de secrets."""
+from decimal import Decimal, InvalidOperation
 import json
 import os
 from pathlib import Path
@@ -73,6 +74,41 @@ def render(env_path):
     return json.loads(result.stdout)
 
 
+AI_DEFAULTS = {
+    'WAVY_AI_PROVIDER': '',
+    'WAVY_AI_MODEL': '',
+    'WAVY_AI_API_KEY': '',
+    'WAVY_AI_TIMEOUT_SECONDS': '60',
+    'WAVY_AI_MAX_FILE_SIZE_MB': '10',
+    'WAVY_AI_ACHAT_AUTO_CREATION_ENABLED': 'false',
+    'WAVY_AI_ACHAT_MINIMUM_CONFIDENCE': '0.90',
+}
+
+
+def validate_ai(e):
+    ai = {key: e.get(key, default) for key, default in AI_DEFAULTS.items()}
+    credentials = [ai[key].strip() for key in
+                   ('WAVY_AI_PROVIDER', 'WAVY_AI_MODEL', 'WAVY_AI_API_KEY')]
+    check(not any(ai[key] for key in ('WAVY_AI_PROVIDER', 'WAVY_AI_MODEL', 'WAVY_AI_API_KEY'))
+          or all(credentials),
+          'IA : provider, modèle et clé API requis ensemble')
+    for key in ('WAVY_AI_TIMEOUT_SECONDS', 'WAVY_AI_MAX_FILE_SIZE_MB'):
+        check(re.fullmatch(r'[0-9]+', ai[key]) and int(ai[key]) > 0,
+              f'{key} : entier strictement positif requis')
+    key = 'WAVY_AI_ACHAT_AUTO_CREATION_ENABLED'
+    check(ai[key] in ('true', 'false'), f'{key} : true ou false requis')
+    check(ai[key] != 'true' or all(credentials),
+          'IA : création automatique exige provider, modèle et clé API')
+    key = 'WAVY_AI_ACHAT_MINIMUM_CONFIDENCE'
+    try:
+        confidence = Decimal(ai[key])
+    except InvalidOperation:
+        raise ValueError(f'{key} : nombre entre 0 et 1 requis') from None
+    check(confidence.is_finite() and 0 <= confidence <= 1,
+          f'{key} : nombre entre 0 et 1 requis')
+    return ai
+
+
 def validate(env_path):
     e, v, d = inputs(env_path)
     check(env_path.stat().st_mode & 0o077 == 0, 'Le dotenv doit être privé : chmod 600')
@@ -115,6 +151,7 @@ def validate(env_path):
         check(u.scheme == 'https' and u.hostname not in ('localhost', '127.0.0.1') and not u.hostname.endswith('.example.com'), 'HTTPS : domaine réel dédié requis')
     check(e['WAVY_CORS_ALLOWED_ORIGIN_PATTERNS'] == url, 'CORS doit correspondre uniquement à WAVY_PUBLIC_URL')
     check(len(e['WAVY_TIERS_SERVICE_PASSWORD']) >= 12, 'Mot de passe interservice trop court')
+    ai = validate_ai(e)
     config = render(env_path)
     services = config['services']
     expected = {'wavy-'+c+'-preprod' for c in COMPONENTS} | {c+'-postgres' for c in ['socle','tiers','contrats','factures','tresorerie']}
@@ -158,6 +195,12 @@ def validate(env_path):
             check(se.get('SPRING_PROFILES_ACTIVE') == 'preprod,secure', f'Profils incorrects : {c}')
             check(service.get('read_only') and 'no-new-privileges:true' in service.get('security_opt', []), f'Durcissement absent : {c}')
             check(se.get('WAVY_CORS_ALLOWED_ORIGIN_PATTERNS') == url, f'CORS incohérent : {c}')
+    factures_env = services['wavy-factures-api-preprod']['environment']
+    for key, value in ai.items():
+        check(factures_env.get(key) == value, f'Paramètre IA non propagé : {key}')
+    check(all(not (AI_DEFAULTS.keys() & service.get('environment', {}).keys())
+              for name, service in services.items() if name != 'wavy-factures-api-preprod'),
+          'Paramètres IA réservés à Factures')
     owners = [name for name, svc in services.items() if any(m['source'] == 'documents-preprod' for m in svc.get('volumes', []))]
     check(owners == ['wavy-contrats-api-preprod'], 'Volume documentaire réservé à Contrats')
     mount = services['wavy-contrats-api-preprod']['volumes'][0]

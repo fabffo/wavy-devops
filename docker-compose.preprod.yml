@@ -141,7 +141,7 @@ services:
     healthcheck:
       <<: *api-health
       test: ["CMD", "wget", "-qO-", "http://localhost:8083/actuator/health"]
-    environment: {<<: *backend-environment, SERVER_PORT: 8083, SPRING_PROFILES_ACTIVE: "preprod,secure", SPRING_DATASOURCE_URL: "jdbc:postgresql://factures-postgres:5432/${WAVY_FACTURES_DB_NAME}", SPRING_DATASOURCE_USERNAME: "${WAVY_FACTURES_DB_USER}", SPRING_DATASOURCE_PASSWORD: "${WAVY_FACTURES_DB_PASSWORD}", WAVY_SOCLE_API_URL: "http://wavy-socle-api-preprod:8080", WAVY_TIERS_API_URL: "http://wavy-tiers-api-preprod:8081", WAVY_CONTRATS_API_URL: "http://wavy-contrats-api-preprod:8082", WAVY_AI_PROVIDER: "${WAVY_AI_PROVIDER:-}", WAVY_AI_MODEL: "${WAVY_AI_MODEL:-}", WAVY_AI_API_KEY: "${WAVY_AI_API_KEY:-}"}
+    environment: {<<: *backend-environment, SERVER_PORT: 8083, SPRING_PROFILES_ACTIVE: "preprod,secure", SPRING_DATASOURCE_URL: "jdbc:postgresql://factures-postgres:5432/${WAVY_FACTURES_DB_NAME}", SPRING_DATASOURCE_USERNAME: "${WAVY_FACTURES_DB_USER}", SPRING_DATASOURCE_PASSWORD: "${WAVY_FACTURES_DB_PASSWORD}", WAVY_SOCLE_API_URL: "http://wavy-socle-api-preprod:8080", WAVY_TIERS_API_URL: "http://wavy-tiers-api-preprod:8081", WAVY_CONTRATS_API_URL: "http://wavy-contrats-api-preprod:8082", WAVY_AI_PROVIDER: "${WAVY_AI_PROVIDER:-}", WAVY_AI_MODEL: "${WAVY_AI_MODEL:-}", WAVY_AI_API_KEY: "${WAVY_AI_API_KEY:-}", WAVY_AI_TIMEOUT_SECONDS: "${WAVY_AI_TIMEOUT_SECONDS:-60}", WAVY_AI_MAX_FILE_SIZE_MB: "${WAVY_AI_MAX_FILE_SIZE_MB:-10}", WAVY_AI_ACHAT_AUTO_CREATION_ENABLED: "${WAVY_AI_ACHAT_AUTO_CREATION_ENABLED:-false}", WAVY_AI_ACHAT_MINIMUM_CONFIDENCE: "${WAVY_AI_ACHAT_MINIMUM_CONFIDENCE:-0.90}"}
     depends_on: {factures-postgres: {condition: service_healthy}}
   wavy-tresorerie-api-preprod:
     <<: *api

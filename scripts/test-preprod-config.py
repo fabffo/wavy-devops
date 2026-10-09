@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 """Tests statiques isolés : aucun daemon Docker ni service démarré."""
+import contextlib
+import io
 import importlib.util
 import os
 from pathlib import Path
@@ -58,6 +60,91 @@ class Validation(unittest.TestCase):
             self.valid()
         finally:
             del os.environ['SOCLE_API_VERSION']
+
+    def set_ai(self, values):
+        lines = self.env.read_text().splitlines()
+        self.env.write_text('\n'.join(
+            line.split('=', 1)[0]+'='+values[line.split('=', 1)[0]]
+            if line.split('=', 1)[0] in values else line for line in lines)+'\n')
+
+    def enable_ai(self):
+        self.set_ai({'WAVY_AI_PROVIDER': 'anthropic',
+                     'WAVY_AI_MODEL': 'claude-sonnet-4-5-20250929',
+                     'WAVY_AI_API_KEY': 'fictional-ai-key-only'})
+
+    def test_ai_optional_and_defaults_ignore_shell(self):
+        self.env.write_text('\n'.join(line for line in self.env.read_text().splitlines()
+                                      if not line.startswith('WAVY_AI_'))+'\n')
+        with patch.dict(os.environ, {key: 'inherited-invalid' for key in config.AI_DEFAULTS}):
+            self.valid()
+            env = config.render(self.env)['services']['wavy-factures-api-preprod']['environment']
+        for key, value in config.AI_DEFAULTS.items():
+            self.assertEqual(env[key], value)
+
+    def test_ai_alignment_and_no_secret_output(self):
+        self.enable_ai()
+        for enabled in ('false', 'true'):
+            self.set_ai({'WAVY_AI_ACHAT_AUTO_CREATION_ENABLED': enabled})
+            output = io.StringIO()
+            with contextlib.redirect_stdout(output), contextlib.redirect_stderr(output):
+                self.valid()
+            self.assertNotIn('fictional-ai-key-only', output.getvalue())
+        for confidence in ('0', '1', '0.90'):
+            self.set_ai({'WAVY_AI_ACHAT_MINIMUM_CONFIDENCE': confidence})
+            self.valid()
+
+    def test_ai_partial_credentials_and_auto_without_ai_rejected(self):
+        original = self.env.read_text()
+        for key in ('WAVY_AI_PROVIDER', 'WAVY_AI_MODEL', 'WAVY_AI_API_KEY',
+                    'WAVY_AI_ACHAT_AUTO_CREATION_ENABLED'):
+            self.env.write_text(original)
+            self.set_ai({key: 'true' if key.endswith('ENABLED') else 'fictional-ai-key-only'})
+            with patch.object(config, 'render') as render:
+                with self.assertRaises(ValueError) as error: self.valid()
+                self.assertNotIn('fictional-ai-key-only', str(error.exception))
+                render.assert_not_called()
+
+    def test_ai_whitespace_credentials_rejected(self):
+        self.set_ai({'WAVY_AI_PROVIDER': "'   '"})
+        with self.assertRaisesRegex(ValueError, 'requis ensemble'): self.valid()
+
+    def test_ai_compose_failure_masks_secret(self):
+        self.enable_ai()
+        failure = subprocess.CompletedProcess([], 1, b'fictional-ai-key-only',
+                                              b'fictional-ai-key-only')
+        with patch.object(config.subprocess, 'run', return_value=failure):
+            with self.assertRaises(ValueError) as error: self.valid()
+        self.assertNotIn('fictional-ai-key-only', str(error.exception))
+
+    def test_ai_invalid_parameters_rejected_before_compose(self):
+        original = self.env.read_text()
+        cases = {
+            'WAVY_AI_TIMEOUT_SECONDS': ('', '0', '-1', '1.5', 'NaN', 'bad'),
+            'WAVY_AI_MAX_FILE_SIZE_MB': ('', '0', '-10', '1.5', 'Infinity', 'bad'),
+            'WAVY_AI_ACHAT_AUTO_CREATION_ENABLED': ('', 'TRUE', '1', 'yes'),
+            'WAVY_AI_ACHAT_MINIMUM_CONFIDENCE': ('', '-0.1', '1.01', 'NaN', 'Infinity', 'bad'),
+        }
+        for key, values in cases.items():
+            for value in values:
+                with self.subTest(key=key, value=value):
+                    self.env.write_text(original)
+                    self.set_ai({key: value})
+                    with patch.object(config, 'render') as render:
+                        with self.assertRaisesRegex(ValueError, key): self.valid()
+                        render.assert_not_called()
+
+    def test_ai_propagation_and_isolation_enforced(self):
+        self.enable_ai()
+        p = self.root/'docker-compose.preprod.yml'
+        original = p.read_text()
+        for key in config.AI_DEFAULTS:
+            with self.subTest(key=key):
+                p.write_text(original.replace('"${'+key+':-'+config.AI_DEFAULTS[key]+'}"', '"wrong"'))
+                with self.assertRaisesRegex(ValueError, key) as error: self.valid()
+                self.assertNotIn('fictional-ai-key-only', str(error.exception))
+        p.write_text(original.replace('x-backend-environment: &backend-environment\n',
+                                     'x-backend-environment: &backend-environment\n  WAVY_AI_PROVIDER: anthropic\n'))
+        with self.assertRaisesRegex(ValueError, 'réservés à Factures'): self.valid()
 
     def test_reject_secret_placeholder(self):
         self.change('WAVY_SESSION_SECRET=ci-fiction-only-wavy_session_secret-0000000000000000', 'WAVY_SESSION_SECRET=CHANGE_ME')
