@@ -8,6 +8,8 @@ usage() {
   cat >&2 <<EOF
 Usage : $0 <composant> <version> [--push]
 
+Source facultative : WAVY_BUILD_REPOSITORY=/chemin/du/depot-ou-worktree
+
 Exemple :
   $0 factures-api 2.5.0
   $0 factures-api 2.5.0 --push
@@ -30,8 +32,23 @@ esac
 [[ "$functional_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z]+)*$ ]] \
   || die "Version invalide : utiliser une version explicite telle que 2.5.0."
 
-repository="$ROOT_DIR/../wavy-$component"
-[[ -d "$repository/.git" ]] || die "Dépôt Git introuvable : $repository"
+repository="${WAVY_BUILD_REPOSITORY-$ROOT_DIR/../wavy-$component}"
+require_command git
+[[ -n "$repository" && -d "$repository" ]] || die "Répertoire source introuvable : $repository"
+repository="$(cd "$repository" && pwd -P)"
+[[ "$(git -C "$repository" rev-parse --is-inside-work-tree 2>/dev/null)" == true ]] \
+  || die "Dépôt ou worktree Git invalide : $repository"
+repository_root="$(git -C "$repository" rev-parse --show-toplevel)"
+[[ "$(cd "$repository_root" && pwd -P)" == "$repository" ]] \
+  || die "Le répertoire source doit être la racine du dépôt ou worktree Git."
+origin_url="$(git -C "$repository" remote get-url origin 2>/dev/null)" \
+  || die "Dépôt distant origin introuvable pour $component."
+case "$origin_url" in
+  "https://github.com/fabffo/wavy-$component"|"https://github.com/fabffo/wavy-$component.git"|\
+  "git@github.com:fabffo/wavy-$component"|"git@github.com:fabffo/wavy-$component.git"|\
+  "ssh://git@github.com/fabffo/wavy-$component"|"ssh://git@github.com/fabffo/wavy-$component.git") ;;
+  *) die "Le dépôt distant origin ne correspond pas au composant $component attendu chez fabffo sur GitHub." ;;
+esac
 sha="$(git -C "$repository" rev-parse --short=7 HEAD)"
 tag="${functional_version}-${sha}"
 registry="ghcr.io/fabffo"
