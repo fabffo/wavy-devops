@@ -1,0 +1,7 @@
+{
+  "state": "DRAFT_NOT_DEPLOYABLE",
+  "components": ["factures-api", "pwa", "factures-front", "erp-shell"],
+  "activation": "erp-shell-last-after-all-runtime-checks",
+  "images": {},
+  "requiredChecks": ["https", "secure-cookie", "volume-uid-gid", "backup-restore", "session-isolation", "browser", "android", "ios"]
+}

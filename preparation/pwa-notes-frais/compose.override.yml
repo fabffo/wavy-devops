@@ -1,0 +1,32 @@
+# CANDIDAT INACTIF. Ne pas ajouter aux commandes actives avant revue de la livraison entière.
+# Les quatre variables sont des références GHCR complètes, immuables, à fournir APRÈS publication.
+services:
+  wavy-factures-api-preprod:
+    image: ${PWA_RELEASE_FACTURES_API_IMAGE:?image vérifiée requise}
+    environment:
+      WAVY_FACTURES_STOCKAGE_JUSTIFICATIFS: /app/justificatifs
+      WAVY_FACTURES_JUSTIFICATIF_MAX_BYTES: '10485760'
+      WAVY_FACTURES_MULTIPART_MAX_FILE_SIZE: 10MB
+      WAVY_FACTURES_MULTIPART_MAX_REQUEST_SIZE: 11MB
+    volumes:
+      - type: volume
+        source: documents-preprod
+        target: /app/justificatifs
+        volume: {nocopy: true, subpath: notes-frais}
+  wavy-pwa-preprod:
+    image: ${PWA_RELEASE_PWA_IMAGE:?image vérifiée requise}
+  wavy-factures-front-preprod:
+    image: ${PWA_RELEASE_FACTURES_FRONT_IMAGE:?image vérifiée requise}
+  wavy-erp-shell-preprod:
+    image: ${PWA_RELEASE_ERP_SHELL_IMAGE:?image vérifiée requise}
+    volumes:
+      - type: bind
+        source: ${WAVY_PWA_CANDIDATE_DIR:?répertoire candidat absolu requis}/nginx-pwa-enabled.conf
+        target: /etc/nginx/pwa-route.conf
+        read_only: true
+      - type: bind
+        source: ${WAVY_PWA_CANDIDATE_DIR:?répertoire candidat absolu requis}/pwa-integration.enabled.json
+        target: /usr/share/nginx/html/pwa-integration.json
+        read_only: true
+    depends_on:
+      wavy-pwa-preprod: {condition: service_healthy}

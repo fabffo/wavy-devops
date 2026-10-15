@@ -1,0 +1,65 @@
+--- a/scripts/preprod_document_archive.py
++++ b/scripts/preprod_document_archive.py
+@@ -11,14 +11,14 @@
+         seen = set()
+         for entry in archive:
+             path = PurePosixPath(entry.name)
+-            if path.is_absolute() or '..' in path.parts or not path.parts or path.parts[0] != 'contrats':
++            if path.is_absolute() or '..' in path.parts or not path.parts or path.parts[0] not in {'contrats', 'notes-frais'}:
+                 raise ValueError('Chemin documentaire interdit')
+             if not (entry.isfile() or entry.isdir()) or entry.mode & 0o7000:
+                 raise ValueError('Type ou permissions documentaires interdits')
+             if str(path) in seen:
+                 raise ValueError('Entrée documentaire dupliquée')
+             if entry.uid != 100 or entry.gid != 101:
+-                raise ValueError('Propriétaire documentaire différent de Contrats (100:101)')
++                raise ValueError('Propriétaire documentaire documentaire invalide (100:101)')
+             seen.add(str(path))
+         if 'contrats' not in seen:
+             raise ValueError('Racine contrats absente')
+--- a/scripts/backup-preprod.sh
++++ b/scripts/backup-preprod.sh
+@@ -40,8 +40,8 @@
+     | WAVY_BACKUP_PASSPHRASE="$passphrase" openssl enc -aes-256-cbc -salt -pbkdf2 \
+         -pass env:WAVY_BACKUP_PASSPHRASE -out "$stage/$db.dump.enc"
+ done
+-info 'Archivage chiffré des pièces jointes Contrats...'
+-preprod_document_tool ro 'test -d /documents/contrats; tar -cpf - -C /documents contrats'   | WAVY_BACKUP_PASSPHRASE="$passphrase" openssl enc -aes-256-cbc -salt -pbkdf2       -pass env:WAVY_BACKUP_PASSPHRASE -out "$stage/documents.tar.enc"
++info 'Archivage chiffré des pièces jointes Contrats et Notes de frais...'
++preprod_document_tool ro 'test -d /documents/contrats; test -d /documents/notes-frais; tar -cpf - -C /documents contrats notes-frais'   | WAVY_BACKUP_PASSPHRASE="$passphrase" openssl enc -aes-256-cbc -salt -pbkdf2       -pass env:WAVY_BACKUP_PASSPHRASE -out "$stage/documents.tar.enc"
+ # Relire l’archive chiffrée avant de publier un lot déclaré restaurable.
+ WAVY_BACKUP_PASSPHRASE="$passphrase" openssl enc -d -aes-256-cbc -pbkdf2 -pass env:WAVY_BACKUP_PASSPHRASE -in "$stage/documents.tar.enc" \
+   | python3 "$SCRIPT_DIR/preprod_document_archive.py" -
+--- a/scripts/restore-preprod.sh
++++ b/scripts/restore-preprod.sh
+@@ -41,14 +41,14 @@
+   [[ "$(docker inspect -f '{{.State.Running}}' "$(service_name "$component" preprod)" 2>/dev/null || true)" == false ]] || die 'Arrêter les six backends PREPROD avant restauration.'
+ done
+ warn 'Remplacement des cinq bases PREPROD ; aucun restore distribué atomique.'
+-confirm 'Confirmer le remplacement des CINQ BASES ET des DOCUMENTS Contrats sur wavy-preprod ?' || die 'Restauration annulée.'
++confirm 'Confirmer le remplacement des CINQ BASES ET des DOCUMENTS Contrats et Notes de frais sur wavy-preprod ?' || die 'Restauration annulée.'
+ for db in socle tiers contrats factures tresorerie; do
+   docker exec -i "$(db_container "$db" preprod)" pg_restore \
+     -U "$(db_user "$db" preprod)" -d "$(db_name "$db" preprod)" \
+     --clean --if-exists --no-owner --exit-on-error --single-transaction < "$tmp/$db.dump"
+ done
+ # Le volume est privé, les backends restent arrêtés jusqu’à la fin de l’extraction.
+-preprod_document_tool rw 'test -d /documents/contrats; rm -rf /documents/contrats; tar -xpf - -C /documents' < "$tmp/documents.tar"
++preprod_document_tool rw 'test -d /documents/contrats; rm -rf /documents/contrats /documents/notes-frais; tar -xpf - -C /documents; mkdir -p /documents/notes-frais; chown 100:101 /documents/notes-frais; chmod 700 /documents/notes-frais' < "$tmp/documents.tar"
+ # Redémarrage des conteneurs existants, sans pull/recréation/changement d’image.
+ for component in socle-api tiers-api contrats-api factures-api tresorerie-api gateway; do
+   container="$(service_name "$component" preprod)"
+--- a/scripts/preprod_config.py
++++ b/scripts/preprod_config.py
+@@ -202,7 +202,10 @@
+               for name, service in services.items() if name != 'wavy-factures-api-preprod'),
+           'Paramètres IA réservés à Factures')
+     owners = [name for name, svc in services.items() if any(m['source'] == 'documents-preprod' for m in svc.get('volumes', []))]
+-    check(owners == ['wavy-contrats-api-preprod'], 'Volume documentaire réservé à Contrats')
++    check(owners == ['wavy-contrats-api-preprod', 'wavy-factures-api-preprod'], 'Volume documentaire réservé à Contrats et Factures')
++    fm = services['wavy-factures-api-preprod']['volumes'][0]
++    check(fm['target'] == '/app/justificatifs' and fm.get('volume', {}).get('subpath') == 'notes-frais' and not fm.get('read_only'), 'Montage Notes de frais incorrect')
++    check(services['wavy-factures-api-preprod']['environment'].get('WAVY_FACTURES_STOCKAGE_JUSTIFICATIFS') == '/app/justificatifs', 'Racine Notes de frais incorrecte')
+     mount = services['wavy-contrats-api-preprod']['volumes'][0]
+     check(mount['target'] == '/app/data' and not mount.get('read_only'), 'Montage documentaire incorrect')
+     check(services['wavy-contrats-api-preprod']['environment']['WAVY_CONTRATS_STOCKAGE_PIECES_JOINTES'] == '/app/data/contrats', 'Racine documentaire incorrecte')

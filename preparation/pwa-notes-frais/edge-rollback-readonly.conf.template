@@ -1,0 +1,27 @@
+# Modèle pour la terminaison TLS existante/future. Aucun certificat ni domaine inventé.
+server {
+  listen 443 ssl;
+  server_name ${WAVY_PUBLIC_SERVER_NAME};
+  ssl_certificate /run/tls/fullchain.pem;
+  ssl_certificate_key /run/tls/privkey.pem;
+  ssl_protocols TLSv1.2 TLSv1.3;
+  client_max_body_size 64m;
+  # À charger AVANT un rollback vers une API ne connaissant pas les références ndf:.
+  location = /pwa { return 404; }
+  location /pwa/ { return 404; }
+  location /api/notes-frais {
+    limit_except GET { deny all; }
+    proxy_pass http://127.0.0.1:24443;
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-Proto https;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header Cookie $http_cookie;
+  }
+  location / {
+    proxy_pass http://127.0.0.1:24443;
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-Proto https;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header Cookie $http_cookie;
+  }
+}
