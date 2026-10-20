@@ -9,6 +9,11 @@ usage() {
 Usage : $0 <composant> <version> [--push]
 
 Source facultative : WAVY_BUILD_REPOSITORY=/chemin/du/depot-ou-worktree
+Tests Maven : WAVY_MAVEN_TEST_ARGS="-Dpropriété=entier ..." (facultatif).
+Propriétés autorisées : spring.datasource.hikari.maximum-pool-size,
+  spring.datasource.hikari.minimum-idle, spring.test.context.cache.maxSize.
+Entiers strictement positifs, sauf minimum-idle (zéro autorisé).
+Séparateurs : espaces ou tabulations ; aucun échappement ni guillemet.
 
 Exemple :
   $0 factures-api 2.5.0
@@ -72,12 +77,31 @@ fi
 is_java=false
 [[ -f "$repository/pom.xml" ]] && is_java=true
 if $is_java; then
+  maven_test_args=()
+  if [[ ${WAVY_MAVEN_TEST_ARGS+x} ]]; then
+    # Filtrer avant le découpage : ni expansion shell, ni glob, ni eval.
+    # Ne jamais inclure la valeur fournie dans les diagnostics.
+    [[ "$WAVY_MAVEN_TEST_ARGS" =~ ^[-a-zA-Z0-9.=[:blank:]]*$ ]] \
+      || die "WAVY_MAVEN_TEST_ARGS invalide : caractères interdits."
+    IFS=$' \t' read -r -a maven_test_args <<< "$WAVY_MAVEN_TEST_ARGS"
+    for maven_test_arg in "${maven_test_args[@]}"; do
+      case "$maven_test_arg" in
+        -Dspring.datasource.hikari.minimum-idle=*)
+          [[ "$maven_test_arg" =~ ^-Dspring\.datasource\.hikari\.minimum-idle=[0-9]+$ ]] \
+            || die "WAVY_MAVEN_TEST_ARGS invalide : entier attendu." ;;
+        -Dspring.datasource.hikari.maximum-pool-size=*|-Dspring.test.context.cache.maxSize=*)
+          [[ "$maven_test_arg" =~ ^-D(spring\.datasource\.hikari\.maximum-pool-size|spring\.test\.context\.cache\.maxSize)=0*[1-9][0-9]*$ ]] \
+            || die "WAVY_MAVEN_TEST_ARGS invalide : entier strictement positif attendu." ;;
+        *) die "WAVY_MAVEN_TEST_ARGS invalide : propriété ou option interdite." ;;
+      esac
+    done
+  fi
   info "Tests Maven de $component..."
   if [[ -x "$repository/mvnw" ]]; then
-    (cd "$repository" && ./mvnw test)
+    (cd "$repository" && ./mvnw test "${maven_test_args[@]}")
   else
     require_command mvn
-    (cd "$repository" && mvn test)
+    (cd "$repository" && mvn test "${maven_test_args[@]}")
   fi
 else
   require_command npm
