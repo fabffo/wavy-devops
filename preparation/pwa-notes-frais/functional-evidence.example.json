@@ -1,0 +1,18 @@
+{
+  "planHash": "REPLACE_WITH_STATE_PLAN_HASH",
+  "run": "REPLACE_WITH_STATE_RUN",
+  "checkedAt": "REPLACE_WITH_ACTUAL_UTC_CHECK_TIME",
+  "reviewer": "REPLACE_WITH_REVIEWER_ID",
+  "observed": {},
+  "backup": {},
+  "checks": {
+    "https": false,
+    "secure-cookie": false,
+    "volume-uid-gid": false,
+    "backup-restore": false,
+    "session-isolation": false,
+    "browser": false,
+    "android": false,
+    "ios": false
+  }
+}

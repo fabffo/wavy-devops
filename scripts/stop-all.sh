@@ -3,8 +3,12 @@
 set -euo pipefail
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/_common.sh"
 
-require_docker
 env="$(env_name)"
+if [[ "$env" == preprod && ${WAVY_PREPROD_WRAPPED_ENTRY:-} != "${BASH_SOURCE[0]}" ]]; then
+  export WAVY_PREPROD_WRAPPED_ENTRY="${BASH_SOURCE[0]}"
+  exec python3 "$SCRIPT_DIR/preprod_operation.py" -- bash "${BASH_SOURCE[0]}" "$@"
+fi
+require_docker
 app_services=(
   "$(service_name socle-api "$env")"
   "$(service_name tiers-api "$env")"

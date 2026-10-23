@@ -2,17 +2,19 @@
 # Lot atomique de cinq dumps chiffrés, authentifiés et privés.
 set -euo pipefail
 umask 077
-source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/_preprod.sh"
-source "$SCRIPT_DIR/_preprod-documents.sh"
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/_runtime.sh"
 passphrase="$(preprod_value WAVY_BACKUP_ENCRYPTION_PASSPHRASE)"
 [[ ${#passphrase} -ge 32 && "$passphrase" != *CHANGE_ME* ]] || die 'Passphrase backup absente ou trop courte.'
 retention="$(preprod_value WAVY_BACKUP_RETENTION_DAYS)"
 [[ "$retention" =~ ^[1-9][0-9]*$ ]] || die 'Rétention invalide.'
 preprod_host_guard
-"$SCRIPT_DIR/validate-preprod-config.sh"
+candidate_validate
 preprod_document_volume_guard
 require_command openssl
 require_command flock
+if [[ ${PWA_RELEASE_LOCK_FD:-} =~ ^[0-9]+$ ]]; then
+  exec 9<&"$PWA_RELEASE_LOCK_FD"
+fi
 preprod_backup_operation_lock
 base="$ROOT_DIR/backups/preprod"
 mkdir -p "$base"
@@ -44,7 +46,7 @@ info 'Archivage chiffré des pièces jointes Contrats et Notes de frais...'
 preprod_document_tool ro 'test -d /documents/contrats; test -d /documents/notes-frais; tar -cpf - -C /documents contrats notes-frais'   | WAVY_BACKUP_PASSPHRASE="$passphrase" openssl enc -aes-256-cbc -salt -pbkdf2       -pass env:WAVY_BACKUP_PASSPHRASE -out "$stage/documents.tar.enc"
 # Relire l’archive chiffrée avant de publier un lot déclaré restaurable.
 WAVY_BACKUP_PASSPHRASE="$passphrase" openssl enc -d -aes-256-cbc -pbkdf2 -pass env:WAVY_BACKUP_PASSPHRASE -in "$stage/documents.tar.enc" \
-  | python3 "$SCRIPT_DIR/preprod_document_archive.py" -
+  | python3 "$CANDIDATE_SCRIPTS/preprod_document_archive.py" -
 WAVY_BACKUP_PASSPHRASE="$passphrase" python3 "$SCRIPT_DIR/preprod_backup_manifest.py" sign "$stage"
 preprod_resume || die "Reprise des backends impossible."
 for service in "${QUIESCED_SERVICES[@]}"; do preprod_wait "$service"; done

@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 # Restore explicite, jamais appelé automatiquement par release-preprod.sh.
 set -euo pipefail
+# Contrat commun : conserve le verrou pendant toute la commande et refuse une réservation.
+if [[ ${WAVY_PREPROD_WRAPPED_ENTRY:-} != "${BASH_SOURCE[0]}" ]]; then
+  export WAVY_PREPROD_WRAPPED_ENTRY="${BASH_SOURCE[0]}"
+  exec python3 "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/preprod_operation.py" -- bash "${BASH_SOURCE[0]}" "$@"
+fi
 umask 077
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/_preprod.sh"
 source "$SCRIPT_DIR/_preprod-documents.sh"
@@ -19,8 +24,7 @@ preprod_document_volume_guard
 require_command openssl
 require_command flock
 mkdir -p "$ROOT_DIR/deployments"
-exec 9>"$ROOT_DIR/deployments/preprod.lock"
-flock -n 9 || die 'Une opération PREPROD est déjà en cours.'
+preprod_backup_operation_lock
 exec 8>"$ROOT_DIR/backups/preprod/.backup.lock"
 flock -n 8 || die 'Une sauvegarde PREPROD est déjà en cours.'
 WAVY_BACKUP_PASSPHRASE="$passphrase" python3 "$SCRIPT_DIR/preprod_backup_manifest.py" verify "$backup"
@@ -41,14 +45,14 @@ for component in socle-api tiers-api contrats-api factures-api tresorerie-api ga
   [[ "$(docker inspect -f '{{.State.Running}}' "$(service_name "$component" preprod)" 2>/dev/null || true)" == false ]] || die 'Arrêter les six backends PREPROD avant restauration.'
 done
 warn 'Remplacement des cinq bases PREPROD ; aucun restore distribué atomique.'
-confirm 'Confirmer le remplacement des CINQ BASES ET des DOCUMENTS Contrats sur wavy-preprod ?' || die 'Restauration annulée.'
+confirm 'Confirmer le remplacement des CINQ BASES ET des DOCUMENTS Contrats et Notes de frais sur wavy-preprod ?' || die 'Restauration annulée.'
 for db in socle tiers contrats factures tresorerie; do
   docker exec -i "$(db_container "$db" preprod)" pg_restore \
     -U "$(db_user "$db" preprod)" -d "$(db_name "$db" preprod)" \
     --clean --if-exists --no-owner --exit-on-error --single-transaction < "$tmp/$db.dump"
 done
 # Le volume est privé, les backends restent arrêtés jusqu’à la fin de l’extraction.
-preprod_document_tool rw 'test -d /documents/contrats; rm -rf /documents/contrats; tar -xpf - -C /documents' < "$tmp/documents.tar"
+preprod_document_tool rw 'test -d /documents/contrats; rm -rf /documents/contrats /documents/notes-frais; tar -xpf - -C /documents; mkdir -p /documents/notes-frais; chown 100:101 /documents/notes-frais; chmod 700 /documents/notes-frais' < "$tmp/documents.tar"
 # Redémarrage des conteneurs existants, sans pull/recréation/changement d’image.
 for component in socle-api tiers-api contrats-api factures-api tresorerie-api gateway; do
   container="$(service_name "$component" preprod)"

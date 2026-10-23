@@ -1,16 +1,42 @@
 #!/usr/bin/env python3
-"""Validation Nginx avec une image DÉJÀ locale, sans pull, réseau ou serveur démarré."""
-import os,re,subprocess,tempfile,sys
+"""nginx -t sur l'image Shell locale exacte, sans pull/réseau/serveur."""
+import json
+import os
 from pathlib import Path
-ROOT=Path(__file__).resolve().parents[2]
-if os.environ.get('DOCKER_HOST') or not subprocess.check_output(['docker','context','inspect','--format','{{.Endpoints.docker.Host}}']).decode().strip().startswith('unix://'):
+import re
+import subprocess
+import tempfile
+
+C = Path(__file__).resolve().parent
+if os.environ.get('DOCKER_HOST') or not subprocess.check_output(
+        ['docker', 'context', 'inspect', '--format', '{{.Endpoints.docker.Host}}'],
+        text=True).strip().startswith('unix://'):
     raise SystemExit('Daemon Docker local Unix requis')
-image=sys.argv[1] if len(sys.argv)>1 else 'ghcr.io/fabffo/wavy-erp-shell:0.1.0-521c2f8'
+image = json.loads((C / 'release-plan.json').read_text())['images']['erp-shell']['reference']
+base = ['docker', 'run', '--rm', '--pull', 'never', '--network', 'none', '--read-only']
+raw = subprocess.check_output(base + ['--entrypoint', 'cat', image,
+                                     '/etc/nginx/templates/default.conf.template'], text=True)
+raw = re.sub(r'\$\{[A-Z_]+_UPSTREAM\}', 'http://127.0.0.1:8088/', raw)
 with tempfile.TemporaryDirectory(prefix='wavy-nginx-pwa-') as tmp:
-    conf=Path(tmp)/'nginx.conf'
-    raw=(ROOT.parent/'wavy-erp-shell/nginx.conf').read_text()
-    raw=re.sub(r'\$\{[A-Z_]+_UPSTREAM\}','http://127.0.0.1:8088/',raw)
-    conf.write_text('events {}\nhttp {\n'+raw+'\n}\n')
-    for snippet in [ROOT.parent/'wavy-erp-shell/nginx-pwa-disabled.conf',Path(__file__).with_name('nginx-pwa-enabled.conf')]:
-        subprocess.run(['docker','run','--rm','--pull','never','--network','none','--read-only','--tmpfs','/var/cache/nginx','--tmpfs','/var/run','--add-host','wavy-pwa-preprod:127.0.0.1','--mount',f'type=bind,source={conf},target=/etc/nginx/nginx.conf,readonly','--mount',f'type=bind,source={snippet.resolve()},target=/etc/nginx/pwa-route.conf,readonly','--entrypoint','nginx',image,'-t'],check=True)
-print('Nginx : configuration fermée et candidate conformes')
+    tmp = Path(tmp)
+    conf = tmp / 'nginx.conf'
+    conf.write_text('events {}\nhttp {\n' + raw + '\n}\n')
+    for name in ('nginx-pwa-disabled.conf', 'nginx-pwa-enabled.conf'):
+        subprocess.run(base + ['--tmpfs', '/var/cache/nginx', '--tmpfs', '/var/run',
+            '--add-host', 'wavy-pwa-preprod:127.0.0.1',
+            '--mount', f'type=bind,source={conf},target=/etc/nginx/nginx.conf,readonly',
+            '--mount', f'type=bind,source={C / name},target=/etc/nginx/pwa-route.conf,readonly',
+            '--entrypoint', 'nginx', image, '-t'], check=True)
+    # Certificat éphémère fictif, uniquement pour le parseur TLS ; jamais conservé.
+    subprocess.run(['openssl', 'req', '-x509', '-newkey', 'rsa:2048', '-nodes',
+                    '-keyout', str(tmp / 'privkey.pem'), '-out', str(tmp / 'fullchain.pem'),
+                    '-days', '1', '-subj', '/CN=example.invalid'], check=True, capture_output=True)
+    for name in ('edge-https.conf.template', 'edge-rollback-readonly.conf.template'):
+        raw = (C / name).read_text().replace('${WAVY_PUBLIC_SERVER_NAME}', 'example.invalid')
+        conf.write_text('events {}\nhttp {\n' + raw + '\n}\n')
+        subprocess.run(base + ['--tmpfs', '/var/cache/nginx', '--tmpfs', '/var/run',
+            '--mount', f'type=bind,source={conf},target=/etc/nginx/nginx.conf,readonly',
+            '--mount', f'type=bind,source={tmp},target=/run/tls,readonly',
+            '--mount', f'type=bind,source={C / "edge-pwa-gate.conf"},target=/etc/nginx/wavy/edge-pwa-gate.conf,readonly',
+            '--entrypoint', 'nginx', image, '-t'], check=True)
+print('Nginx : route fermée, candidate, edge HTTPS et rollback conformes en syntaxe uniquement')

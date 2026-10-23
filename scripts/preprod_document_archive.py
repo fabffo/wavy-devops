@@ -11,7 +11,7 @@ def validate(filename):
         seen = set()
         for entry in archive:
             path = PurePosixPath(entry.name)
-            if path.is_absolute() or '..' in path.parts or not path.parts or path.parts[0] != 'contrats':
+            if path.is_absolute() or '..' in path.parts or not path.parts or path.parts[0] not in {'contrats', 'notes-frais'}:
                 raise ValueError('Chemin documentaire interdit')
             if not (entry.isfile() or entry.isdir()) or entry.mode & 0o7000:
                 raise ValueError('Type ou permissions documentaires interdits')

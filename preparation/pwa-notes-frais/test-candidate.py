@@ -11,13 +11,15 @@ class Candidate(unittest.TestCase):
     def test_active_manifests_unchanged(self):
         protected=['versions','docker-compose.preprod.yml','docker-compose.recette.yml']
         subprocess.run(['git','diff','--exit-code','--',*protected],cwd=ROOT,check=True,capture_output=True)
-    def test_patch_applies_only_in_isolated_copy(self):
+    def test_historical_patch_remains_readable_and_not_executed(self):
+        patch=(C/'integration-scripts.patch').read_text()
+        self.assertIn('--- a/scripts/backup-preprod.sh',patch)
+        runtime=(C/'scripts/release_pwa_preprod.py').read_text()
+        self.assertNotIn('integration-scripts.patch',runtime)
+        # Le validateur actif accepte maintenant les deux racines, y compris le format Contrats seul.
+        active=load(ROOT/'scripts/preprod_document_archive.py')
         with tempfile.TemporaryDirectory() as tmp:
-            tmp=Path(tmp);(tmp/'scripts').mkdir()
-            names=['preprod_document_archive.py','backup-preprod.sh','restore-preprod.sh','preprod_config.py']
-            for name in names:shutil.copy(ROOT/'scripts'/name,tmp/'scripts'/name)
-            subprocess.run(['patch','--batch','-p1','-i',str(C/'integration-scripts.patch')],cwd=tmp,check=True,capture_output=True)
-            for name in names:self.assertEqual((tmp/'scripts'/name).read_bytes(),(C/'scripts'/name).read_bytes())
+            archive=Path(tmp)/'fixture.tar';self.archive(archive);active.validate(str(archive))
     def archive(self,path,root='notes-frais',kind=tarfile.REGTYPE):
         with tarfile.open(path,'w') as archive:
             for name in ['contrats',root]:
@@ -54,25 +56,64 @@ class Candidate(unittest.TestCase):
             validator.validate(str(path))
     def test_compose_candidate_with_fictional_values(self):
         tests=load(ROOT/'scripts/test-preprod-config.py');config=tests.config
+        plan=json.loads((C/'release-plan.json').read_text())
         with tempfile.TemporaryDirectory() as temp:
             envfile=Path(temp)/'fiction.env';envfile.write_text(tests.fixture());envfile.chmod(0o600)
-            with envfile.open('a') as f:f.write('WAVY_PWA_CANDIDATE_DIR='+str(C)+'\n')
-            for key in ('FACTURES_API','PWA','FACTURES_FRONT','ERP_SHELL'):
-                with envfile.open('a') as f:f.write(f'PWA_RELEASE_{key}_IMAGE=ghcr.io/fabffo/wavy-{key.lower().replace("_","-")}@sha256:'+('a'*64)+'\n')
-            cmd,env=config.compose_args(envfile,['-f',str(C/'compose.override.yml'),'config','--format','json'])
-            rendered=subprocess.run(cmd,env=env,capture_output=True,check=True);services=json.loads(rendered.stdout)['services']
-            for key in ('factures-api','pwa','factures-front','erp-shell'):self.assertRegex(services['wavy-'+key+'-preprod']['image'],r'@sha256:[a-f0-9]{64}$')
-            mount=services['wavy-factures-api-preprod']['volumes'][0];self.assertEqual(mount['volume']['subpath'],'notes-frais')
-            self.assertEqual(services['wavy-factures-api-preprod']['environment']['WAVY_FACTURES_STOCKAGE_JUSTIFICATIFS'],'/app/justificatifs')
-            self.assertIn('wavy-pwa-preprod',services['wavy-erp-shell-preprod']['depends_on'])
-            self.assertTrue(all(Path(m['source']).is_file() for m in services['wavy-erp-shell-preprod']['volumes'] if m['type']=='bind'))
+            cmd,env=config.compose_args(envfile,['config','--format','json'])
+            baseline=json.loads(subprocess.run(cmd,env=env,capture_output=True,check=True).stdout)['services']
+            for real_refs in (False,True):
+                envfile.write_text(tests.fixture()+'WAVY_PWA_CANDIDATE_DIR='+str(C)+'\n')
+                for key in ('FACTURES_API','PWA','FACTURES_FRONT','ERP_SHELL'):
+                    component=key.lower().replace('_','-')
+                    ref=plan['images'][component]['reference'] if real_refs else f'ghcr.io/fabffo/wavy-{component}@sha256:'+('a'*64)
+                    with envfile.open('a') as f:f.write(f'PWA_RELEASE_{key}_IMAGE={ref}\n')
+                cmd,env=config.compose_args(envfile,['-f',str(C/'compose.override.yml'),'config','--format','json'])
+                rendered=subprocess.run(cmd,env=env,capture_output=True,check=True);services=json.loads(rendered.stdout)['services']
+                for key in ('factures-api','pwa','factures-front','erp-shell'):
+                    ref=services['wavy-'+key+'-preprod']['image']
+                    self.assertRegex(ref,r'@sha256:[a-f0-9]{64}$')
+                    if real_refs:self.assertEqual(ref,plan['images'][key]['reference'])
+                changed={'wavy-'+key+'-preprod' for key in plan['components']}
+                self.assertEqual({k:v for k,v in baseline.items() if k not in changed},
+                                 {k:v for k,v in services.items() if k not in changed})
+                mount=services['wavy-factures-api-preprod']['volumes'][0]
+                self.assertEqual(mount['volume']['subpath'],'notes-frais')
+                self.assertFalse(mount.get('read_only',False))
+                self.assertEqual(services['wavy-factures-api-preprod']['environment']['WAVY_FACTURES_STOCKAGE_JUSTIFICATIFS'],'/app/justificatifs')
+                shell=services['wavy-erp-shell-preprod']
+                for component in ('factures-api','factures-front','pwa'):
+                    self.assertEqual(shell['depends_on']['wavy-'+component+'-preprod']['condition'],'service_healthy')
+                mounts={m['target']:m for m in shell['volumes'] if m['type']=='bind'}
+                self.assertEqual(Path(mounts['/etc/nginx/pwa-route.conf']['source']).name,'nginx-pwa-disabled.conf')
+                self.assertFalse(json.loads(Path(mounts['/usr/share/nginx/html/pwa-integration.json']['source']).read_text())['enabled'])
+                self.assertTrue(all(Path(m['source']).is_file() and m['read_only'] for m in mounts.values()))
     def test_feature_disabled_without_candidate(self):
         self.assertFalse(json.loads((ROOT.parent/'wavy-erp-shell/public/pwa-integration.json').read_text())['enabled'])
         self.assertIn('return 404',(ROOT.parent/'wavy-erp-shell/nginx-pwa-disabled.conf').read_text())
     def test_bundle_refuses_missing_or_mutable_images(self):
+        import copy
         tool=load(C/'validate-bundle.py')
-        with self.assertRaises(ValueError):tool.validate(json.loads((C/'release-plan.json').read_text()))
-        data=json.loads((C/'release-plan.json').read_text());data['images']={c:{'version':'0.1.0-abcdef0','digest':'sha256:'+'a'*64} for c in data['components']};tool.validate(data)
-        data['images']['pwa']['digest']='sha256:short'
-        with self.assertRaises(ValueError):tool.validate(data)
+        data=json.loads((C/'release-plan.json').read_text())
+        self.assertTrue(tool.validate(data))
+        mutations=[lambda d: d['images'].pop('pwa'),
+                   lambda d: d['images']['pwa'].update(digest='sha256:short'),
+                   lambda d: d['images']['pwa'].update(reference='ghcr.io/fabffo/wavy-pwa:latest'),
+                   lambda d: d['images']['pwa']['ociLabels'].update({'org.opencontainers.image.revision':'abcdef0'}),
+                   lambda d: d['images']['pwa']['ociLabels'].update({'org.opencontainers.image.source':'wrong'}),
+                   lambda d: d['images']['pwa']['ociLabels'].update({'org.opencontainers.image.version':'9.9.9'}),
+                   lambda d: d['images']['pwa'].update(platform='linux/arm64'),
+                   lambda d: d.update(pwaEnabledByDefault=True),
+                   lambda d: d.update(deploymentOrder=list(reversed(d['deploymentOrder'])))]
+        for mutate in mutations:
+            candidate=copy.deepcopy(data);mutate(candidate)
+            with self.assertRaises(ValueError):tool.validate(candidate)
+
+    def test_candidate_stays_closed(self):
+        self.assertFalse(json.loads((C/'pwa-integration.disabled.json').read_text())['enabled'])
+        self.assertIn('location = /pwa { return 404; }',(C/'nginx-pwa-disabled.conf').read_text())
+        self.assertIn('location /pwa/ { return 404; }',(C/'nginx-pwa-disabled.conf').read_text())
+        override=(C/'compose.override.yml').read_text()
+        self.assertNotIn('/nginx-pwa-enabled.conf',override)
+        self.assertNotIn('/pwa-integration.enabled.json',override)
+
 if __name__=='__main__':unittest.main()

@@ -14,3 +14,7 @@ backups/
 # Journaux et verrous PREPROD produits uniquement sur la VM
 deployments/preprod*.tsv
 deployments/preprod.lock
+
+# Réservation et état privés du candidat PWA (jamais des secrets dans Git).
+deployments/preprod-reservation.json
+deployments/pwa-release/

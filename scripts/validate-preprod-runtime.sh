@@ -1,14 +1,18 @@
 #!/usr/bin/env bash
 # Validation explicite d’une installation initiale ; ne recrée aucun service.
 set -euo pipefail
+# Contrat commun : conserve le verrou pendant toute la commande et refuse une réservation.
+if [[ ${WAVY_PREPROD_WRAPPED_ENTRY:-} != "${BASH_SOURCE[0]}" ]]; then
+  export WAVY_PREPROD_WRAPPED_ENTRY="${BASH_SOURCE[0]}"
+  exec python3 "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/preprod_operation.py" -- bash "${BASH_SOURCE[0]}" "$@"
+fi
 umask 077
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/_preprod.sh"
 preprod_host_guard
 "$SCRIPT_DIR/validate-preprod-config.sh"
 require_command flock
 mkdir -p "$ROOT_DIR/deployments"
-exec 9>"$ROOT_DIR/deployments/preprod.lock"
-flock -n 9 || die 'Une opération PREPROD est en cours.'
+preprod_backup_operation_lock
 for component in socle-api tiers-api contrats-api factures-api tresorerie-api gateway socle-front tiers-front contrats-front factures-front tresorerie-front pwa erp-shell; do
   service="$(service_name "$component" preprod)"
   preprod_container_guard "$service" "$service"

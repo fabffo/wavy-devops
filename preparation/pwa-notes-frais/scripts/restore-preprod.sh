@@ -2,15 +2,14 @@
 # Restore explicite, jamais appelé automatiquement par release-preprod.sh.
 set -euo pipefail
 umask 077
-source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/_preprod.sh"
-source "$SCRIPT_DIR/_preprod-documents.sh"
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/_runtime.sh"
 [[ $# == 2 && $2 == --with-documents ]] || die 'Usage : restore-preprod.sh backups/preprod/<lot> --with-documents (remplace DB ET pièces jointes)'
 backup="$(realpath "$1")"
 [[ "$backup" == "$ROOT_DIR/backups/preprod/"* && -d "$backup" ]] || die 'Lot hors du répertoire backups/preprod.'
 passphrase="$(preprod_value WAVY_BACKUP_ENCRYPTION_PASSPHRASE)"
 [[ ${#passphrase} -ge 32 && "$passphrase" != *CHANGE_ME* ]] || die 'Passphrase absente.'
 preprod_host_guard
-"$SCRIPT_DIR/validate-preprod-config.sh"
+candidate_validate
 for key in WAVY_SMOKE_TENANT_ID WAVY_SMOKE_USER_ID WAVY_SMOKE_COMPANY_ID; do
   [[ "${!key:-}" =~ ^[1-9][0-9]*$ ]] || die "Contexte smoke manquant : $key"
 done
@@ -19,8 +18,7 @@ preprod_document_volume_guard
 require_command openssl
 require_command flock
 mkdir -p "$ROOT_DIR/deployments"
-exec 9>"$ROOT_DIR/deployments/preprod.lock"
-flock -n 9 || die 'Une opération PREPROD est déjà en cours.'
+preprod_backup_operation_lock
 exec 8>"$ROOT_DIR/backups/preprod/.backup.lock"
 flock -n 8 || die 'Une sauvegarde PREPROD est déjà en cours.'
 WAVY_BACKUP_PASSPHRASE="$passphrase" python3 "$SCRIPT_DIR/preprod_backup_manifest.py" verify "$backup"
@@ -35,7 +33,7 @@ for db in socle tiers contrats factures tresorerie; do
   docker exec -i "$container" pg_restore --list < "$tmp/$db.dump" >/dev/null
  done
 WAVY_BACKUP_PASSPHRASE="$passphrase" openssl enc -d -aes-256-cbc -pbkdf2   -pass env:WAVY_BACKUP_PASSPHRASE -in "$backup/documents.tar.enc" -out "$tmp/documents.tar"
-python3 "$SCRIPT_DIR/preprod_document_archive.py" "$tmp/documents.tar"
+python3 "$CANDIDATE_SCRIPTS/preprod_document_archive.py" "$tmp/documents.tar"
 # Pas de restauration avec des APIs susceptibles d’écrire en parallèle.
 for component in socle-api tiers-api contrats-api factures-api tresorerie-api gateway; do
   [[ "$(docker inspect -f '{{.State.Running}}' "$(service_name "$component" preprod)" 2>/dev/null || true)" == false ]] || die 'Arrêter les six backends PREPROD avant restauration.'

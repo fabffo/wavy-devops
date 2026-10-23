@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 # Lot atomique de cinq dumps chiffrés, authentifiés et privés.
 set -euo pipefail
+# Contrat commun : conserve le verrou pendant toute la commande et refuse une réservation.
+if [[ ${WAVY_PREPROD_WRAPPED_ENTRY:-} != "${BASH_SOURCE[0]}" ]]; then
+  export WAVY_PREPROD_WRAPPED_ENTRY="${BASH_SOURCE[0]}"
+  exec python3 "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/preprod_operation.py" -- bash "${BASH_SOURCE[0]}" "$@"
+fi
 umask 077
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/_preprod.sh"
 source "$SCRIPT_DIR/_preprod-documents.sh"
@@ -11,6 +16,10 @@ retention="$(preprod_value WAVY_BACKUP_RETENTION_DAYS)"
 preprod_host_guard
 "$SCRIPT_DIR/validate-preprod-config.sh"
 preprod_document_volume_guard
+# Dès qu'un lot PWA a été préparé, une archive Contrats seule ne doit plus masquer un stockage absent.
+if [[ -f "$ROOT_DIR/deployments/pwa-release/state.json" ]]; then
+  preprod_document_tool ro 'test -d /documents/notes-frais; test ! -L /documents/notes-frais'
+fi
 require_command openssl
 require_command flock
 preprod_backup_operation_lock
@@ -40,8 +49,8 @@ for db in socle tiers contrats factures tresorerie; do
     | WAVY_BACKUP_PASSPHRASE="$passphrase" openssl enc -aes-256-cbc -salt -pbkdf2 \
         -pass env:WAVY_BACKUP_PASSPHRASE -out "$stage/$db.dump.enc"
 done
-info 'Archivage chiffré des pièces jointes Contrats...'
-preprod_document_tool ro 'test -d /documents/contrats; tar -cpf - -C /documents contrats'   | WAVY_BACKUP_PASSPHRASE="$passphrase" openssl enc -aes-256-cbc -salt -pbkdf2       -pass env:WAVY_BACKUP_PASSPHRASE -out "$stage/documents.tar.enc"
+info 'Archivage chiffré des documents Contrats et Notes de frais si présents...'
+preprod_document_tool ro 'test -d /documents/contrats; test ! -L /documents/notes-frais; if test -d /documents/notes-frais; then tar -cpf - -C /documents contrats notes-frais; else tar -cpf - -C /documents contrats; fi'   | WAVY_BACKUP_PASSPHRASE="$passphrase" openssl enc -aes-256-cbc -salt -pbkdf2       -pass env:WAVY_BACKUP_PASSPHRASE -out "$stage/documents.tar.enc"
 # Relire l’archive chiffrée avant de publier un lot déclaré restaurable.
 WAVY_BACKUP_PASSPHRASE="$passphrase" openssl enc -d -aes-256-cbc -pbkdf2 -pass env:WAVY_BACKUP_PASSPHRASE -in "$stage/documents.tar.enc" \
   | python3 "$SCRIPT_DIR/preprod_document_archive.py" -

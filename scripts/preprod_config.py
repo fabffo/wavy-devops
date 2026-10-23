@@ -7,6 +7,7 @@ from pathlib import Path
 import re
 import subprocess
 import sys
+sys.dont_write_bytecode = True
 from urllib.parse import urlsplit
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -252,6 +253,15 @@ if __name__ == '__main__':
         elif action == 'value':
             print(dotenv(env_path).get(sys.argv[3], ''))
         elif action == 'compose':
+            from preprod_operation import Operation
+            compose_options = sys.argv[3:]
+            read_only = compose_options in (['config'], ['config', '--quiet'], ['config', '--format', 'json'])
+            read_only = read_only or (bool(compose_options) and compose_options[0] in ('ps', 'logs', 'images', 'version'))
+            if not read_only:
+                with Operation(ROOT) as operation:
+                    cmd, clean = compose_args(env_path, sys.argv[3:])
+                    clean['WAVY_PREPROD_LOCK_FD'] = str(operation.fd)
+                    raise SystemExit(subprocess.run(cmd, env=clean, pass_fds=(operation.fd,)).returncode)
             cmd, clean = compose_args(env_path, sys.argv[3:])
             os.execvpe(cmd[0], cmd, clean)
         else:

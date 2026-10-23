@@ -93,7 +93,7 @@ class Nginx(unittest.TestCase):
             if command:
                 scripts = root/'scripts'
                 scripts.mkdir()
-                for name in ('_common.sh', '_preprod.sh', 'release-preprod.sh', 'deploy.sh', 'rollback.sh'):
+                for name in ('_common.sh', '_preprod.sh', 'preprod_operation.py', 'release-preprod.sh', 'deploy.sh', 'rollback.sh'):
                     shutil.copyfile(ROOT/'scripts'/name, scripts/name)
                     (scripts/name).chmod(0o700)
                 shutil.copyfile(ROOT/'wavy', root/'wavy')

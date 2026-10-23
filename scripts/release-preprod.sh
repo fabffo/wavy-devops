@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 # Déploiement/rollback ciblé PREPROD, jamais de build ni de restore automatique.
 set -euo pipefail
+# Contrat commun : conserve le verrou pendant toute la commande et refuse une réservation.
+if [[ ${WAVY_PREPROD_WRAPPED_ENTRY:-} != "${BASH_SOURCE[0]}" ]]; then
+  export WAVY_PREPROD_WRAPPED_ENTRY="${BASH_SOURCE[0]}"
+  exec python3 "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/preprod_operation.py" -- bash "${BASH_SOURCE[0]}" "$@"
+fi
 umask 077
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/_preprod.sh"
 action="${1:-}"; component="${2:-}"
@@ -17,8 +22,7 @@ preprod_host_guard
 "$SCRIPT_DIR/validate-preprod-config.sh"
 require_command flock
 mkdir -p "$ROOT_DIR/deployments"
-exec 9>"$ROOT_DIR/deployments/preprod.lock"
-flock -n 9 || die 'Une opération PREPROD est déjà en cours.'
+preprod_backup_operation_lock
 # Refuse une configuration non reproductible, sans interdire l’historique runtime ignoré.
 git -C "$ROOT_DIR" diff --quiet -- docker-compose.preprod.yml scripts versions/preprod.env versions/preprod.digests || die 'Configuration PREPROD modifiée : synchroniser Git avant déploiement.'
 git -C "$ROOT_DIR" diff --cached --quiet || die 'Index Git modifié.'

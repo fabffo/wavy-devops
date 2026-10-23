@@ -1,0 +1,14 @@
+# Réservé à l'action activate de l'orchestrateur après validation liée au lot.
+services:
+  wavy-erp-shell-preprod:
+    volumes:
+      - type: bind
+        source: ${WAVY_PWA_CANDIDATE_DIR:?required}/nginx-pwa-enabled.conf
+        target: /etc/nginx/pwa-route.conf
+        read_only: true
+        bind: {create_host_path: false}
+      - type: bind
+        source: ${WAVY_PWA_CANDIDATE_DIR:?required}/pwa-integration.enabled.json
+        target: /usr/share/nginx/html/pwa-integration.json
+        read_only: true
+        bind: {create_host_path: false}

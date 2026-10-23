@@ -19,14 +19,20 @@ services:
     image: ${PWA_RELEASE_FACTURES_FRONT_IMAGE:?image vérifiée requise}
   wavy-erp-shell-preprod:
     image: ${PWA_RELEASE_ERP_SHELL_IMAGE:?image vérifiée requise}
+    # Fermeture explicite même si le Shell précédent avait déjà été activé.
     volumes:
       - type: bind
-        source: ${WAVY_PWA_CANDIDATE_DIR:?répertoire candidat absolu requis}/nginx-pwa-enabled.conf
+        source: ${WAVY_PWA_CANDIDATE_DIR:?répertoire candidat absolu requis}/nginx-pwa-disabled.conf
         target: /etc/nginx/pwa-route.conf
         read_only: true
+        bind: {create_host_path: false}
       - type: bind
-        source: ${WAVY_PWA_CANDIDATE_DIR:?répertoire candidat absolu requis}/pwa-integration.enabled.json
+        source: ${WAVY_PWA_CANDIDATE_DIR:?répertoire candidat absolu requis}/pwa-integration.disabled.json
         target: /usr/share/nginx/html/pwa-integration.json
         read_only: true
+        bind: {create_host_path: false}
+    # Défense au démarrage seulement : release-preprod.sh utilise --no-deps.
     depends_on:
+      wavy-factures-api-preprod: {condition: service_healthy}
+      wavy-factures-front-preprod: {condition: service_healthy}
       wavy-pwa-preprod: {condition: service_healthy}

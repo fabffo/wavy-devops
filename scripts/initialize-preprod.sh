@@ -2,6 +2,11 @@
 # Premier provisionnement explicite UNIQUEMENT sur une VM sans état PREPROD.
 # Ne jamais utiliser pour une mise à jour ; celles-ci passent par deploy.sh.
 set -euo pipefail
+# Contrat commun : conserve le verrou pendant toute la commande et refuse une réservation.
+if [[ ${WAVY_PREPROD_WRAPPED_ENTRY:-} != "${BASH_SOURCE[0]}" ]]; then
+  export WAVY_PREPROD_WRAPPED_ENTRY="${BASH_SOURCE[0]}"
+  exec python3 "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/preprod_operation.py" -- bash "${BASH_SOURCE[0]}" "$@"
+fi
 umask 077
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/_preprod.sh"
 source "$SCRIPT_DIR/_preprod-documents.sh"
@@ -10,8 +15,7 @@ preprod_host_guard
 "$SCRIPT_DIR/validate-preprod-config.sh"
 require_command flock
 mkdir -p "$ROOT_DIR/deployments"
-exec 9>"$ROOT_DIR/deployments/preprod.lock"
-flock -n 9 || die 'Opération PREPROD déjà en cours.'
+preprod_backup_operation_lock
 [[ -z "$(git -C "$ROOT_DIR" status --porcelain -- scripts docker-compose.preprod.yml versions/preprod.env versions/preprod.digests)" ]] || die 'Configuration non synchronisée avec Git.'
 for dir in "$ROOT_DIR" "$(docker info --format '{{.DockerRootDir}}')"; do
   available="$(df -Pk "$dir" | awk 'NR==2 {print $4}')"

@@ -1,0 +1,10 @@
+{
+  "planHash": "REPLACE_WITH_VALIDATED_PLAN_HASH",
+  "checkedAt": "REPLACE_WITH_ACTUAL_UTC_CHECK_TIME",
+  "reviewer": "REPLACE_WITH_REVIEWER_ID",
+  "checks": {
+    "restore-five-databases-and-documents": false,
+    "https-certificate": false,
+    "storage-provisioned": false
+  }
+}

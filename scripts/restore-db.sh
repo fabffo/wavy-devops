@@ -3,8 +3,9 @@
 set -euo pipefail
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/_common.sh"
 
-require_docker
 env="$(env_name)"
+[[ "$env" != preprod ]] || die 'PREPROD : utiliser la chaîne chiffrée backup-preprod.sh/restore-preprod.sh avec documents.'
+require_docker
 backup_root="$ROOT_DIR/backups"
 [[ -d "$backup_root" ]] || die "Aucun dossier backups trouvé : $backup_root"
 

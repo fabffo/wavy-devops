@@ -9,10 +9,15 @@ preprod_backup_operation_lock() {
   local lock="$ROOT_DIR/deployments/preprod.lock"
   require_command flock
   mkdir -p "$ROOT_DIR/deployments"
+  if [[ ${WAVY_PREPROD_LOCK_FD:-} =~ ^[0-9]+$ && /proc/$$/fd/$WAVY_PREPROD_LOCK_FD -ef "$lock" ]]; then
+    exec 9<&"$WAVY_PREPROD_LOCK_FD"
+  fi
   if [[ ! /proc/$$/fd/9 -ef "$lock" ]]; then
     exec 9>"$lock"
   fi
   flock -n 9 || die 'Une opération PREPROD est déjà en cours.'
+  WAVY_PREPROD_LOCK_FD=9 python3 "$SCRIPT_DIR/preprod_operation.py" --root "$ROOT_DIR" --check \
+    || die 'PREPROD réservé : commande classique refusée.'
 }
 preprod_host_guard() {
   [[ "$(hostname -s)" == wavy-preprod ]] || die 'Opération réservée à la VM wavy-preprod ; refus sur ce poste.'
