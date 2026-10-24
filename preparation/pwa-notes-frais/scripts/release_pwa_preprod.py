@@ -32,6 +32,7 @@ def load(path, name):
 config = load(HERE / 'preprod_config.py', 'candidate_config')
 operation = load(ROOT / 'scripts/preprod_operation.py', 'shared_operation')
 edge = load(HERE / 'edge_gate.py', 'edge_gate')
+storage_auth = load(HERE / 'storage_authorization.py', 'storage_authorization')
 
 
 def fingerprint(data):
@@ -158,10 +159,27 @@ class Engine:
         self.operation('verify-images', self.backend.images, self.plan)
         self.state['previous'] = self.operation('snapshot', self.backend.snapshot, self.plan)
         self.save()
+        self._storage_prechecked = True
         self.deploy_bundle()
 
     def deploy_bundle(self):
+        if not getattr(self, '_storage_prechecked', False):
+            raise ValueError('Précontrôles de cette invocation requis')
+        self._storage_prechecked = False
         self.operation('close-edge', self.backend.close)
+        self.attest(self.state['prerequisites'], ['restore-five-databases-and-documents', 'https-certificate', 'storage-provisioned'])
+        self.state['storagePreconditions'] = {'run':self.run_id, 'checkedAt':storage_auth.time.time(),
+                                             'closed':True, 'preflight':True, 'snapshotHash':fingerprint(self.state['previous']),
+                                             'attempt':uuid.uuid4().hex}
+        self.save()
+        authorization_fd = storage_auth.issue(self.directory, self.reservation, self.run_id, self.plan)
+        try:
+            self.operation('provision-storage', self.backend.provision_storage, authorization_fd)
+        finally:
+            os.close(authorization_fd)
+            receipt = self.directory/'storage-authorization.json'
+            if operation.read_private(receipt).get('action') == 'provision-storage':
+                operation.atomic_json(receipt, {'invalidated':True, 'run':self.run_id})
         self.operation('storage', self.backend.storage)
         self.state['backup'] = self.operation('backup', self.backend.backup)
         self.state['completed'] = []
@@ -201,6 +219,7 @@ class Engine:
         if self.state['previous'] is None:
             self.state['previous'] = self.operation('snapshot', self.backend.snapshot, self.plan)
             self.save()
+        self._storage_prechecked = True
         self.deploy_bundle()  # Snapshot initial préservé ; nouvelle preuve fonctionnelle obligatoire.
 
     def abandon(self):
@@ -360,6 +379,7 @@ class DockerBackend:
         self.lock_fd = None
         self.current_plan = None
         self.run_id = None
+        self.storage_authorization_fd = None
         self.gate = edge.Gate(self.directory / 'edge.json')
 
     def identity(self):
@@ -372,7 +392,7 @@ class DockerBackend:
 
     def command(self, args, env=None, combined=False):
         result = subprocess.run(args, env=env, capture_output=True, timeout=900,
-                                pass_fds=(() if self.lock_fd is None else (self.lock_fd,)))
+                                pass_fds=tuple(fd for fd in (self.lock_fd, self.storage_authorization_fd) if fd is not None))
         if result.returncode:
             raise ValueError('Commande runtime refusée')
         return result.stdout + (result.stderr if combined else b'')
@@ -386,6 +406,10 @@ class DockerBackend:
                    PWA_RELEASE_PLAN=str(self.directory / 'runtime-plan.json'),
                    PWA_RELEASE_LOCK_FD=str(self.lock_fd), PWA_RELEASE_RUN=self.run_id, PYTHONDONTWRITEBYTECODE='1',
                    WAVY_PREPROD_LOCK_FD=str(self.lock_fd))
+        if action == 'provision-storage' and self.storage_authorization_fd is not None:
+            env['PWA_STORAGE_AUTH_FD'] = str(self.storage_authorization_fd)
+        else:
+            env.pop('PWA_STORAGE_AUTH_FD', None)
         self.command(['bash', str(HERE / 'runtime-action.sh'), action, *args], env)
 
     def guard(self, plan):
@@ -454,6 +478,13 @@ class DockerBackend:
 
     def open_edge(self, expiry):
         self.gate.open(self.run_id, expiry)
+
+    def provision_storage(self, authorization_fd):
+        self.storage_authorization_fd = authorization_fd
+        try:
+            self.helper('provision-storage')
+        finally:
+            self.storage_authorization_fd = None
 
     def storage(self):
         self.helper('storage')

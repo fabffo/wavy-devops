@@ -107,3 +107,7 @@ wavy-devops/preparation/pwa-notes-frais/wavy-pwa-gate.service.template
 wavy-devops/preparation/pwa-notes-frais/test-operation-guards.py
 wavy-devops/preparation/pwa-notes-frais/test-edge-gate.py
 wavy-devops/preparation/pwa-notes-frais/test-edge-nginx-local.py
+wavy-devops/preparation/pwa-notes-frais/scripts/provision_storage.py
+wavy-devops/preparation/pwa-notes-frais/scripts/storage_authorization.py
+wavy-devops/preparation/pwa-notes-frais/test-storage-security.py
+wavy-devops/preparation/pwa-notes-frais/test-storage-authorization-concurrency.py

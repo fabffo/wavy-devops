@@ -9,6 +9,7 @@ from pathlib import Path
 import subprocess
 import sys
 import tempfile
+import threading
 import unittest
 import unittest.mock
 
@@ -17,6 +18,12 @@ C = Path(__file__).resolve().parent
 spec = importlib.util.spec_from_file_location('release', C / 'scripts/release_pwa_preprod.py')
 release = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(release)
+
+
+class BackendFailure(ValueError):
+    def __init__(self, stage):
+        self.stage = stage
+        super().__init__('SECRET_CANARY_FROM_CHILD_OUTPUT')
 
 
 class MockBackend:
@@ -36,7 +43,7 @@ class MockBackend:
     def step(self, event):
         self.events.append(event)
         if event in self.fail:
-            raise ValueError('SECRET_CANARY_FROM_CHILD_OUTPUT')
+            raise BackendFailure(event)
 
     def identity(self): return 'fixture-config-hash'
     def guard(self, plan): self.step('guard')
@@ -53,6 +60,7 @@ class MockBackend:
         self.step('open-edge')
         if not self.shell_open: raise ValueError('Shell fermé')
         self.open = True
+    def provision_storage(self, authorization_fd): self.step('provision-storage')
     def storage(self): self.step('storage')
     def backup(self):
         self.step('backup')
@@ -85,6 +93,17 @@ class MockBackend:
 
 class Orchestration(unittest.TestCase):
     def setUp(self):
+        # Même horloge logique pour les preuves, le moteur et l'émission des capacités.
+        # Aucun recul de l'horloge hôte ne doit déplacer le point d'échec attendu par ces tests.
+        class Clock(datetime):
+            current = datetime(2026,10,24,12,0,tzinfo=timezone.utc)
+            @classmethod
+            def now(cls, tz=None): return cls.current if tz is None else cls.current.astimezone(tz)
+        self.clock = Clock
+        patches = [unittest.mock.patch.object(release,'datetime',Clock),
+                   unittest.mock.patch.object(release.storage_auth.time,'time',side_effect=lambda:Clock.current.timestamp())]
+        for patch in patches:
+            patch.start();self.addCleanup(patch.stop)
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
         self.root = Path(self.tmp.name)
@@ -112,6 +131,8 @@ class Orchestration(unittest.TestCase):
 
     def test_exact_order_and_explicit_activation(self):
         self.validated()
+        ordered = ['guard','preflight','images','snapshot','close','provision-storage','storage','backup','deploy-factures-api-closed']
+        self.assertEqual([self.backend.events.index(e) for e in ordered], sorted(self.backend.events.index(e) for e in ordered))
         self.assertEqual([e for e in self.backend.events if e.startswith('deploy-')],
                          ['deploy-' + c + '-closed' for c in release.ORDER])
         self.assertNotIn('record', self.backend.events)
@@ -121,7 +142,7 @@ class Orchestration(unittest.TestCase):
         self.assertEqual(self.backend.events[-1], 'record')
 
     def test_prepare_failure_at_every_step_stops_and_never_activates(self):
-        stages = ['preflight', 'images', 'snapshot', 'close', 'storage', 'backup', 'checks', 'route-closed']
+        stages = ['preflight', 'images', 'snapshot', 'close', 'provision-storage', 'storage', 'backup', 'checks', 'route-closed']
         stages += [prefix + c + suffix for c in release.ORDER for prefix, suffix in
                    [('deploy-', '-closed'), ('healthy-', ''), ('observed-', '')]]
         for stage in stages:
@@ -129,6 +150,8 @@ class Orchestration(unittest.TestCase):
                 backend = MockBackend(self.plan);backend.fail = {stage}
                 engine = release.Engine(backend, Path(tmp) / 'state', self.plan, Path(tmp) / 'lock')
                 with self.assertRaises(ValueError):engine.run('prepare', self.evidence())
+                if stage in ('preflight','images','snapshot','close'):
+                    self.assertNotIn('provision-storage', backend.events)
                 if stage != 'close':self.assertFalse(backend.open)
                 self.assertNotIn('deploy-erp-shell-open', backend.events)
                 self.assertNotIn('record', backend.events)
@@ -294,6 +317,17 @@ class Orchestration(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertNotEqual(subprocess.run(['flock','-n',str(lock),'true']).returncode, 0)
 
+    def test_interrupted_storage_revokes_ticket_and_resume_issues_new_attempt(self):
+        with unittest.mock.patch.object(self.backend, 'provision_storage', side_effect=InterruptedError):
+            with self.assertRaises(InterruptedError):self.engine.run('prepare', self.evidence())
+        receipt=self.engine.directory/'storage-authorization.json'
+        self.assertTrue(json.loads(receipt.read_text())['invalidated'])
+        previous=self.engine.state['storagePreconditions']['attempt']
+        self.assertNotIn('backup', self.backend.events)
+        self.engine.run('resume', self.evidence())
+        self.assertNotEqual(self.engine.state['storagePreconditions']['attempt'],previous)
+        self.assertEqual(self.engine.state['phase'],'prepared')
+
     def test_signal_closes_shell_and_snapshot_survives(self):
         with unittest.mock.patch.object(self.backend, 'storage', side_effect=KeyboardInterrupt):
             with self.assertRaises(KeyboardInterrupt):self.engine.run('prepare', self.evidence())
@@ -350,12 +384,40 @@ class Orchestration(unittest.TestCase):
 
     def test_abandon_cannot_release_first_mutation_that_failed_healthcheck(self):
         self.backend.fail={'healthy-factures-api'}
-        with self.assertRaises(ValueError):self.engine.run('prepare',self.evidence())
+        reached = threading.Event()
+        original = self.backend.healthy
+        def healthy(component):
+            self.assertTrue(self.engine.state['mutationStarted'])
+            self.assertTrue(json.loads(self.engine.path.read_text())['mutationStarted'])
+            reached.set()
+            original(component)
+        with unittest.mock.patch.object(self.backend,'healthy',side_effect=healthy):
+            with self.assertRaises(BackendFailure) as failure:self.engine.run('prepare',self.evidence())
+        self.assertTrue(reached.is_set())
+        self.assertEqual(failure.exception.stage,'healthy-factures-api')
         self.assertEqual(self.engine.state['completed'],[])
         self.assertTrue(self.engine.state['mutationStarted'])
         self.backend.fail.clear()
         with self.assertRaises(ValueError):self.engine.run('abandon')
         self.assertTrue(self.engine.reservation.exists())
+
+    def test_wall_clock_rewind_refuses_before_mutation(self):
+        proof=self.evidence()
+        original=self.backend.close;rewound=threading.Event()
+        def close_then_rewind(readonly=False):
+            original(readonly)
+            if not rewound.is_set():
+                self.clock.current -= timedelta(seconds=2)
+                rewound.set()
+        with unittest.mock.patch.object(self.backend,'close',side_effect=close_then_rewind):
+            with self.assertRaisesRegex(ValueError,'Preuve expirée'):
+                self.engine.run('prepare',proof)
+        self.assertTrue(rewound.is_set())
+        self.assertIn('preflight',self.backend.events)
+        self.assertNotIn('provision-storage',self.backend.events)
+        self.assertFalse(self.engine.state['mutationStarted'])
+        self.assertFalse(any(event.startswith('deploy-') for event in self.backend.events))
+        self.assertEqual(self.engine.state['phase'],'failed')
 
     def test_unconfirmed_edge_blocks_activation_and_keeps_reservation(self):
         import contextlib,io

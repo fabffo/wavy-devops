@@ -863,3 +863,202 @@ ou volume applicatif ; seuls des upstreams factices démarrent dans le conteneur
 Les autres tests utilisent mocks, fichiers temporaires et serveur HTTP loopback éphémère.
 Le test database-from-zero est explicitement désactivé dans le dépôt et n'est pas un exercice de
 restauration réelle ; aucune commande destructrice de base n'est exécutée pendant ces validations.
+
+
+## Provisionnement Notes de frais corrigé — 24 octobre 2026
+
+La première version du provisionnement avait deux défauts confirmés : course entre création et
+chown par chemin, et appel direct possible avec un état preparing et un FD sans précontrôles.
+Cette section remplace les garanties de cette première version. Le correctif reste candidat,
+PWA désactivée par défaut ; aucun manifeste actif ni environnement réel n'est modifié.
+
+Ordre prepare/resume : garde hôte sous verrou global, réservation persistante créée/vérifiée,
+attestation des prérequis, précontrôles HTTPS/configuration/disque, images vérifiées et snapshot
+initial conservé, fermeture HTTPS confirmée, autorisation à usage unique, provisionnement,
+`storage` RO avec montage subpath, sauvegarde complète, puis étapes applicatives. Le booléen
+interne de l'invocation est armé uniquement après les précontrôles ; un état preparing sur disque
+ne suffit jamais à entrer dans cette séquence. L'attestation historique `storage-provisioned`
+désigne l'infrastructure documentaire existante et l'autorisation du provisionnement, pas
+l'existence préalable obligatoire de notes-frais.
+
+### Capacité à usage unique
+
+Après le retour réussi de la fermeture HTTPS et une nouvelle vérification de la fraîcheur des
+prérequis, l'orchestrateur inscrit une attestation dans l'état privé (run, précontrôles, snapshot,
+fermeture, tentative aléatoire et date). `storage_authorization.py` émet alors un reçu privé 0600
+lié à l'action exacte provision-storage, au run, au plan, au contenu et à l'identité inode/mtime
+de l'état et de la réservation. Il expire après au plus 60 secondes, sans dépasser l'échéance des prérequis (24 h) ni celle
+des précontrôles courants. Un jeton aléatoire de 256 bits est
+transmis seulement par pipe hérité ; seul son hash figure dans le reçu. Aucun jeton n'est placé
+dans argv, un fichier ou un journal. La variable d'environnement ne contient que le numéro du FD.
+
+L'appel direct de runtime-action.sh exige ce jeton, le FD du verrou global, la réservation privée,
+les empreintes courantes et un état edge fermé du même run sans latch closureBlocked. La réception
+du jeton consomme le pipe et remplace durablement le reçu AVANT Docker ; il n'est jamais réarmé
+en cas d'échec. Un reçu expiré, un état/réservation modifié, un plan différent, un autre run, une
+autre action ou une barrière non confirmée provoquent un refus. Le finally de l'orchestrateur
+invalide aussi tout reçu non consommé. La reprise réexécute les précontrôles et la fermeture,
+puis crée une nouvelle tentative et un nouveau jeton. Un FD verrouillé n'est pas une capacité.
+Le CLI Compose candidat reste limité à config ; il ne peut pas lancer le provisionnement.
+
+L'échéance d'origine est transmise au helper qui la revérifie avant création, changements de
+métadonnées, publication et contrôle final. Docker ne prolonge pas la validité de l'autorisation.
+Un arrêt brutal peut laisser le reçu et l'état privés ; sans le pipe éphémère ils ne permettent
+pas un nouvel appel. Une commande enfant déjà autorisée peut terminer dans sa fenêtre de 60 s ;
+ce mécanisme ne prétend pas détecter immédiatement la mort du parent.
+
+### Inodes et stockage
+
+Les labels Compose projet wavy-preprod et volume documents-preprod, ainsi que le nom exact
+wavy-preprod_documents-preprod, sont contrôlés avant montage. Le volume et sa racine contrats
+doivent déjà exister. Le helper Python ouvre chaque composant de chemin avec O_DIRECTORY et
+O_NOFOLLOW ; la racine doit appartenir au compte du helper et ne pas être inscriptible par le
+groupe ou les autres utilisateurs. Contrats est ouvert en lecture, jamais modifié.
+
+Si notes-frais existe, son FD doit déjà être 100:101:0700 : aucun fchown/fchmod de réparation.
+Sinon le helper crée un nom aléatoire `.notes-frais.provision-<uuid>`, l'ouvre sans suivre de
+liens et contrôle son identité, son propriétaire initial, son mode et son absence de contenu.
+Les changements utilisent fchmod/fchown sur ce FD, jamais sur un chemin résolu à nouveau.
+Après fsync et revérification d'identité, renameat2(RENAME_NOREPLACE) publie notes-frais sans
+écraser une entrée concurrente, même vide. Les identités du FD final, de Contrats et de la
+racine sont encore vérifiées. Une substitution après ouverture ne peut pas détourner le chown
+vers le remplacement et fait refuser le succès. Aucun lien symbolique n'est suivi.
+
+Le helper s'exécute sans réseau, rootfs RO, avec CHOWN et DAC_OVERRIDE uniquement, dans l'image
+supplémentaire épinglée :
+`python:3.12-alpine@sha256:b658b05ce9c4eb97ec6fc19424818a1f31993659c2b505a532f470e83807815d`.
+Elle doit être approvisionnée explicitement avant préparation, comme l'image PostgreSQL utilitaire
+existante ; l'adaptateur n'effectue aucun pull automatique. Le script est monté RO. Linux avec
+renameat2 est requis ; son absence fait échouer le provisionnement. `storage` demeure RO et
+éprouve réellement le montage volume-subpath=notes-frais sous l'utilisateur 100:101 avant backup.
+
+### Interruption et limites de confiance
+
+Une interruption avant publication peut laisser un répertoire provisoire, vide en 0700, appartenant
+à root ou à 100:101 selon le point atteint. Après publication, notes-frais est déjà conforme ; un
+échec ultérieur peut le laisser en place. Aucun répertoire ni document n'est supprimé ou réparé
+automatiquement. Les traces provisoires sont conservées et une reprise utilise un nouveau nom,
+sans les suivre ni les recycler. Une inspection explicite pourra décider de leur traitement ;
+ne jamais supprimer des documents pour débloquer une reprise. La réservation reste persistante.
+
+Le volume parent et les sources/états privés sont de confiance, administrés par l'identité
+opérationnelle. Le compte qui peut modifier ces scripts ou forger les états privés, comme un
+administrateur root/Docker complet, peut contourner les contrôles applicatifs. Les descripteurs
+protègent contre les substitutions pendant les opérations ; ils n'isolent pas un administrateur
+capable de modifier les inodes, les permissions ou les montages arbitrairement, notamment avant
+l'ouverture initiale d'un répertoire privé. Restreindre les droits et les chemins d'exploitation.
+La preuve est une autorisation de l'orchestrateur, pas une attestation indépendante de l'hôte.
+
+### Non-régressions locales
+
+Les fragments historiques reproduisent le succès indésirable du remplacement et de l'appel
+direct sans précontrôles. Les régressions du correctif imposent le refus des mêmes scénarios,
+avec substitutions par répertoire/lien au point de fchown, destination concurrente, permissions
+incorrectes, interruption, préservation Contrats, idempotence et archive candidate. Les tests
+couvrent aussi FD verrouillé sans capacité, run/plan/état/réservation invalidés, expiration,
+autre action, mauvais jeton, réutilisation et révocation/reprise de l'orchestrateur.
+
+`WAVY_TEST_LOCAL_DOCKER=1 python3 preparation/pwa-notes-frais/test-storage-security.py` ajoute
+un test Linux réel sur un volume `wavy-storage-security-test-<uuid>` jetable, supprimé en finally :
+propriétaires et permissions réels, substitutions et subpath RO sous 100:101. Il utilise seulement
+un contexte Unix local et les images déjà présentes. Les autres cas emploient des répertoires
+privés temporaires et des fixtures ; aucun accès au volume PREPROD, aucune base ni migration.
+
+
+Validation finale locale : **146 tests Python réussis**, dont 18 de sécurité stockage,
+5 de vérification runtime RO et 24 d'orchestrateur ; suites candidates et DevOps existantes,
+rendus Compose de fixture, huit contrôles historique, quatre nginx -t, lot OCI/RepoDigests local,
+syntaxe de 26 fichiers Python et 63 fichiers Bash, git diff --check conformes. Le scanner
+`detect-secrets` 1.5.0 ne relève aucun secret dans le périmètre du correctif. FILES.txt référence
+les deux helpers et la nouvelle suite. Aucun commit, push, accès VM ou base ; manifestes actifs,
+versions/digests/historiques et fichiers locaux préexistants préservés. Ce résultat autorise une
+revue du correctif ; il ne valide pas une préparation ou un déploiement PREPROD réel.
+
+
+## V3 — consommation exclusive et horloge des tests — 24 octobre 2026
+
+La revue V2 a confirmé deux consommateurs autorisés simultanément : ils partageaient la même
+description du verrou global hérité et avaient chacun une copie du jeton dans un pipe distinct.
+Un remplacement atomique de l'enveloppe courante ne réservait pas sa consommation. Le résultat
+V2 de 146 tests ci-dessus est historique : il ne couvrait pas ce scénario concurrent.
+
+### Reçu terminal par capacité
+
+`storage_authorization.claim_once` crée désormais
+`deployments/pwa-release/storage-consumed-<sha256-du-jeton>.json` avec
+O_CREAT|O_EXCL|O_NOFOLLOW et mode 0600. La création exclusive du nom est le point de décision :
+un seul gagnant, indépendamment des descriptions de fichiers du verrou global. Le contenu minimal
+(run, plan et consumed:true) est écrit, flushé, fsyncé, puis le répertoire est fsyncé AVANT la mise
+à jour de l'enveloppe courante et avant tout retour autorisant Docker. Le verrou global, les
+contrôles d'état/réservation/edge et les échéances V2 restent obligatoires, sans être l'unique
+protection contre le rejeu.
+
+Un fichier terminal existant, même vide, incomplet ou symbolique, provoque un refus. Aucun code
+ne le supprime, ne le tronque ou ne le remplace. Si le processus est interrompu après la création
+exclusive, le jeton est définitivement brûlé même si l'enveloppe storage-authorization.json affiche
+encore l'autorisation initiale. Un échec de flush/fsync n'autorise aucune opération documentaire.
+Après un crash électrique, la garantie d'une autorisation déjà retournée repose sur les fsync
+réussis et sur un système de fichiers respectant O_EXCL et la persistance POSIX. Ce n'est pas une
+preuve matérielle de résistance à une panne disque.
+
+Avant la création exclusive, aucun succès ni opération Docker n'a été autorisé. Après interruption
+à ce point, une autre copie encore valide du jeton peut gagner la consommation, toujours au plus
+une fois. Après la création exclusive, toute copie et tout nouveau processus sont refusés.
+Une reprise explicitement orchestrée réexécute les précontrôles et crée une nouvelle capacité :
+elle peut remplacer l'enveloppe courante, mais jamais le reçu terminal de l'ancienne capacité.
+Les reçus terminaux restent privés et conservés ; aucune purge automatique n'est introduite.
+Les traces documentaires provisoires, la réservation et les limites administrateur de V2 restent
+inchangées. Un opérateur ne doit jamais effacer un reçu terminal pour réarmer son jeton.
+
+### Concurrence et interruptions déterministes
+
+`test-storage-authorization-concurrency.py` est obligatoire sans option Docker. Des barrières
+alignent réellement 2 puis 10 processus forkés et, pour le FD global partagé, imposent qu'ils
+aient tous lu le même reçu initial avant de poursuivre. Chaque processus reçoit une copie du
+même jeton dans un pipe séparé. Les cas normaux exigent exactement un gagnant, les cas refusés
+zéro, toujours au plus un. La matrice couvre les FD hérités partagés et les FD ouverts
+indépendamment, les reçus modifiés/expirés/autre run et le rejeu par de nouveaux processus.
+Des rendez-vous explicites permettent SIGKILL avant le claim, pendant son fsync, après le claim
+durable et après le retour de consommation. Aucune attente temporelle supposée ne remplace ces
+rendez-vous. Les bornes de join/barrière sont uniquement des watchdogs d'échec des tests.
+Les horloges logiques sont identiques dans le parent et les consommateurs pour isoler la
+concurrence des recalages de l'horloge hôte.
+
+La reproduction commune à deux consommateurs a été exécutée sur une copie temporaire V2 :
+deux succès, donc échec de la nouvelle assertion. Le même scénario passe en V3 avec un seul
+succès. La copie historique utilisée pour ce contrôle ne fait pas partie du dépôt.
+
+### Analyse de mutationStarted
+
+Le diagnostic a reproduit un refus anticipé « Preuve expirée ou sans relecteur » alors que le
+test attendait l'échec healthy-factures-api. Une observation instrumentée a mesuré un recul UTC
+d'environ 1,7 seconde pendant que CLOCK_MONOTONIC avançait ; l'âge calculé de la preuve devenait
+négatif (-1,527181 s). La mutation n'avait donc pas commencé, conformément au refus sécurisé du
+moteur. Ce n'était pas une course sur mutationStarted, ni un état partagé entre les répertoires
+temporaires ; l'assertion générique ValueError confondait deux points de refus. L'origine externe
+du recalage UTC n'a pas été modifiée ni investiguée sur une VM.
+
+Les tests d'orchestrateur synchronisent maintenant leurs preuves, dates du moteur et capacités
+sur une horloge logique contrôlée. Le scénario vérifie explicitement le rendez-vous healthy,
+le marqueur mutationStarted déjà persisté et une exception BackendFailure portant exactement
+healthy-factures-api. Un refus antérieur différent fait échouer le test. Une régression distincte
+fait reculer l'horloge de deux secondes et vérifie le refus AVANT mutation. Les contrôles de
+production sur les preuves futures ou expirées ne sont pas assouplis ; aucun délai n'est augmenté.
+
+
+Résultats V3 : **159 tests Python validés**, dont 12 de consommation concurrente et durable,
+18 de sécurité stockage et 25 d'orchestrateur. La suite orchestrateur a réussi trois passages
+complets, plus 100 répétitions isolées du scénario mutationStarted avec contrôle de l'étape
+healthy attendue. Les cas à 2/10 consommateurs ont exactement un gagnant ; rejeux, reçus invalides,
+claims interrompus et erreurs fsync n'autorisent aucun second gagnant. Une expiration pendant la
+transition durable brûle le jeton sans retourner d'autorisation, même si l'horloge est ensuite
+rétablie dans la simulation. Les refus sont persistants avec l'ancienne enveloppe réintroduite.
+
+Rendus Compose, quatre nginx -t, huit contrôles historique, OCI/RepoDigests locaux, syntaxe de
+27 fichiers Python et 63 fichiers Bash, git diff --check et scan detect-secrets 1.5.0 conformes.
+FILES.txt couvre le nouveau test obligatoire ; aucun fichier hors périmètre, index Git vide.
+Aucun accès VM, commit, push, build/publication Docker, changement de base ou manifeste actif.
+La PWA reste désactivée par défaut. Ces validations autorisent une revue du correctif, pas une
+préparation PREPROD réelle. L'horloge UTC correcte, les images utilitaires épinglées déjà présentes,
+les permissions privées, la fiabilité du stockage/fsync et l'identité d'exploitation de confiance
+restent des prérequis ; aucune collecte automatique des reçus terminaux n'est introduite.

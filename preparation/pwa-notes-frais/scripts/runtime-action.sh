@@ -29,6 +29,19 @@ case "${1:-}" in
       [[ $available =~ ^[0-9]+$ ]] && ((available >= 1048576)) || die 'Disque insuffisant.'
     done
     ;;
+  provision-storage)
+    deadline="$(candidate_provision_guard)"
+    preprod_document_volume_guard
+    [[ "$(docker volume inspect -f '{{.Name}}' "$DOCUMENT_VOLUME")" == wavy-preprod_documents-preprod ]] || die 'Identité du volume inattendue.'
+    python_image=python:3.12-alpine@sha256:b658b05ce9c4eb97ec6fc19424818a1f31993659c2b505a532f470e83807815d
+    docker image inspect "$python_image" >/dev/null 2>&1 || die 'Image Python de provisionnement épinglée absente.'
+    docker run --rm --pull never --network none --read-only --user 0:0 \
+      --security-opt no-new-privileges:true --cap-drop ALL --cap-add CHOWN --cap-add DAC_OVERRIDE \
+      --env "WAVY_STORAGE_DEADLINE=$deadline" \
+      --mount "type=volume,source=$DOCUMENT_VOLUME,target=/documents" \
+      --mount "type=bind,source=$CANDIDATE_SCRIPTS/provision_storage.py,target=/provision_storage.py,readonly" \
+      --entrypoint python3 "$python_image" -B /provision_storage.py
+    ;;
   storage)
     preprod_document_volume_guard
     # Lecture seulement : ne crée ni répertoire ni fichier sur le volume.

@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Adaptateur Bash stockage avec Docker/hostname/stat simulés ; volumes actifs inaccessibles."""
 import json
+import hashlib
+import importlib.util
 import os
 from pathlib import Path
 import shutil
@@ -26,7 +28,7 @@ args=sys.argv[1:]
 with open(os.environ['MOCK_LOG'],'a') as f:f.write(json.dumps(args)+'\\n')
 if args[:2]==['context','inspect']:print('unix:///var/run/docker.sock')
 elif args[:2]==['volume','inspect']:
-    print('wavy-preprod' if 'com.docker.compose.project' in ' '.join(args) else 'documents-preprod')
+    print(os.environ.get('MOCK_PROJECT','wavy-preprod') if 'com.docker.compose.project' in ' '.join(args) else (os.environ.get('MOCK_VOLUME_NAME','wavy-preprod_documents-preprod') if '{{.Name}}' in args else os.environ.get('MOCK_VOLUME_LABEL','documents-preprod')))
 elif args[0]=='run':
     if '100:101' in args and os.environ.get('MOCK_UNREADABLE')=='1':sys.exit(1)
     script=args[-1].replace('/documents',os.environ['MOCK_DOCUMENTS'])
@@ -36,6 +38,18 @@ elif args[0] not in ('info','compose','image'):sys.exit(90)
         for name, source in {'docker':docker, 'hostname':"print('wavy-preprod')",
                              'stat':"import os,sys; print(os.environ.get('MOCK_OWNER','100:101')+':'+oct(os.stat(sys.argv[-1]).st_mode & 0o777)[2:])"}.items():
             file=self.bin/name;file.write_text('#!'+sys.executable+'\n'+source+'\n');file.chmod(0o755)
+        self.fixture = self.root/'repo'
+        shutil.copytree(C.parent.parent/'scripts', self.fixture/'scripts', ignore=shutil.ignore_patterns('__pycache__'))
+        shutil.copytree(C/'scripts', self.fixture/'preparation/pwa-notes-frais/scripts', ignore=shutil.ignore_patterns('__pycache__'))
+        self.runtime = self.fixture/'preparation/pwa-notes-frais/scripts/runtime-action.sh'
+        self.private = self.fixture/'deployments/pwa-release'; self.private.mkdir(parents=True, mode=0o700)
+        self.plan = self.private/'runtime-plan.json'; self.plan.write_text((C/'release-plan.json').read_text())
+        spec = importlib.util.spec_from_file_location('test_operation', self.fixture/'scripts/preprod_operation.py')
+        self.operation = importlib.util.module_from_spec(spec); spec.loader.exec_module(self.operation)
+        self.run = 'a'*32
+        self.digest = hashlib.sha256(json.dumps(json.loads(self.plan.read_text()),sort_keys=True).encode()).hexdigest()
+        self.operation.atomic_json(self.fixture/'deployments/preprod-reservation.json', {'run':self.run,'planHash':self.digest})
+        self.operation.atomic_json(self.private/'state.json', {'run':self.run,'planHash':self.digest,'phase':'preparing','previous':{}})
         self.env={**os.environ,'PATH':str(self.bin)+':/usr/bin:/bin',
                   'PWA_RELEASE_PLAN':str(C/'release-plan.json'),'PWA_RELEASE_ENV':str(self.root/'unused.env'),
                   'MOCK_DOCUMENTS':str(self.docs),'MOCK_LOG':str(self.log)}

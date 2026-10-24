@@ -29,3 +29,9 @@ try:
 except Exception:raise SystemExit('Verrou/réservation candidate refusé.')
 PY
 }
+
+# Le FD verrouillé ne constitue pas une autorisation ; consommation du reçu et du jeton.
+candidate_provision_guard() {
+  preprod_backup_operation_lock
+  python3 "$CANDIDATE_SCRIPTS/storage_authorization.py"
+}
