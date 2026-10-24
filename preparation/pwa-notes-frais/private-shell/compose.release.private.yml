@@ -1,0 +1,20 @@
+# Candidat privé quatre images ; jamais utilisé seul, aucun port publié.
+services:
+  wavy-factures-api-preprod:
+    image: ghcr.io/fabffo/wavy-factures-api@sha256:a414a866c910bd20a4c8af4018fc0e31db513ffff1cca76b15c913807f75d0e5
+    environment:
+      WAVY_FACTURES_STOCKAGE_JUSTIFICATIFS: /app/justificatifs
+      WAVY_FACTURES_JUSTIFICATIF_MAX_BYTES: '10485760'
+      WAVY_FACTURES_MULTIPART_MAX_FILE_SIZE: 10MB
+      WAVY_FACTURES_MULTIPART_MAX_REQUEST_SIZE: 11MB
+    volumes:
+      - type: volume
+        source: documents-preprod
+        target: /app/justificatifs
+        volume: {nocopy: true, subpath: notes-frais}
+  wavy-factures-front-preprod:
+    image: ghcr.io/fabffo/wavy-factures-front@sha256:92afeb07b95e08fcd3379d70c4b02bb984fb0dd2afba9f0aa1bd74c262448470
+  wavy-pwa-preprod:
+    image: ghcr.io/fabffo/wavy-pwa@sha256:95c0cbb999708b40cd20ddc66a719e796d38d8d90c97835410a74f3d432f751b
+  wavy-erp-shell-preprod:
+    image: ghcr.io/fabffo/wavy-erp-shell@sha256:0182ea7a16a1c0d665e98df0b2bc4e318d96534ea11b4c9de0aee825f9ad8022

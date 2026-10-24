@@ -1,0 +1,131 @@
+AVIS HISTORIQUE — corrections locales ultérieures : voir PLAN-INSTALLATION.txt.
+
+Wavy — Revue finale contradictoire — 24 octobre 2026
+
+Décision : NO-GO POUR COMMIT ROUTAGE PRIVÉ PWA.
+Cette revue remplace l'avis favorable initial, conservé dans RAPPORT.txt.
+Lecture intégrale du rapport, des deux configs, du Compose et des trois tests
+initiaux, ainsi que du préflight ; examen complémentaire des contrôleurs Notes,
+du filtre Gateway et des sources de stockage navigateur PWA. Aucun sous-agent.
+
+BLOQUANT — Fausse fermeture sur marqueur invalide (routes.conf:7,11,21,31,42,55)
+Le test -f vérifie le type de fichier, pas sa lecture, son contenu, son propriétaire
+ou sa date. Quatre reproductions HTTP réelles sur le Nginx de l'image Shell :
+contenu invalid-json, JSON expiré en 2000, fichier chmod 000 et lien symbolique
+vers un fichier existant => GET /pwa/ répond 200 au lieu de 404. Nginx peut stat
+un fichier chmod 000 sans pouvoir le lire. Un répertoire parent réellement
+inaccessible devrait faire échouer stat, mais ne corrige pas ces quatre cas.
+Absence du marqueur : fermeture vérifiée. Le préflight refuse un marqueur
+présent au moment de son exécution ; il ne protège pas les requêtes suivantes.
+
+BLOQUANT — Ouverture illimitée et droits non validés
+Aucune expiration ; un fichier vide ouvre et survit aux redémarrages. Le
+préflight accepte control en mode 0777 : test en échec reproduit sur fixture.
+Les droits/owner des sources et leur intégrité ne sont pas attestés. Une source
+bind RO dans le conteneur reste modifiable par un acteur ayant les droits hôte.
+
+BLOQUANT — Contournement de la barrière Nginx par paramètre de chemin
+POST /api/notes-frais;v=1/1/justificatif, marqueur absent, atteint la fixture
+API avec HTTP 200. Les locations exacte et /api/notes-frais/ ne couvrent pas
+ce chemin, qui passe dans /api/. Ce test prouve l'absence de filtrage à l'entrée ;
+il ne prouve PAS que Gateway/Spring accepteraient réellement l'écriture.
+Exiger rejet 400/403 de ces ambiguïtés avant proxy, avec tests ; inclure
+paramètres matriciels encodés, double encodage et variantes normalisées.
+
+BLOQUANT POUR L'EXIGENCE 7 — Fermeture != révocation des données client
+ngsw local n'a aucun dataGroup et les assets restent sous /pwa/, ce qui est bon.
+Mais no-store ne purge ni worker ni localStorage ni données déjà en mémoire.
+ContextService conserve email, noms, tenant, société et rôles dans
+wavy-pwa-contexte ; ScanHistoryService conserve nomFichier, message et
+numeroFacture dans wavy-pwa-scans. La fermeture Nginx ne déclenche aucun nettoyage.
+Le rapport initial ne mentionnait que les caches SW. Les API partagées et GET
+Notes/justificatifs restent accessibles à une session valide après fermeture,
+conformément à l'objectif de préserver l'ERP ; Nginx ne distingue pas un appel
+ERP d'un ancien onglet PWA utilisant la même session. La garantie stricte
+« aucune donnée sensible après fermeture » n'est donc pas établie. Il faut
+préciser cette garantie et prouver le comportement client (profil dédié,
+pas de persistance sensible, nettoyage et revalidation avant affichage).
+Aucun serveur ne peut effacer des données déjà copiées par un utilisateur.
+
+Expiration proposée — à implémenter avant nouvel avis favorable
+Remplacer le marqueur d'existence par un contrôle auth_request interne au
+Shell vers un petit service privé, sans port publié et indépendant de PWA.
+À chaque requête, sans cache, valider une autorisation atomique 0600 sous
+répertoire 0700, owner attendu, fichier régulier, O_NOFOLLOW, schéma strict,
+identifiant du run lié aux quatre digests, openedAt/notAfter UTC, durée maximale
+par exemple 15 minutes. Refuser absent/corrompu/illisible/expiré/futur ou service
+indisponible ; traduire l'erreur en fermeture, sans fallback vers l'amont.
+Compléter par un délai monotone en mémoire, refuser toute réouverture au restart
+sans nouvelle autorisation ; une horloge reculant ne doit pas prolonger le test.
+Un timer retire/révoque l'autorisation à échéance, en défense supplémentaire ;
+la vérification par requête garantit la fermeture même si le timer échoue.
+Ouverture explicite sous verrou/réservation existants après preuves, aucun
+renouvellement tacite ; fermer avant rollback, même si rollback échoue.
+Fermeture et expiration doivent être testées sans reload et PWA arrêtée.
+Cette proposition n'est pas implémentée dans la revue ; ne pas présenter les
+nouveaux tests rouges comme attendus/acceptables pour une livraison.
+
+Autres vérifications
+- Fermeture ordinaire sans reload et sans PWA : OK sur fixtures locales.
+- POST/PUT/PATCH/DELETE/OPTIONS sont maintenant testés sur création, modification,
+  suppression, justificatif, transformation et les six actions par note ;
+  verrou fermé => 403, ouvert => transfert. La couverture repose sur les
+  mappings des deux contrôleurs locaux, pas sur une preuve runtime PREPROD.
+- /api/, cinq modules et / : OK dans les trois états ; cookies transmis.
+- Aucun header tenant/société/utilisateur forgé par ce candidat ; le Gateway
+  retire les headers client puis reconstruit le contexte depuis la session.
+  Aucun contournement de session observé dans le diff, mais les fixtures HTTP
+  ne prouvent pas l'isolation métier ni les images réellement servies.
+- Compose : mêmes images, services, réseaux, volumes métier, cookies et ports
+  après retrait des seuls trois binds. Un seul port publié, 127.0.0.1:24443.
+  Tunnel seul accès externe prévu ; le réseau Docker partagé reste accessible
+  aux autres conteneurs et ne fournit pas une isolation PWA.
+- Candidat HTTPS public : fichiers inchangés et suites dédiées vertes.
+- Test assets repose sur dist local, chemins applicatifs absolus propres à cette
+  machine ; absence du dist provoque un skip. Ne pas l'assimiler à une preuve
+  reproductible des quatre images/digests réellement déployés.
+
+Tests exécutés localement, sans build/pull/VM
+private-shell/test-private.py : 3 OK (matrice de méthodes élargie, curl sans
+suivi de redirect, query string et /pwa exact désormais vérifiés).
+private-shell/test-compose.py : 2 OK ; test-assets.py : 1 OK.
+private-shell/test-review-regressions.py : 6 ÉCHECS BLOQUANTS.
+Candidat existant : test-candidate.py 9 OK ; test-compose-validator.py 7 OK ;
+test-orchestrator.py 25 OK ; test-edge-gate.py 5 OK ; test-operation-guards.py
+4 OK ; test-storage-security.py 17 OK, 1 skip (Docker jetable non sélectionné).
+Nginx : test-nginx-local.py quatre configurations syntaxiquement valides ;
+test-edge-nginx-local.py 4 OK ; scripts/test-preprod-nginx.py 5 OK.
+Total unittest : 82 réussis, 1 ignoré, 6 échecs. Aucun test DB/runtime stockage
+ou navigateur lancé. Les alertes orchestrateur sont des scénarios négatifs.
+
+Git, secrets et inventaire
+Aucun fichier suivi modifié/indexé ; aucun manifeste actif ou script public
+modifié. Tous les fichiers du candidat sont encore non suivis. git diff --check
+et --cached --check passent ; audit-local.py contrôle aussi le whitespace des
+fichiers non suivis et imprime leur SHA-256.
+Gitleaks et trufflehog indisponibles. Scan heuristique local du candidat : clés
+privées, tokens GitHub/AWS/OpenAI, URL avec identifiants et credentials littéraux ;
+aucune détection. Ce scan ne certifie pas l'absence de secrets et ne porte pas
+sur les .env privés ou l'historique. Aucun contenu sensible affiché.
+
+Inventaire exhaustif dans private-shell/ (12 fichiers)
+Préexistants conservés : compose.private.yml, control/.gitkeep, routes.conf,
+shell.conf.template, test-assets.py, test-compose.py, validate-private.py.
+Préexistants modifiés par la revue : RAPPORT.txt (avis initial remplacé),
+test-private.py (curl, méthodes/endpoints, hooks de régression, redirect/query).
+Nouveaux : test-review-regressions.py, audit-local.py, REVUE-FINALE.txt.
+Aucun marqueur open livré. Aucun autre fichier créé/modifié volontairement.
+Six fichiers .pyc non suivis étaient déjà présents avant la revue, laissés en
+place et exclus du candidat :
+preparation/pwa-notes-frais/scripts/__pycache__/edge_gate.cpython-312.pyc
+preparation/pwa-notes-frais/scripts/__pycache__/preprod_config.cpython-312.pyc
+preparation/pwa-notes-frais/scripts/__pycache__/preprod_document_archive.cpython-312.pyc
+preparation/pwa-notes-frais/scripts/__pycache__/release_pwa_preprod.cpython-312.pyc
+scripts/__pycache__/preprod_config.cpython-312.pyc
+scripts/__pycache__/test-preprod-config.cpython-312.pyc
+Ne pas les inclure dans un futur commit. Exécutions avec PYTHONDONTWRITEBYTECODE=1.
+
+Aucun commit, push, accès VM, build d'image, déploiement, ouverture de port,
+changement de base ou de données documentaires.
+
+NO-GO POUR COMMIT ROUTAGE PRIVÉ PWA

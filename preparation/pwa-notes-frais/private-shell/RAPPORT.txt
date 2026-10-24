@@ -1,0 +1,113 @@
+AVIS INITIAL REMPLACÉ : voir REVUE-FINALE.txt. NO-GO POUR COMMIT.
+
+Wavy — Candidat routage privé ERP Shell — 24 octobre 2026
+
+Statut : PRÉPARATION LOCALE UNIQUEMENT, PWA fermée par défaut.
+Aucun accès VM, build, pull, déploiement, commit/push, changement des manifestes
+actifs PREPROD/RECETTE, des bases ou des données documentaires.
+
+Fichiers candidats
+- shell.conf.template : copie de ../wavy-erp-shell/nginx.conf local. Seul
+  l'include PWA change, avec une variable API dédiée substituée au démarrage.
+  /api/, les cinq /modules/*/ et le fallback / sont conservés.
+- routes.conf : /pwa => /pwa/ (308), suppression d'un seul préfixe /pwa/
+  vers wavy-pwa-preprod. Query string conservée, pas de sub_filter Angular.
+  DNS Docker différé (127.0.0.11), cache DNS 5 s : l'absence de PWA ne bloque
+  pas le chargement Nginx. L'amont PWA sert sa SPA à la racine.
+- compose.private.yml : trois binds RO, sans création implicite de source.
+  Aucun changement d'image, réseau, ports, environnement API ou volumes métier.
+  Port hérité exclusivement loopback 127.0.0.1:24443. Aucun Nginx Ubuntu.
+- control/.gitkeep : répertoire de commande livré SANS marqueur open.
+- validate-private.py : préflight privé en lecture seule, --env-file obligatoire.
+  Réutilise le validateur PREPROD puis autorise seulement ces trois montages.
+  Refuse une PWA déjà ouverte, les montages inattendus et le profil hors tunnel.
+- test-private.py, test-compose.py, test-assets.py : tests locaux reproductibles.
+
+Mécanisme proposé pour les tests autorisés (non exécuté)
+Le répertoire control doit être réservé à l'opérateur ; il est monté comme
+répertoire, jamais comme fichier open isolé. Nginx vérifie l'existence de
+/run/wavy-private-pwa/open à chaque requête, open_file_cache explicitement off.
+Absence => 404 PWA et API /api/pwa ; écritures Notes de frais => 403.
+La création explicite du marqueur par l'opérateur autorisé ouvre le test.
+La suppression du marqueur ferme immédiatement les NOUVELLES requêtes,
+sans reload Nginx, changement d'image, Docker exec, arrêt PWA ou rollback.
+Une interruption après échec de rollback doit laisser le marqueur absent.
+Aucun marqueur n'a été créé dans le candidat livré.
+Ne pas combiner cette variante avec les overlays d'activation/edge publics.
+L'endpoint pwa-integration.json du Shell conserve sa version désactivée :
+l'accès de test est direct /pwa/, sans activation du menu global ERP.
+
+Notes de frais et justificatifs
+Les lectures restent sur l'API existante, y compris les justificatifs ;
+toutes les méthodes autres que GET/HEAD sous /api/notes-frais sont bloquées
+sans marqueur. Cela rend aussi les écritures Notes ERP temporairement
+indisponibles pendant la fermeture : effet volontaire à faire valider.
+À l'ouverture, corps, cookies et Authorization sont transmis normalement ;
+aucun tenant/société/utilisateur injecté, aucune session créée par Nginx,
+aucune suppression d'authentification ou de contrôle backend. Limite de corps
+64m conservée ; limites métier 10/11 MB et stockage restent du ressort du
+lot backend existant. Ce candidat ne provisionne ni ne monte de justificatifs.
+Il ne suffit pas pour livrer le nouveau backend : les preuves stockage,
+restauration et autorisation du candidat général restent obligatoires.
+
+Angular et navigateur
+Les artefacts dist locaux existants (pas reconstruits) ont été vérifiés :
+base /pwa/, scripts/styles relatifs présents, manifeste scope /pwa/,
+start_url /pwa/notes-frais, icônes relatives présentes, index et hashTable
+ngsw sous /pwa/, worker présent, aucun dataGroup d'API et absence de l'URL
+API localhost:8088 dans main. Production source utilise /api.
+Le Dockerfile PWA sert à / avec try_files : le proxy retire donc /pwa/.
+Pas de Service-Worker-Allowed élargi : scope maximal naturel /pwa/.
+Ces résultats ne prouvent pas que les images distantes sont identiques au dist.
+localhost peut permettre le service worker en HTTP ; les comportements cookies,
+auth réelle, installation Android/iOS et Secure doivent être testés au navigateur.
+Ne pas désactiver Secure dans une image ou un profil HTTPS pour ce test.
+Un service worker déjà installé peut servir une UI hors ligne après fermeture.
+La fermeture serveur ne purge pas les caches clients, ne révoque pas une session
+et n'annule pas une requête déjà en vol. Nettoyage du worker/cache ou profil
+navigateur dédié obligatoire pour vérifier une fermeture visuelle.
+
+Orchestrateur
+Le release_pwa_preprod.py public et ses preuves HTTPS/cookie Secure, edge natif,
+lease, stockage, sauvegarde et restauration restent INCHANGÉS. Aucun flag pour
+les ignorer. Le nouveau validate-private.py adapte seulement le préflight au
+routage tunnel ; il ne déploie et n'active rien. Il ne faut pas faire passer
+ce candidat pour une release HTTPS validée.
+Avant toute automatisation d'ouverture : ajouter un backend privé distinct,
+sous le même verrou/réservation durable ; fermer le marqueur AVANT mutation ;
+lier les preuves aux quatre digests et à l'origine http://localhost:24443 ;
+exiger session/tenant/société/utilisateur et justificatifs ; confirmer PWA fermée
+et routes ERP accessibles avant/après rollback. Ouvrir en dernier, pour une
+fenêtre autorisée et bornée ; toujours fermer dans les chemins d'erreur.
+Le marqueur proposé n'expire PAS tout seul et survit au redémarrage du Shell :
+l'automatisation doit supprimer le marqueur au début de chaque opération et
+prévoir une échéance externe avant une activation automatisée. Elle reste
+bloquée dans cette livraison. Aucun branchement sur l'orchestrateur public.
+Si le rollback enlève l'overlay privé, la fermeture dépend de la config de
+l'image restaurée : conserver cet overlay jusqu'à preuve de fermeture, puis
+restaurer le Shell d'origine fermé. Ne jamais arrêter le Shell pour fermer PWA.
+
+Résultats locaux
+- test-private.py : 3/3, Nginx de l'image Shell exacte du release-plan, --pull
+  never, --network none, aucun port publié, fixtures uniquement. Syntaxe et
+  HTTP : fermé/ouvert/refermé sans reload, amont PWA indisponible, ressources,
+  worker/manifeste, URL encodée, API, justificatifs, cookies et cinq modules ERP.
+  Les fixtures ne remplacent pas un test d'autorisation métier réel.
+- test-compose.py : 2/2, rendu avec données synthétiques, égalité au Compose
+  de base après retrait des seuls trois binds ; préflight privé exécuté.
+- test-assets.py : 1/1 sur dist local existant.
+- test-orchestrator.py existant : 25/25.
+- test-compose-validator.py existant : 7/7.
+Les messages ALERTE de fermeture de l'orchestrateur sont des scénarios négatifs
+attendus et les tests passent. Aucun test sur la VM ni preuve runtime PREPROD.
+
+Risques restant à lever avant activation
+Écart possible entre template local et configuration effective VM (non lue),
+digests des artefacts réellement servis, disponibilité DNS Docker, permissions
+réelles du répertoire de commande, restauration gardant le verrou privé,
+expiration automatique, tests navigateur et isolation métier. Les lectures
+Notes restent autorisées à travers les contrôles backend comme dans l'ERP.
+La PWA reste joignable entre conteneurs du réseau Docker existant : la barrière
+porte sur l'entrée Shell du tunnel, elle ne constitue pas une isolation réseau.
+
+GO POUR REVUE ROUTAGE PRIVÉ PWA

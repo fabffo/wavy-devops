@@ -1,0 +1,339 @@
+DOCUMENT HISTORIQUE — remplacé pour la finalisation par ORCHESTRATEUR-PRIVE.txt et RESULTATS-ORCHESTRATEUR.txt.
+
+Wavy — Plan d'installation TEST PREPROD PRIVÉE — 24 octobre 2026
+
+DÉCISION : NO-GO POUR INSTALLATION TEST PREPROD.
+Préparation locale uniquement. Les corrections de routage sont testées ; aucune
+preuve VM, sauvegarde restaurée ou test métier réel n'est inventée. Les actions
+ci-dessous nécessitent une validation explicite ultérieure. Ne pas lancer les
+anciennes commandes activate HTTPS, ne pas déclarer leurs checks HTTPS vrais.
+RAPPORT.txt et REVUE-FINALE.txt sont des avis historiques ; ce plan décrit le
+candidat corrigé. Aucun changement de manifeste actif, PostgreSQL ou documents.
+
+1. Architecture corrigée
+ERP Shell/Nginx Docker conservés, entrée unique 127.0.0.1:24443. Aucun DNS,
+Nginx natif ou port 80/443. L'écoute supplémentaire 127.0.0.1:8087 existe seulement
+DANS le conteneur pour la redirection /pwa après auth_request ; aucun mapping
+Compose. Le port est inaccessible sur les interfaces réseau du conteneur.
+La PWA reste résolue dynamiquement sur wavy-preprod ; son absence ne bloque
+pas le démarrage Nginx ou l'ERP. /api/ et les cinq modules sont conservés.
+Les chemins API matriciels, les pourcentages résiduels après normalisation et
+les doubles encodages sont refusés avant proxy ; les query strings ordinaires
+ne sont pas concernées. Ce rejet concerne toutes les routes /api/ : vérifier
+les usages ERP de paramètres matriciels/chemins contenant un pourcentage avant
+approbation ; aucune modification de données ni des contrôles backend.
+
+session-gate.py remplace définitivement le marqueur open (désormais ignoré).
+Communication auth_request par socket Unix, aucun port TCP, endpoint interne
+Nginx non appelable par le client. Le service Python est hors conteneur PWA,
+sans Nginx hôte ; il ne peut qu'autoriser ou refuser une session.
+Par défaut fermé, ouverture seulement au démarrage avec --authorize-test et
+un fichier cookie 0600 dans un parent 0700 appartenant à l'opérateur. Fichier
+régulier sans symlink, lecture bornée ; cookie unique WAVY_SESSION obligatoire.
+La valeur de session n'est conservée qu'en hash SHA-256 en mémoire du service.
+Durée 1..900 secondes : contrôles monotone et UTC à chaque requête, timer de
+fermeture supplémentaire, recul d'horloge ferme, redémarrage fermé sans reprise
+automatique des arguments d'ouverture. SIGUSR1 ferme définitivement le grant
+courant. Crash/arrêt/socket absent => PWA 404 et écritures Notes 403 ; délais
+proxy gate 1 seconde. Aucun reload Nginx requis pour fermer.
+Tout autre cookie/session est refusé. Le hash ne remplace jamais les contrôles
+de session backend ; session révoquée/tenant/société/utilisateur restent vérifiés
+par Gateway/API. Changement de société avec le même cookie reste possible.
+Si le login renouvelle le cookie, il faut clore puis autoriser explicitement la
+nouvelle session dans une nouvelle fenêtre ; aucun renouvellement automatique.
+
+Le socket 0666 ne propose qu'un check lecture seule ; son répertoire 0755 est
+inscriptible seulement par l'opérateur, monté RO dans Shell. Un utilisateur local
+ou conteneur ayant déjà accès à une session valide reste dans le modèle de
+confiance de cette session ; ce dispositif ne protège pas d'un administrateur
+Docker/root. Les logs du gate n'impriment ni cookie ni contenu documentaire.
+Le contrôle d'ouverture opérateur est manuel : il n'atteste PAS la disponibilité
+des preuves de release. L'adaptateur d'orchestration privée manque encore.
+
+Les écritures de toutes méthodes hors GET/HEAD sous /api/notes-frais sont
+soumises à la même session temporaire, y compris justificatifs et transformations.
+Cela bloque aussi les écritures ERP Notes des autres utilisateurs pendant le
+test/fermeture ; à accepter dans la fenêtre de maintenance. Les lectures ERP
+restent sous l'authentification existante. /api/pwa reste fermé sans autorisation.
+pwa-integration.json conserve enabled=false, accès test direct /pwa/ seulement.
+
+2. Quatre images, aucune reconstruction
+compose.release.private.yml fige les références du release-plan.json existant :
+- factures-api 0.1.0-09fcd98 :
+  ghcr.io/fabffo/wavy-factures-api@sha256:a414a866c910bd20a4c8af4018fc0e31db513ffff1cca76b15c913807f75d0e5
+- factures-front 0.1.0-a201858 :
+  ghcr.io/fabffo/wavy-factures-front@sha256:92afeb07b95e08fcd3379d70c4b02bb984fb0dd2afba9f0aa1bd74c262448470
+- pwa 0.1.0-6944c31 :
+  ghcr.io/fabffo/wavy-pwa@sha256:95c0cbb999708b40cd20ddc66a719e796d38d8d90c97835410a74f3d432f751b
+- erp-shell 0.1.0-0cfb699 :
+  ghcr.io/fabffo/wavy-erp-shell@sha256:0182ea7a16a1c0d665e98df0b2bc4e318d96534ea11b4c9de0aee825f9ad8022
+Inspection du cache Docker LOCAL : digests, plateforme linux/amd64 et labels
+OCI version/source/revision conformes pour les quatre. Lecture de l'image PWA
+épinglée : base /pwa/, manifeste scope /pwa/, start /pwa/notes-frais, index ngsw
+/pwa/index.html et aucun dataGroup. Aucun pull ni vérification actuelle GHCR.
+Revalider ces mêmes éléments sur VM après acquisition explicite des digests ;
+pas de latest/tag flottant. Architecture VM, Docker/Compose subpath et module
+Nginx auth_request à confirmer ; image Shell locale nginx -t validée.
+
+3. Prérequis BLOQUANTS avant autorisation
+- Chemin exact du checkout VM, hostname/project/labels conteneurs et volume,
+  état effectif Nginx, espace disque (images + backup + restauration isolée),
+  UID/GID du processus Factures et absence de dépendance d'une autre release.
+- Livraison approuvée et traçable des fichiers candidats (encore non committés),
+  hash du plan, inventaire, snapshot durable des quatre images/configs actuelles.
+- Backend privé d'orchestration sous verrou deployments/preprod.lock et même
+  réservation durable que scripts/preprod_operation.py, avec fermeture avant
+  mutation et à chaque reprise/erreur ; les commandes publiques actuelles ne
+  savent pas valider ce profil. Ne jamais contourner ce verrou avec un appel
+  direct à Docker ou en supprimant un fichier de réservation/verrou.
+- Autorisation de provisionnement à usage unique, liée au run/plan et aux FD
+  hérités : réutiliser storage_authorization.py, sans substituer un simple
+  timestamp à cette autorisation. Son adaptateur privé reste à implémenter.
+- Snapshot chiffré récent restauré intégralement en environnement isolé ; aucun
+  lot n'a été lu, déchiffré ou restauré dans cette étape.
+- Compte test dédié, au moins deux sociétés et deux tenants, utilisateurs distincts,
+  jeu documentaire synthétique JPEG/PNG/PDF. Identifiants uniquement privés,
+  pas dans Git, CLI, logs, pièces de preuve ou captures.
+- Profil tunnel existant cohérent : http://localhost:24443, CORS même origine,
+  cookies HttpOnly/SameSite et paramètre Secure déjà adapté par le profil tunnel
+  validé. Ne jamais désactiver Secure d'une configuration HTTPS ni passer les
+  checks HTTPS publics par une dérogation.
+- Provider IA, modèle, clé WAVY_AI_API_KEY et sortie réseau du backend testés.
+  Garder WAVY_AI_ACHAT_AUTO_CREATION_ENABLED=false : l'extraction d'une note ne
+  doit pas créer une facture achat implicitement. Échec 401/quota/timeout IA
+  doit rester visible et ne pas produire un faux résultat « IA OK ».
+- Persistance navigateur : sources PWA stockent contexte et historique scans
+  en localStorage ; la fermeture serveur ne les retire pas. Profil navigateur
+  jetable dédié, données synthétiques uniquement, purge complète en fin de test.
+  Garantie « effacer des données déjà reçues » impossible par le routage seul.
+  Aucun GO pour données réelles tant que la politique client n'est pas validée.
+
+4. Stockage documentaire prévu, AUCUNE exécution ici
+Volume existant attendu : wavy-preprod_documents-preprod, labels projet et volume
+à vérifier. Contrats reste inchangé. Créer uniquement notes-frais vide avec
+100:101:0700 ; refuser symlink, mauvaise racine/owner/mode, inode substitué,
+répertoire préexistant non conforme. Aucun chown -R sur le volume partagé.
+Le mécanisme existant provision_storage.py utilise des descripteurs O_NOFOLLOW,
+renameat2 exclusif, fchmod/fchown et une échéance courte ; conserver son reçu/
+jeton et son verrou dans le futur backend privé. Il ne corrige pas un répertoire
+préexistant incorrect : une intervention séparée serait nécessaire.
+L'overlay donne UNIQUEMENT le subpath notes-frais à Factures, monté à
+/app/justificatifs, nocopy=true ; limite métier 10 MiB, multipart 10MB/11MB.
+Contrats conserve son montage original. Contrôler lecture ET écriture comme
+100:101 sur fixture autorisée, puis suppression de cette fixture ; ne pas
+utiliser un justificatif métier pour tester les permissions.
+
+5. Sauvegarde et restauration
+AVANT provisionnement : lot initial chiffré des cinq DB + Contrats (Notes peut
+être absent). APRÈS provisionnement et avant migrations : deuxième lot complet
+incluant notes-frais vide ou existant. Les cinq bases sont socle, tiers,
+contrats, factures, tresorerie. Quiescer proprement gateway + cinq APIs pendant
+TOUT le lot ; refuser arrêt forcé 137, reprise contrôlée même en erreur.
+Mécanismes examinés : pg_dump -Fc, OpenSSL AES-256-CBC + salt/PBKDF2, HMAC du
+manifest format 2 avec PBKDF2 200000 et SHA-256 de chaque ciphertext. CBC seul
+n'authentifie pas : vérifier le HMAC AVANT déchiffrement. Répertoire backup 0700,
+fichiers 0600, passphrase hors Git et sauvegarde hors VM contrôlée. Le script
+candidat exige les deux racines documentaires ; le script actif permet Notes
+absent AVANT préparation. L'adaptation privée des gardes reste nécessaire.
+Contrôler catalogues pg_restore --list des cinq dumps, archive documentaire
+sans lien/traversée et contenant les deux racines dans le lot post-provision.
+
+restore-isolated.compose.yml prépare six services sans ports ni réseau :
+cinq PostgreSQL épinglés et une copie documentaire. Projet UNIQUE
+wavy-pwa-restore-<run>, aucun container_name/volume external/nom PREPROD.
+Les secrets de restauration sont synthétiques, distincts de PREPROD ; le lot
+chiffré doit être copié en lecture seule et identifié par HMAC/run/date.
+Restaurer les cinq dumps et les deux racines dans les copies seulement ;
+contrôler tables et Flyway, cohérence des FK et références/fichiers justificatifs,
+comptages et empreintes des documents, propriétaire 100:101:0700 de notes-frais.
+Le test Compose prouve la séparation des noms et l'absence de ports/réseau,
+pas la restaurabilité d'un vrai backup. L'exercice reste à autoriser et exécuter.
+Ne PAS utiliser restore-preprod.sh pour l'exercice : il cible les ressources
+actives et remplace DB/documents. Aucun restore automatique en rollback.
+
+6. Séquence future coordonnée, à implémenter dans l'adaptateur privé
+A. Réservation/verrou durable, snapshot des quatre images/configs et preuves.
+B. Fermer le gate et vérifier PWA 404, Notes écritures 403, ERP disponible.
+C. Sauvegarde initiale cohérente, exercice isolé ; autorisation provisioning.
+D. Provisionner notes-frais, contrôler permissions/subpath puis second backup
+   cohérent et exercice isolé complet. Conserver les deux lots distincts.
+E. Acquérir/inspecter les quatre digests, valider Compose privé complet fermé,
+   installer le gate par défaut FERMÉ ; aucun argument d'ouverture persistant.
+F. Mettre en place le Shell privé FERMÉ comme barrière AVANT mutations backend
+   si le Shell courant ne fournit pas cette fermeture. C'est une étape de
+   sécurisation à part entière, puis vérifier immédiatement les routes ERP.
+   La cohorte finale reste API -> Factures Front -> PWA -> Shell en dernier.
+G. Migrer/déployer Factures API, contrôler Flyway, health, UID/GID et stockage ;
+   Factures Front, PWA, puis Shell complet avec les binds privés conservés.
+   Chaque composant : --no-deps --no-build --pull never, stop au premier échec.
+H. Healthchecks + smoke ERP, cinq modules, auth et API ; preuves de la cohorte
+   observée par digest. Tant que fermé, aucune écriture Notes via l'entrée Shell.
+I. Connexion dédiée via ERP/login, capturer le cookie de cette session dans un
+   fichier privé hors checkout ; ouverture explicite <=900 s, tests ci-dessous.
+J. SIGUSR1 immédiatement en fin de test, même en erreur/timeout ; contrôler
+   avec cookie autorisé et autre session que PWA=404 et écritures=403.
+   Garder la barrière fermée, confirmer ERP, supprimer le fichier cookie,
+   révoquer la session backend et détruire le profil navigateur dédié.
+K. Ne libérer la réservation qu'après fermeture confirmée et situation cohérente.
+
+Rollback : fermeture du gate AVANT toute tentative Docker. Enregistrer l'échec
+si fermeture non confirmée ; aucune nouvelle ouverture. Restaurer les quatre
+images et configs snapshot, sous le même verrou, en gardant la barrière Shell
+privée fermée jusqu'à preuve qu'un Shell restauré ferme réellement /pwa et les
+écritures Notes. Échec rollback : conserver gate fermé/réservation et rapport
+reprise ; ne jamais arrêter Shell pour fermer la PWA. Ne pas supprimer les
+justificatifs créés, volumes ou colonnes. Un ancien backend doit être compatible
+avec les migrations effectuées ; preuve manquante => pas de rollback binaire
+aveugle, maintenance et décision explicite. Restore DB+documents du même lot
+uniquement après autorisation séparée, six backends arrêtés, cinq transactions
+DB distinctes : pas d'atomicité distribuée.
+
+7. Tests d'acceptation backend réel et IA (non exécutés)
+Fenêtre de test <=15 min ; clore puis réautoriser explicitement une nouvelle
+fenêtre si nécessaire. Enregistrer run/digests/date, sans cookie ni document.
+- Tunnel : /, /api/tiers/health, cinq /modules/*/ avant/pendant/après ; aucun
+  accès direct sur IP VM:24443 depuis l'extérieur. /pwa fermé hors grant.
+- Auth : sans session/expirée/autre session refusés ; connexion compte dédié,
+  société A -> B puis retour, aucune ancienne donnée A affichée en B.
+- Import : photo puis JPEG, PNG, PDF synthétiques ; MIME usurpé, fichier trop
+  gros et extension interdite refusés, nom dangereux non réutilisé comme chemin.
+- Extraction : provider IA réel/configuration validée, champs lus vérifiés contre
+  fixture, pas de création automatique facture ; traiter timeout/quota/erreur.
+- Créer/modifier une note avec justificatif ; recharger après navigation et
+  redémarrage autorisé API, comparer contenu/empreinte, consulter depuis ERP.
+- Isolation : autre utilisateur/société/tenant, identifiants de notes devinés et
+  headers contexte falsifiés => refus sans fuite ni changement documentaire.
+- Fermeture : SIGUSR1, expiration, process gate arrêté, PWA indisponible,
+  requêtes ambiguës/encodées, POST/PUT/PATCH/DELETE/OPTIONS sur tous les mappings
+  Notes et justificatifs refusés ; GET ERP demeure soumis à l'auth backend.
+- Vérifier absence de nouvelle écriture et fichier créé après fermeture avec
+  requêtes de fixture ; une requête déjà en vol doit être drainée/constatée.
+- Worker limité /pwa/, aucun cache API ; purge worker/caches/localStorage du
+  profil jetable, révocation session. Ne pas promettre d'effacement à distance.
+
+8. Commandes futures — exemples à relire, PAS un script d'installation autorisé
+Remplacer VM et chemin par les valeurs confirmées ; ne pas afficher .env,
+Docker .Config.Env ou cookies. Aucun set -x. Les commandes en mutation restent
+bloquées tant que l'adaptateur privé et les preuves ci-dessus manquent.
+
+Poste utilisateur (après validation) :
+  ssh -N -L 24443:127.0.0.1:24443 <VM_ERP_PREPROD_CONFIRMEE>
+  # Accès navigateur http://localhost:24443/pwa/ uniquement pendant le grant.
+
+Sur VM, lecture seule (après autorisation d'accès) :
+  cd <CHEMIN_DEVOPS_VM_CONFIRME>
+  export WAVY_PRIVATE_PWA_DIR="$PWD/preparation/pwa-notes-frais/private-shell"
+  export WAVY_PRIVATE_PWA_GATE_DIR=/run/wavy-private-pwa-gate
+  docker version
+  docker compose version
+  docker network inspect wavy-preprod
+  docker volume inspect wavy-preprod_documents-preprod
+  docker exec wavy-erp-shell-preprod nginx -t
+  docker exec wavy-erp-shell-preprod nginx -T
+  python3 "$WAVY_PRIVATE_PWA_DIR/validate-private.py" --env-file .env.preprod \
+    --gate-dir "$WAVY_PRIVATE_PWA_GATE_DIR" --release-candidate
+  # Le gate-dir doit être préparé par l'opérateur avant ce préflight.
+  # docker image inspect <chacun des quatre digests> (sélectionner labels/ID,
+  # plateforme et RepoDigests seulement ; ne pas publier tout l'environnement).
+
+Préparation opérateur future, MUTATIONS hors données métier :
+  install -d -m 755 "$WAVY_PRIVATE_PWA_GATE_DIR"
+  install -d -m 700 "$WAVY_PRIVATE_PWA_DIR/control"
+  # Propriétaire opérateur à confirmer, pas root si le gate tourne non-root.
+  # Démarrage fermé :
+  python3 -B "$WAVY_PRIVATE_PWA_DIR/session-gate.py" \
+    --socket-dir "$WAVY_PRIVATE_PWA_GATE_DIR"
+  # À superviser sans conserver --authorize-test dans une unité redémarrée.
+  # Les arguments suivants exigent une autorisation de test et un fichier privé
+  # préparé hors dépôt, contenant UNE ligne Cookie avec WAVY_SESSION :
+  python3 -B "$WAVY_PRIVATE_PWA_DIR/session-gate.py" \
+    --socket-dir "$WAVY_PRIVATE_PWA_GATE_DIR" --authorize-test \
+    --session-cookie-file <FICHIER_0600_PARENT_0700_HORS_DEPOT> --seconds 900
+  # Arrêter d'abord l'instance fermée. Retirer un socket résiduel uniquement
+  # après preuve que son processus est arrêté ; jamais remplacer un socket vivant.
+  # Fermeture de l'instance autorisée (PID issu du superviseur vérifié) :
+  kill -USR1 <PID_GATE_CONFIRME>
+  curl --silent --show-error --output /dev/null --write-out '%{http_code}\n' \
+    http://127.0.0.1:24443/pwa/
+  # Attendu 404, puis probes AVEC cookie via fichier curl privé, jamais --cookie
+  # littéral ou export de la valeur en CLI. Vérifier aussi écritures=403 et ERP.
+
+Compose de cohorte fermé — uniquement APRÈS futur verrou/adaptateur validé :
+  # CP est un tableau Bash pour conserver les arguments exacts :
+  CP=(docker compose --env-file .env.preprod --env-file versions/preprod.env \
+      -p wavy-preprod -f docker-compose.preprod.yml \
+      -f "$WAVY_PRIVATE_PWA_DIR/compose.private.yml" \
+      -f "$WAVY_PRIVATE_PWA_DIR/compose.release.private.yml")
+  "${CP[@]}" config --quiet
+  # Acquisition ultérieure autorisée : docker pull <chacun des quatre digests>.
+  # L'adaptateur privé devra exécuter, sous verrou et preuves, pour chaque étape :
+  "${CP[@]}" up -d --no-deps --no-build --pull never --force-recreate wavy-factures-api-preprod
+  "${CP[@]}" up -d --no-deps --no-build --pull never --force-recreate wavy-factures-front-preprod
+  "${CP[@]}" up -d --no-deps --no-build --pull never --force-recreate wavy-pwa-preprod
+  "${CP[@]}" up -d --no-deps --no-build --pull never --force-recreate wavy-erp-shell-preprod
+  # NE PAS copier ces up en exécution manuelle pour contourner la réservation.
+
+Sauvegarde initiale : bash scripts/backup-preprod.sh existe, mais seulement
+avant la réservation de cohorte et sous ses gardes actifs ; après réservation,
+l'adaptateur privé doit transmettre owner/run/FD hérités. Les scripts candidats
+backup-preprod.sh et runtime-action.sh utilisent encore candidate_validate HTTPS :
+ils ne sont PAS utilisables tels quels pour la cohorte privée. Ne pas exporter
+de fausses preuves HTTPS ou supprimer les validations pour les faire passer.
+Provisionnement : aucun appel autonome à provision_storage.py avec seulement
+WAVY_STORAGE_DEADLINE ; l'autorisation storage_authorization.py doit être
+consommée sous verrou par le futur adaptateur. Commande non disponible à ce jour.
+
+Exercice isolé futur, dans une infrastructure approuvée :
+  # ENV_RESTORE, RESTORE_SECRET_DIR, BACKUP_LOT et RUN sont des chemins/ID
+  # confirmés, sans secret littéral ; secret files 0600, parent 0700.
+  # ENV_RESTORE contient RESTORE_{SOCLE,TIERS,CONTRATS,FACTURES,TRESORERIE}_{DB,USER}
+  # et RESTORE_SECRET_DIR. Ne jamais utiliser .env.preprod pour ce projet.
+  R=(docker compose --env-file "$ENV_RESTORE" -p "wavy-pwa-restore-$RUN" \
+     -f "$WAVY_PRIVATE_PWA_DIR/restore-isolated.compose.yml")
+  "${R[@]}" config --quiet
+  # HMAC AVANT toute restauration ; variable lue d'un fichier privé sans log :
+  read -r WAVY_BACKUP_PASSPHRASE < "$RESTORE_SECRET_DIR/backup.passphrase"
+  export WAVY_BACKUP_PASSPHRASE
+  python3 scripts/preprod_backup_manifest.py verify "$BACKUP_LOT"
+  unset WAVY_BACKUP_PASSPHRASE
+  "${R[@]}" up -d --no-build --pull never
+  set -o pipefail
+  for db in socle tiers contrats factures tresorerie; do
+    ready=false
+    for attempt in {1..30}; do
+      if "${R[@]}" exec -T "$db" sh -c 'pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"' >/dev/null; then
+        ready=true; break
+      fi
+      sleep 2
+    done
+    test "$ready" = true || exit 1
+    openssl enc -d -aes-256-cbc -pbkdf2 \
+      -pass "file:$RESTORE_SECRET_DIR/backup.passphrase" -in "$BACKUP_LOT/$db.dump.enc" \
+      | "${R[@]}" exec -T "$db" sh -c \
+        'pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --no-owner --exit-on-error --single-transaction'
+  done
+  # Valider l'archive avec preprod_document_archive.py avant une extraction.
+  openssl enc -d -aes-256-cbc -pbkdf2 \
+    -pass "file:$RESTORE_SECRET_DIR/backup.passphrase" -in "$BACKUP_LOT/documents.tar.enc" \
+    | python3 preparation/pwa-notes-frais/scripts/preprod_document_archive.py -
+  # Puis extraction de CETTE archive vérifiée vers la copie documentaire :
+  openssl enc -d -aes-256-cbc -pbkdf2 \
+    -pass "file:$RESTORE_SECRET_DIR/backup.passphrase" -in "$BACKUP_LOT/documents.tar.enc" \
+    | "${R[@]}" exec -T documents tar -xpf - -C /documents
+  # Attendre pg_isready dans les cinq services avant pg_restore ; contrôler
+  # schémas/contenus/permissions/empreintes avant de déclarer l'exercice réussi.
+  # Nettoyage DE CE PROJET UNIQUEMENT après archivage de la preuve et validation :
+  "${R[@]}" down --volumes
+  # Aucun docker volume prune, aucun volume PREPROD référencé dans cet overlay.
+
+9. État de vérification de cette préparation
+Tests locaux sans réseau ni volumes métier, images locales --pull never :
+quatre tests HTTP private-shell, six anciennes régressions, six tests de lease,
+Compose routage+cohorte, Compose restauration isolée et assets locaux.
+Tests candidats publics, contrats backend et stockage simulés réexécutés.
+Les résultats détaillés sont dans VERIFICATION-INSTALLATION.txt.
+Aucun test extraction IA réel, session réelle, migration, backup réel ou restore
+réel exécuté. Les prérequis absents restent bloquants ; le plan n'autorise pas
+une installation ou une ouverture de test par simple accord implicite.
+
+NO-GO POUR INSTALLATION TEST PREPROD

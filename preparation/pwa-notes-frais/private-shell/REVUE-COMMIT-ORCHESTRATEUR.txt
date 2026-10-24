@@ -1,0 +1,145 @@
+REVUE HISTORIQUE — B1 à B4 corrigés dans la finalisation ; voir RESULTATS-ORCHESTRATEUR.txt.
+
+Wavy — Revue finale indépendante du candidat privé — 24 octobre 2026
+
+NO-GO POUR COMMIT ORCHESTRATEUR PRIVÉ PWA.
+Cet avis remplace le GO pour revue antérieur. Aucune correction fonctionnelle
+n'est appliquée ici : quatre régressions rouges matérialisent les anomalies.
+Lecture intégrale de ORCHESTRATEUR-PRIVE.txt, RESULTATS-ORCHESTRATEUR.txt,
+PLAN-INSTALLATION.txt, README.md global et FILES.txt ; confrontation au moteur,
+backend, gate, adaptateurs, sauvegarde/restauration, Nginx/Compose et V3.
+Revue contradictoire effectuée dans le même workspace, sans sous-agent.
+
+B1 — Entrée directe de restauration sans gardes runtime complets — priorité haute
+restore-private.py:70-83 et :155-160 ; scripts/preprod_operation.py:60-68.
+Le CLI appelle restore() sans garde hostname, daemon local, refus des overrides,
+dotenv canonique ni option explicite d'exécution. Operation hérite d'un FD s'il
+est valide, mais rouvre le verrou si le FD est invalide : ce comportement normal
+du wrapper global ne prouve donc pas ici la présence d'un FD hérité autorisé.
+Reproduction sur racine temporaire avec réservation/état privés du même run,
+appel de restore() utilisé par le CLI, PWA_RELEASE_LOCK_FD=999999 et
+DOCKER_HOST distant fictif : les commandes Docker
+config, up et down SIMULÉES sont atteintes. Aucun Docker réel n'est lancé.
+Ce n'est pas une prise concurrente du flock : l'exclusion reste effective. C'est
+un parcours parallèle au moteur qui élude ses gardes hôte/FD/configuration.
+Corriger en supprimant l'entrée mutante autonome, ou imposer indépendamment
+hôte/daemon/overrides, FD valide du même inode AVANT Operation, run/profil/hash
+canonique/étape attendue et contrat de configuration. Ne pas se fier seulement
+au fait que l'appel normal passe par private-runtime.sh.
+
+B2 — Préconditions V3 artificiellement rajeunies après sauvegarde — priorité haute
+release-private.py:70-85. Les précontrôles et la fermeture sont faits avant la
+baseline ; après le backup, storagePreconditions.checkedAt reçoit l'heure du
+moment sans réexécuter ces contrôles. Avec une baseline simulée de 120 secondes,
+preflight et close ont réellement 120 secondes, mais issue ET consume V3 réels
+acceptent la capacité car l'état annonce une date récente.
+Les helpers V3 sont inchangés et leur reçu terminal reste exclusif ; le défaut
+est dans les attestations que leur fournit le nouveau moteur privé.
+Refaire préflight/fraîcheur des prérequis et fermeture prouvée APRÈS baseline,
+conserver le snapshot initial, puis dater ces contrôles réels et émettre le jeton.
+Ne pas modifier stateHash après issue et ne pas assouplir la borne des 60 s.
+
+B3 — Prérequis périmé pendant les contrôles d'ouverture accepté — priorité haute
+release-private.py:133-142. Prérequis/restore sont vérifiés avant healthy,
+verify-backup/storage/checks ; seule l'autorisation de test est revérifiée après.
+Reproduction déterministe : prérequis âgé de 23 h 59 min 50 s, contrôles de
+20 secondes ; test-window est appelé alors que le prérequis a plus de 24 h.
+La preuve spécifique de session est fraîche, ce qui masque cette expiration.
+Revérifier TOUTES les preuves dont dépend l'ouverture immédiatement avant le
+grant, avec bornage cohérent de la fenêtre. Ajouter la même frontière pour la
+preuve de restauration. La lease elle-même respecte bien le maximum 900 s :
+cette anomalie concerne l'autorisation d'entrer dans la fenêtre, pas sa durée.
+
+B4 — Échec du nettoyage isolé : envFile de reprise supprimé — priorité haute
+restore-private.py:85 et :147-153. Si up échoue puis down --volumes échoue aussi,
+restore-attempt.json reste creating et référence envFile ; mais la sortie du
+TemporaryDirectory supprime automatiquement ce fichier et le staging.
+La procédure de reprise documentée pointe alors vers un --env-file inexistant,
+alors que des ressources isolées peuvent encore subsister. Aucune preuve restore
+n'est publiée, ce qui est correct, mais la récupération promise n'est pas fiable.
+Reproduction avec Docker entièrement simulé, deux erreurs injectées : creating
+persiste et Path(envFile).is_file() vaut False. Aucun volume n'a été créé.
+Préserver un environnement/config de récupération 0600/0700 et l'identité du
+projet jusqu'au nettoyage confirmé, puis seulement supprimer le staging. Tester
+séparément échec up, échec down, timeout, SIGTERM et SIGKILL ; jamais de prune.
+
+Contrôles conformes sur le parcours normal
+- Même Operation/flock global et réservation persistante ; mauvais owner et
+  contention refusés, y compris par les suites V3 à 2 et 10 processus.
+- Issue/consume/claim_once et provision_storage.py identiques à HEAD ; reçu
+  terminal O_EXCL non rejouable. Aucun changement de leurs gardes.
+- Gate fermé par défaut/redémarrage, session unique en mémoire, timer et horloge
+  monotone/UTC <=900 s, retrait de socket sans Docker, PDEATHSIG parent testé.
+- Fermeture avec PWA/gate indisponibles, rollback partiel et interruption : les
+  suites existantes restent vertes. Un JSON irrécupérable bloque les reprises.
+- Nginx garde /api/, cinq modules et / ; filtre les écritures Notes/justificatifs
+  hors GET/HEAD et les chemins ambigus. Aucun port public ajouté ; seul
+  127.0.0.1:24443 demeure publié. La fermeture ne coupe pas le Shell ; backup
+  quiesce les backends et recréations interrompent brièvement le service.
+- Quatre images épinglées exactement par digest dans compose.release.private.yml,
+  conformes au plan ; validate-bundle.py --local-images confirme RepoDigests,
+  labels OCI et plateformes du cache local. Pas de vérification GHCR distante.
+- Sauvegarde : cinq dumps et archive chiffrés, HMAC des ciphertexts avant restore,
+  copie Notes limitée au subpath. Isolation Compose : pas de port/réseau ni volume
+  actif/externe ; pg_restore vise les cinq copies. L'anomalie B4 reste bloquante.
+
+Compatibilité Factures API / justificatifs
+Examen Git en lecture seule des commits locaux b277edb (version des manifestes
+actifs) et 09fcd98 (candidat), ainsi que des services actuels. Aucune migration
+ajoutée entre ces commits sous src/main/resources/db/migration.
+L'ancien modifier appelle appliquerPiece et réécrit directement pieceCheminStockage,
+hash/nom/taille/type depuis le payload client. Il ne gère pas le dépôt original
+sécurisé ndf:<UUID>. Le nouveau appliquer ne modifie plus ces métadonnées ; le
+dépôt sécurisé s'en charge, les verrous et callbacks encadrent les remplacements.
+La réconciliation nouvelle peut supprimer après grâce un fichier devenu orphelin.
+Donc « schéma compatible » ne signifie PAS « ancien backend compatible en écriture ».
+Le rollback doit rester strictement readonly Notes ; conservation des fichiers
+seule insuffisante si leurs références étaient écrasées. La barrière va dans
+ce sens ; aucune compatibilité métier réelle de l'ancien backend n'est prouvée.
+Ne pas rouvrir l'ancien parcours sans preuve spécifique métadonnées/originals.
+Aucun test Java/SQL ou accès à une base n'a été exécuté dans cette revue.
+
+Résultats réexécutés
+Suites privées préexistantes : 52/52 réussis, dont 13 moteur, 9 backend, 3 runtime,
+2 backup, 4 restore, 6 anciennes régressions et les tests Unix/Compose/Nginx.
+Suites partagées : 93 réussis + 1 ignoré, dont concurrence V3 12 et moteur public 25.
+Suites actives : configuration 36, gardes 10, Nginx 5 réussis.
+Nouvelles exigences test-final-review.py : 4 ÉCHECS BLOQUANTS (B1 à B4), sans
+expectedFailure ni skip. Les fonctions/effets Docker sont interceptés ; seules
+les métadonnées/fichiers de fixtures temporaires sont utilisés.
+Total unittest : 196 réussis, 1 ignoré, 4 échecs. En supplément 8 contrôles
+historiques, quatre nginx -t publics et nginx -t HTTP privés conformes.
+Syntaxe 45 Python et 65 Bash conforme ; Compose routage/cohorte/restore conforme.
+Le skip de stockage Docker jetable est maintenu : aucun volume autorisé ici.
+
+Git, inventaire, secrets et autres dépôts
+36 fichiers privés initiaux exactement inventoriés dans FILES.txt. Deux ajouts
+de cette revue (rapport présent + test-final-review.py), inventoriés séparément
+puis ajoutés à FILES.txt : 38 fichiers privés au total. Seuls les documents
+ORCHESTRATEUR-PRIVE.txt, RESULTATS-ORCHESTRATEUR.txt, README.md et FILES.txt sont
+annotés pour remplacer le GO antérieur ; aucune correction de code runtime.
+Manifestes PREPROD/RECETTE, versions/digests/historiques, scripts actifs et V3
+n'ont aucun diff HEAD. Aucune modification indexée ; git diff --check/--cached --check passent.
+Six .pyc hors candidat préexistaient, conservés et exclus du futur commit.
+Scan heuristique des textes privés et ajouts README/FILES : aucune détection ;
+Gitleaks/TruffleHog/detect-secrets indisponibles. Pas de certification exhaustive,
+ni lecture/scan des dotenv privés. Aucune valeur de secret réel imprimée.
+Les status et diffs Git des quatre dépôts voisins restent identiques au début.
+Deux écarts voisins préexistaient : Shell e2e/pwa-notes-frais.local.spec.ts modifié,
+et Factures Front src/environments/environment.preprod.ts non suivi. Le premier
+est dans FILES.txt, le second n'y figure pas. Ils n'ont pas été modifiés par cette
+revue. Classer le fichier Front séparément ; il n'appartient pas au commit DevOps.
+Aucun changement PWA/Factures API voisin ; aucune commande mutante dans ces dépôts.
+
+Prérequis opérationnels encore non validés
+VM/daemon/chemin et permissions réelles, fsync/renameat2/PDEATHSIG, images locales
+sur VM et historique de rollback, espace/temps de backup/restore, restauration
+d'un vrai lot avec cohérence métier DB/documents, sessions et isolation réelles,
+JPEG/PNG/PDF et extraction IA réelle, purge/logout du profil navigateur jetable.
+La fermeture ne retire ni données déjà reçues ni requêtes en vol. Ces limites
+restent distinctes des quatre défauts de code ci-dessus, à corriger avant commit.
+
+Aucun commit, push, accès VM, déploiement, build/pull, modification PostgreSQL,
+volume, manifeste actif ou écriture dans un autre dépôt.
+
+NO-GO POUR COMMIT ORCHESTRATEUR PRIVÉ PWA

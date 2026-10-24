@@ -1,0 +1,72 @@
+DOCUMENT HISTORIQUE — remplacé pour la finalisation par ORCHESTRATEUR-PRIVE.txt et RESULTATS-ORCHESTRATEUR.txt.
+
+Vérification locale du plan — 24 octobre 2026
+
+Portée : corrections de fichiers candidats et tests locaux uniquement. Aucune
+VM, installation, base ou volume métier touchés. Aucun build, pull, commit/push.
+
+Suites exécutées (PYTHONDONTWRITEBYTECODE=1)
+private-shell/test-private.py : 4 OK, syntaxe Nginx + HTTP réel sur image locale
+Shell nginx/1.27.5, réseau none, sans port publié, temporaires uniquement.
+private-shell/test-review-regressions.py : 6 OK, auparavant 6 échecs ; marqueurs
+invalides ignorés, chemins matriciels/encodés refusés, control 0777 refusé.
+private-shell/test-session-gate.py : 6 OK, fermé par défaut, durée bornée,
+expiration monotone/UTC, recul d'horloge, refus d'autre session/cookies ambigus,
+fichier privé, restart fermé, fermeture et HTTP réel sur socket Unix.
+private-shell/test-compose.py : 2 OK ; préflight routage ET quatre images.
+private-shell/test-assets.py : 1 OK, artefacts dist locaux.
+private-shell/test-isolated-restore.py : 1 OK, rendu isolé sans ressource active.
+Candidat public inchangé : test-orchestrator.py 25 OK ; test-runtime-backend.py
+5 OK (contrats Docker simulés, PAS un backend métier réel) ;
+test-storage-runtime.py 5 OK (Docker simulé) ; test-storage-security.py
+17 OK + 1 ignoré (Docker jetable non sélectionné) ; test-candidate.py 9 OK ;
+test-compose-validator.py 7 OK ; test-edge-nginx-local.py 4 OK.
+Total : 92 réussis, 1 ignoré, aucun échec. En supplément test-nginx-local.py :
+quatre configurations publiques syntaxiquement valides.
+Les alertes orchestrateur sont des tests négatifs attendus.
+
+Vérification image locale supplémentaire, sans pull ni accès VM :
+quatre références GHCR du release-plan présentes en RepoDigests, labels OCI
+source/version/revision et linux/amd64 conformes. L'image PWA elle-même contient
+base /pwa/, scope manifeste /pwa/, start_url /pwa/notes-frais, index ngsw
+/pwa/index.html et dataGroups vide. Cela ne revalide pas le registre GHCR actuel.
+
+Git/scan : git diff --check, --cached --check et absence de diff HEAD des
+manifestes actifs/versions/scripts publics vérifiés par audit-local.py. Les
+20 fichiers candidats texte sont scannés par heuristiques, aucune détection.
+Gitleaks/TruffleHog ne sont pas installés ; pas de certification exhaustive ni
+scan des .env privés ou historique. Aucun secret réel ajouté ou affiché.
+Le candidat est encore non suivi. Aucun fichier indexé. Les six .pyc non suivis
+préexistaient, laissés intacts hors candidat ; ils ne doivent pas être commités.
+
+Inventaire exhaustif private-shell/ :
+Nouveaux pendant cette préparation :
+- PLAN-INSTALLATION.txt
+- VERIFICATION-INSTALLATION.txt
+- session-gate.py
+- test-session-gate.py
+- compose.release.private.yml
+- restore-isolated.compose.yml
+- test-isolated-restore.py
+- socket/.gitkeep
+Modifiés pendant cette préparation :
+- routes.conf (auth_request, proxy Unix, fermeture des erreurs)
+- shell.conf.template (rejet des chemins ambigus, redirect loopback conteneur)
+- compose.private.yml (bind socket à la place du marqueur)
+- validate-private.py (permissions, allowlist cohorte quatre images/subpath)
+- test-private.py (gate Unix réel, modes ouvert/fermé/absent et PWA absente)
+- test-review-regressions.py (six exigences maintenues, encodages, contrôle positif)
+- test-compose.py (socket + validation cohorte)
+- REVUE-FINALE.txt (mention historique et renvoi au plan actuel)
+Conservés : RAPPORT.txt, audit-local.py, test-assets.py, control/.gitkeep.
+Permissions locales control passées à 0700, socket 0755 ; Git ne conserve pas
+ces modes de répertoire, la préparation opérateur devra les reproduire.
+
+Aucune preuve de backup chiffré réel, restauration isolée, migration, session
+réelle, autorisation tenant/société/documents ou extraction IA n'a été produite.
+Le code de barrière est un candidat local, pas une release privée coordonnée.
+Le backend privé sous réservation durable et les adaptations backup/provision
+restent à implémenter et valider avant l'installation ; aucun bypass des gardes
+HTTPS publiques n'a été ajouté. Voir les commandes et points bloquants du plan.
+
+NO-GO POUR INSTALLATION TEST PREPROD

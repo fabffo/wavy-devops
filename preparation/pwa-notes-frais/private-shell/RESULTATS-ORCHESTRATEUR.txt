@@ -1,0 +1,86 @@
+WAVY — Finalisation PWA + Notes de frais PREPROD privée — 24 octobre 2026
+
+GO POUR COMMIT ET PRÉPARATION INSTALLATION PREPROD
+Aucun commit/push, accès VM, déploiement, build/pull ni changement de base/volume
+réalisé. Ce GO ne vaut pas validation d'une restauration opérationnelle réelle.
+
+1. Quatre corrections, sans refonte
+B1 : runner restore fermé sans option explicite ; FD du même inode exigé AVANT
+Operation, hôte/daemon locaux sans override, dotenv canonique, run/profil/hash/
+pending et validation privée contrôlés. Le verrou et la réservation restent obligatoires.
+B2 : après baseline, vrais précontrôles et fermeture refaits ; checkedAt est daté
+au début de ces contrôles. V3 conserve la borne 60 s, le snapshot et les reçus exclusifs.
+B3 : trois preuves revérifiées après contrôles lents. L'échéance absolue la plus
+proche borne aussi le gate enfant ; maximum monotone 900 s inchangé.
+B4 : staging et envFile 0700/0600 conservés si down échoue/expire ou si le runner
+est interrompu ; retrait seulement après nettoyage confirmé. Aucune preuve publiée en erreur.
+Les quatre reproductions initiales restent obligatoires et vertes, sans expectedFailure.
+
+2. Fichiers de cette correction
+Runtime : release-private.py, restore-private.py, private-runtime.sh,
+private-backend.py, session-gate.py.
+Tests : test-final-review.py, test-private-backend.py, test-session-gate.py.
+Documents : ORCHESTRATEUR-PRIVE.txt, ce rapport, annotation historique de
+REVUE-COMMIT-ORCHESTRATEUR.txt et section finale du README.md global.
+Aucun nouveau fichier hors inventaire. FILES.txt couvre les 38 fichiers privés.
+Staging préparé par chemins explicites : ces 38 fichiers + README.md + FILES.txt.
+Six caches .pyc préexistants conservés, exclus du staging. Manifestes actifs,
+versions/digests/historiques, scripts actifs et helpers V3/HTTPS public inchangés.
+
+3. Campagne globale unique après correction
+Périmètre                                      Réussis   Ignorés   Échoués
+Candidat privé (12 suites)                          63         0         0
+Candidat partagé/public, concurrence et stockage    93         1         0
+Config/gardes/Nginx actifs, build-image simulé       65         0         0
+TOTAL UNITTEST                                    221         1         0
+
+Inclus : 9 régressions finales, 10 tests backend privé, 7 tests lease ; 25 tests
+moteur public et 12 de consommation V3 concurrente. Le seul skip concerne un test
+créant un volume Docker jetable : il n'est pas autorisé pendant cette étape.
+Compléments conformes : 8 contrôles d'historique, quatre nginx -t publics et
+fixtures HTTP Nginx privées ; Compose routage/cohorte/restauration ; quatre
+RepoDigests/labels/plateformes locaux ; syntaxe 45 Python + 65 Bash ; scan
+heuristique sans détection ; Git et inventaire. Pas de scanner spécialisé installé.
+Les pg_dump/pg_restore/Docker de restauration sont simulés dans les fixtures ;
+les tests crypto/archives/Unix et Nginx locaux ne prouvent pas un restore VM.
+
+4. Prérequis réellement bloquants pour exécuter sur VM
+Autorisation explicite et livraison des sources approuvées ; chemin/compte
+canonique wavy-preprod, horloge UTC, images et utilitaires épinglés disponibles,
+historique des quatre images courantes pour rollback, espace/maintenance et
+permissions réelles 100:101:0700. Dotenv privé tunnel/IA opérationnel, compte test,
+deux tenants/sociétés et documents synthétiques. Les copies isolées et tests
+session/IA réels seront exécutés uniquement après autorisation, avant validation finale.
+Aucun blocage de code connu ne reste parmi B1 à B4. Les permissions/fsync,
+restaurabilité métier, authentification et extraction IA réelles restent à prouver.
+
+5. Commandes de mise en place
+Procédure Bash exacte : ORCHESTRATEUR-PRIVE.txt, section COMMANDES FUTURES.
+Tunnel poste : ssh -N -L 24443:127.0.0.1:24443 wavy-preprod
+VM : vérifier checkout master approuvé et dotenv, préparer le socket au compte
+opérateur, acquérir uniquement les six références épinglées indiquées, puis :
+  R reserve -> R prepare --evidence prerequisites.json -> R restore -> R deploy
+  R open-test --evidence test.json --session-cookie-file session.cookie --seconds 900
+  R close -> R validate --evidence functional.json -> R abandon
+R est le tableau Bash complet du runbook ; toutes les actions après reserve
+exigent --run-id. Aucun booléen de preuve n'est validé automatiquement.
+Le moteur déploie API -> Factures Front -> PWA -> Shell, route toujours fermée.
+Tests autorisés : login/société, JPEG/PNG/PDF, IA réelle, créer/modifier, recharger
+pièce, lecture ERP et refus inter-tenant/société/utilisateur. Fermer puis logout/
+purge du navigateur jetable ; le serveur ne retire pas les données déjà reçues.
+
+6. Retour arrière
+SIGUSR1 au PID orchestrateur vérifié termine normalement la fenêtre et ferme ;
+SIGINT/SIGTERM ferment et laissent un échec à inspecter. SIGKILL tue le gate enfant.
+R close doit prouver PWA=404 et écritures Notes=403 avec marqueur, sans reload
+ni dépendance PWA. R rollback restaure les quatre digests snapshot avec Shell
+DÉMARRÉ et Notes readonly, sans restaurer DB ou supprimer d'original ; garder
+les cinq modules, /api/ et / accessibles selon disponibilité des backends.
+Fournir une preuve récente de compatibilité avant rollback : l'ancien Factures
+API ne doit JAMAIS être rouvert en écriture sur les métadonnées ndf:.
+Rollback incomplet : réservation conservée, pas d'abandon ; diagnostic puis
+retry. Restore interrompu : nettoyer le seul projet isolé via envFile conservé,
+jamais prune ; reprise seulement après inspection. Les requêtes déjà en vol
+ne sont pas annulées par la fermeture.
+
+GO POUR COMMIT ET PRÉPARATION INSTALLATION PREPROD

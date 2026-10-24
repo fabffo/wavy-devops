@@ -1,0 +1,300 @@
+RÉFÉRENCE COURANTE — B1 à B4 corrigés ; résultats uniques dans RESULTATS-ORCHESTRATEUR.txt.
+
+Wavy — Orchestrateur privé PWA, candidat final — 24 octobre 2026
+
+STATUT : GO POUR REVUE ORCHESTRATEUR PRIVÉ PWA.
+Ce statut autorise la revue des fichiers locaux, ni un commit ni une installation.
+Ce document remplace les commandes historiques de PLAN-INSTALLATION.txt, notamment
+le démarrage manuel du gate et la mention d'un adaptateur privé manquant.
+Aucune commande de cette notice n'a été exécutée sur une VM.
+
+Contrat du moteur
+release-private.py est inactif sans --execute-on-approved-host ; CLI et backend
+refusent tout hôte hors wavy-preprod, DOCKER_HOST/DOCKER_CONTEXT ou daemon autre
+que unix:///var/run/docker.sock. Dotenv machine canonique : <repo>/.env.preprod.
+Profil strict tunnel, origine http://localhost:24443, port loopback 24443.
+Aucun Nginx natif, DNS, TLS public ou ouverture 80/443. Les trois binds privés
+restent RO ; les quatre images sont celles du release-plan existant.
+
+Le moteur réutilise Operation de scripts/preprod_operation.py : même inode
+<repo>/deployments/preprod.lock, flock non bloquant et réservation persistante
+preprod-reservation.json, état canonique deployments/pwa-release en 0700.
+Pas de nouveau verrou concurrent. Aucun run accepté par simple environnement.
+reserve produit le run et le hash du plan profilé private-tunnel-v1 ; il conserve
+les requiredChecks du plan HTTPS sans les certifier et sans modifier ce plan.
+Les autres actions exigent le run exact et le même hash/sources/dotenv/gate-dir.
+Un refus de propriétaire ou de flock ne ferme jamais une autre opération.
+Une erreur du propriétaire ferme le socket AVANT de lire les preuves ou appeler
+Docker, même si le JSON d'état est corrompu. La réservation reste en place.
+closureConfirmed exige ensuite des probes HTTP avec marqueur Nginx, distincts
+d'un simple succès d'unlink. En panne Nginx, l'absence de preuve est consignée.
+
+Étapes séparées, aucune activation automatique
+reserve -> reserved
+prepare : preuve maintenance/schéma/synthétique et précontrôles, quatre images
+OCI/platforme, snapshot initial dans l'historique ; barrière sur l'image Shell
+actuelle avec fermeture ciblée ; backup initial cinq DB + Contrats/Notes si
+présentes ; précontrôles/fermeture refaits après backup ; capacité V3 ; provisionnement ; contrôle RO/subpath ; second backup
+complet cinq DB + Contrats ET Notes -> awaiting-restore.
+restore : HMAC avant déchiffrement, catalogues et pg_restore réel dans cinq DB
+jetables, copie des deux racines, empreintes de chaque fichier et 100:101:0700,
+puis nettoyage du seul projet isolé et publication de preuve -> restored.
+deploy : revérification preuves/backup/stockage/cohorte, Factures API puis
+Factures Front puis PWA puis Shell, --no-deps --no-build --pull never, validation
+healthy/Flyway/RepoDigest/ERP, point d'entrée toujours fermé -> prepared.
+open-test : autorisation opérateur liée aux IDs/cohorte/backup, contrôles refaits,
+une session WAVY_SESSION via pipe hérité -> testing au premier plan, durée <=900 s,
+fermeture finale vérifiée -> tested. Aucun enfant ne détient le flock du test.
+validate : attestation du parcours réel ET nettoyage client datée après fermeture,
+liée au run/backup/IDs ; contrôles ERP et fermé -> validated, toujours fermé.
+abandon : fermeture + ERP ; si mutation, validation complète ou rollback complet
+obligatoire ; archive durable puis libération de la réservation. Les binds privés
+et le blocage des écritures Notes restent en place, aucune ouverture implicite.
+
+Réservation conservée entre toutes ces étapes, après erreur, validate et rollback.
+Pas d'enregistrement de promotion publique/HTTPS ni changement des versions actives.
+Le snapshot refuse un Shell actuellement publié hors 127.0.0.1:24443, un montage
+Shell non revu ou un environnement Shell différent du Compose machine reproductible.
+Un Shell existant personnalisé doit donc être réconcilié avant l'opération.
+La mise en place initiale de la barrière recrée le Shell : brève interruption ERP.
+La sauvegarde quiesce les six backends : prévoir une fenêtre de maintenance,
+la disponibilité ERP n'est pas continue pendant la sauvegarde cohérente.
+
+V3 inchangé
+storage_authorization.issue/consume/claim_once et provision_storage.py sont ceux
+du candidat V3, sans copie ni modification. Chemins canoniques pwa-release,
+plan privé complet, run/réservation/état, inode/mtime, fraîcheur <60 s, bridge
+edge.json fermé du même run, pipe hérité et reçu terminal O_EXCL sont requis.
+L'état pending=provision-storage est persisté AVANT issue et n'est plus changé
+avant consume : aucune invalidation accidentelle du stateHash. Le reçu est
+consommé AVANT Docker et jamais effacé/réarmé ; finally invalide toute enveloppe
+non consommée. L'adaptateur d'origine runtime-action.sh n'est réutilisé que pour
+provision-storage, storage et wait, chemins sans validation HTTPS. Les autres
+opérations ont leur adaptateur privé strict, aucune fausse preuve de certificat.
+
+Fermeture et durée
+session-gate.py n'accepte plus --authorize-test/--session-cookie-file autonomes.
+Le moteur transmet la session uniquement par pipe hérité, jamais argv/env/état/
+journal. Le grant est en mémoire, fermé par défaut et au redémarrage ; seule la
+session exacte est admise. Deux cookies WAVY_SESSION ou des contrôles CR/LF sont
+refusés. Les vérifications UTC/monotone et le timer bornent la durée à 900 s. Le gate
+vérifie aussi l’échéance absolue la plus proche des trois preuves (prérequis,
+restauration, autorisation), y compris si le démarrage du child est retardé.
+PDEATHSIG Linux tue le gate si le parent meurt, avec recontrôle de parent au
+fork. Le socket est retiré avant toute commande Docker de fermeture ou rollback.
+Un socket absent/service mort => PWA 404, écritures Notes 403 avec marqueur.
+La suppression finale du socket par le gate vérifie son inode : aucun nouveau
+socket ne peut être effacé par l'ancien processus.
+Les probes PWA sont répétées pendant la fenêtre (intervalle 2 s, curl borné) ;
+un échec observé retire le socket dans finally, sans commande Docker.
+SIGUSR1 au PID ORCHESTRATEUR vérifié demande une fin normale de fenêtre (boucle
+200 ms, puis fermeture/probes), sans reload. SIGINT/SIGTERM sont des échecs :
+fermeture, phase failed, inspection/reprise explicite. SIGKILL ne peut écrire
+l'état final : le gate enfant meurt, la réservation et pending survivent.
+Une requête déjà admise/en vol n'est pas annulée. Un hôte suspendu/panne FS ne
+constitue pas une preuve de disponibilité ; aucune garantie contre root/Docker.
+
+Notes et ERP
+Les lectures ERP de Notes/justificatifs restent contrôlées par Gateway/API.
+Toutes les méthodes autres que GET/HEAD sous /api/notes-frais sont verrouillées
+pendant fermeture et rollback, y compris transformations et justificatifs.
+Pendant le grant, seule la session test peut les écrire : effet à accepter aussi
+pour les utilisateurs ERP. Les routes /api/, cinq modules et / sont conservées.
+Les chemins API matriciels/encodages résiduels sont rejetés avant proxy, y compris
+les doubles encodages ; les recherches en query string ordinaires restent valides.
+Ce filtrage de chemin concerne toutes les API : valider les usages ERP inhabituels.
+Les probes de fermeture emploient OPTIONS sans corps/cookie et exigent le marqueur
+Nginx, pour ne provoquer aucune mutation métier sur un endpoint qui serait ouvert.
+Les tests locaux couvrent POST/PUT/PATCH/DELETE/OPTIONS et les mappings Notes.
+Aucun contexte tenant/société/utilisateur n'est inventé ou forcé dans le proxy.
+
+Rollback et reprise
+rollback conserve le volume et les DB, ferme avant toute action, puis restaure
+les quatre digests snapshot. Le Shell restauré reste DÉMARRÉ avec la barrière
+privée, jamais --no-start ; ERP/probes vérifiés. Aucun pg_restore actif, suppression
+de justificatif, downgrade de migration ou modification de manifeste.
+Une preuve rollback-schema-compatible récente est obligatoire ; si les prérequis
+ont expiré, fournir une nouvelle preuve --evidence (même run/plan/origine).
+Échec partiel => rollback-failed + réservation + gate fermé ; relancer rollback
+avec le même run après diagnostic. Aucun abandon d'une mutation partielle.
+resume ne réexécute jamais un provisioning ambigu. Il exige une preuve récente
+interrupted-effect-inspected, pending exact et resumePhase dans awaiting-restore,
+restored, prepared ou tested. Il conserve le snapshot initial et exige le backup
+complet ; les phases avancées imposent restore/IDs runtime/ERP. Une interruption
+avant le backup complet ne peut pas reprendre à l'aveugle : rollback puis abandon
+et nouvelle réservation/préparation, le provisioning idempotent vérifiera le dossier.
+Après une reprise, la validation fonctionnelle antérieure est invalidée.
+
+Une interruption de restore peut laisser uniquement des copies et du staging
+privé (dumps déchiffrés) sous deployments/pwa-release/restore-private-*. Le projet
+et envFile exacts sont consignés dans restore-attempt.json AVANT up. Après arrêt
+confirmé du runner, inspecter ce projet, config --format json et isolation, puis
+down --volumes DE CE SEUL PROJET avec ce fichier env. Ne jamais utiliser prune,
+restore-preprod.sh, rm d'un volume PREPROD, ni effacer une réservation/reçu V3.
+Nettoyer le staging privé ciblé après preuve que les copies sont retirées. Le
+relecteur doit attester cette inspection avant resume. En cas d’échec ou timeout de down, le staging et envFile restent présents en
+0700/0600 ; ils ne sont retirés qu’après down et état cleaned persisté. SIGTERM
+ou SIGKILL conservent aussi ces données de reprise. Ne supprimer aucun fichier
+avant confirmation du retrait des copies.
+
+Preuves préparées
+prerequisites.private.example.json : maintenance approuvée, compatibilité rollback,
+synthétique uniquement, plan isolation, clé backup et capacité de restauration.
+test-authorization.private.example.json : autorisation de la session test et jeu
+synthétique, IDs observed et backup exacts.
+functional.private.example.json : isolation/changement société/JPEG-PNG-PDF/IA
+réelle/création-modification/rechargement pièce/consultation ERP/nettoyage client.
+resume.private.example.json : effet interrompu inspecté, pending et point de reprise.
+Toutes les valeurs sont vides/fausses. Copies à remplir hors Git, fichiers 0600,
+parent 0700. reviewer et checkedAt UTC réels, âge <=24 h, aucune preuve future.
+Un objet restore-proof.json est généré par l'exercice effectif, pas un booléen
+opérateur remplaçant pg_restore. Il contient identité du lot HMAC, run, projet,
+hash du jeu documentaire et checks des cinq copies ; pas de document ni secret.
+Les preuves opérateur restent déclaratives, pas une attestation indépendante.
+
+COMMANDES FUTURES EXACTES — NE PAS EXÉCUTER pendant la préparation
+Préconditions : livraison approuvée des sources/inventaire, mêmes droits opérateur,
+images publiées et utilitaires épinglés déjà présentes, hostname/daemon corrects,
+.env.preprod 0600 cohérent tunnel/IA, espace suffisant, deux tenants/sociétés et
+utilisateurs tests. Le chemin canonique VM et l'identité SSH doivent être confirmés.
+Aucun pull implicite : acquérir explicitement chaque digest après autorisation.
+Image utilitaire supplémentaire V3 requise :
+python:3.12-alpine@sha256:b658b05ce9c4eb97ec6fc19424818a1f31993659c2b505a532f470e83807815d
+PostgreSQL/utilitaire requis :
+postgres:16-alpine@sha256:93d55776e04376e19adb2733e3ccebb4392ee7dd86d8ff238503b30fe719c84f
+
+Sur poste, terminal tunnel :
+  ssh -N -L 24443:127.0.0.1:24443 wavy-preprod
+
+Sur VM, terminal exploitation, seulement après validation :
+  # WAVY_DEVOPS_ROOT permet de préciser le chemin approuvé s'il diffère.
+  umask 077
+  DEVOPS_ROOT="${WAVY_DEVOPS_ROOT:-$HOME/projets/wavy-devops}"
+  cd "$DEVOPS_ROOT"
+  test "$(hostname -s)" = wavy-preprod
+  test "$(git branch --show-current)" = master
+  git diff --quiet HEAD -- scripts preparation/pwa-notes-frais docker-compose.preprod.yml versions
+  git ls-files --error-unmatch preparation/pwa-notes-frais/private-shell/release-private.py >/dev/null
+  PRIVATE="$PWD/preparation/pwa-notes-frais/private-shell"
+  GATE=/run/wavy-private-pwa-gate
+  # Créer GATE avec le propriétaire d'exploitation réel, pas un autre compte.
+  # Si /run exige root, faire provisionner ce répertoire par l'exploitation.
+  sudo install -d -m 755 -o "$(id -u)" -g "$(id -g)" "$GATE"
+  install -d -m 700 "$PRIVATE/control"
+  R=(python3 -B "$PRIVATE/release-private.py" --env "$PWD/.env.preprod" \
+      --gate-dir "$GATE" --execute-on-approved-host)
+  # Acquisition explicite après autorisation (aucun build, références immuables).
+  docker pull ghcr.io/fabffo/wavy-factures-api@sha256:a414a866c910bd20a4c8af4018fc0e31db513ffff1cca76b15c913807f75d0e5
+  docker pull ghcr.io/fabffo/wavy-factures-front@sha256:92afeb07b95e08fcd3379d70c4b02bb984fb0dd2afba9f0aa1bd74c262448470
+  docker pull ghcr.io/fabffo/wavy-pwa@sha256:95c0cbb999708b40cd20ddc66a719e796d38d8d90c97835410a74f3d432f751b
+  docker pull ghcr.io/fabffo/wavy-erp-shell@sha256:0182ea7a16a1c0d665e98df0b2bc4e318d96534ea11b4c9de0aee825f9ad8022
+  docker pull python:3.12-alpine@sha256:b658b05ce9c4eb97ec6fc19424818a1f31993659c2b505a532f470e83807815d
+  docker pull postgres:16-alpine@sha256:93d55776e04376e19adb2733e3ccebb4392ee7dd86d8ff238503b30fe719c84f
+  RUN="$("${R[@]}" reserve)"
+  EVIDENCE="$HOME/wavy-private-evidence/$RUN"
+  install -d -m 700 "$EVIDENCE"
+  "${R[@]}" status --run-id "$RUN" > "$EVIDENCE/status.json"
+  chmod 600 "$EVIDENCE/status.json"
+  cp "$PRIVATE/prerequisites.private.example.json" "$EVIDENCE/prerequisites.json"
+  chmod 600 "$EVIDENCE/prerequisites.json"
+  # Renseigner run, planHash (status), profile/origin, reviewer, checkedAt et les
+  # checks réellement vérifiés ; aucune identité/cookie/clé/document dans la preuve.
+  "${R[@]}" prepare --run-id "$RUN" --evidence "$EVIDENCE/prerequisites.json"
+  "${R[@]}" restore --run-id "$RUN"
+  "${R[@]}" deploy --run-id "$RUN"
+  "${R[@]}" status --run-id "$RUN" > "$EVIDENCE/status.json"
+  cp "$PRIVATE/test-authorization.private.example.json" "$EVIDENCE/test.json"
+  chmod 600 "$EVIDENCE/test.json"
+  # Renseigner checkedAt/reviewer et backup/observed exactement depuis status.
+  # Connexion du compte dédié via ERP par tunnel ; capturer UNE ligne de cookie
+  # WAVY_SESSION dans $EVIDENCE/session.cookie 0600, sans l'imprimer ou la mettre
+  # dans argv. Vérifier le parent 0700. Ne pas enregistrer dans le checkout.
+  "${R[@]}" open-test --run-id "$RUN" --evidence "$EVIDENCE/test.json" \
+    --session-cookie-file "$EVIDENCE/session.cookie" --seconds 900
+  # Cette commande reste au premier plan pendant les tests. Ne pas fermer SSH
+  # ou détacher un daemon d'ouverture ; le tunnel est un autre terminal.
+
+Fermeture anticipée normale depuis un autre terminal (pas une nouvelle ouverture) :
+  # Lire seulement le PID depuis l'état privé, vérifier le run et la commande du
+  # processus ; ne pas afficher l'ensemble de l'état/proofs/env.
+  # testOwnerPid est inscrit au passage testing. Après vérification :
+  kill -USR1 <PID_ORCHESTRATEUR_VERIFIE>
+  # La commande open-test du premier terminal doit terminer après fermeture
+  # prouvée. Si PID/identité ne sont pas vérifiables, interrompre ce terminal
+  # avec Ctrl-C : il ferme mais classe l'opération failed, puis reprise inspectée.
+
+Après fin de fenêtre, toujours fermé :
+  "${R[@]}" close --run-id "$RUN"
+  "${R[@]}" status --run-id "$RUN" > "$EVIDENCE/status.json"
+  cp "$PRIVATE/functional.private.example.json" "$EVIDENCE/functional.json"
+  chmod 600 "$EVIDENCE/functional.json"
+  # Terminer le logout backend/purge du profil navigateur jetable, détruire le
+  # fichier session.cookie, vérifier toutes les cases métier puis dater la preuve.
+  "${R[@]}" validate --run-id "$RUN" --evidence "$EVIDENCE/functional.json"
+  # Libérer seulement après revue de cet état fermé validé :
+  "${R[@]}" abandon --run-id "$RUN"
+
+En panne, diagnostiquer sans modifier les preuves/états existants :
+  "${R[@]}" status --run-id "$RUN"
+  "${R[@]}" close --run-id "$RUN"
+  # Choisir explicitement rollback OU reprise inspectée. Pas de restore actif.
+  "${R[@]}" rollback --run-id "$RUN"
+  "${R[@]}" abandon --run-id "$RUN"
+  # OU préparer resume.json depuis resume.private.example.json, avec pending
+  # exact de status et resumePhase autorisée, puis :
+  "${R[@]}" resume --run-id "$RUN" --evidence "$EVIDENCE/resume.json"
+  # Continuer restore/deploy/open-test/validate selon le point de reprise.
+  # Ne pas lancer prepare sur un run en échec, ni modifier à la main phase/run.
+
+Contrôles de test prioritaires
+Tunnel ERP et /pwa ; login, session invalide et changement société ; photo/import
+JPEG/PNG/PDF et refus MIME/taille ; extraction IA backend réelle et erreur/quota ;
+création/modification de note ; dépôt puis relecture exacte de la pièce ;
+consultation ERP ; autre utilisateur/société/tenant et headers falsifiés refusés ;
+expiration/fermeture, toutes écritures Notes bloquées, ERP toujours routé.
+Garder WAVY_AI_ACHAT_AUTO_CREATION_ENABLED=false. Aucun résultat IA simulé ne
+vaut le check real-ai-extraction. Utiliser seulement des documents synthétiques.
+Le no-store/fermeture serveur ne retire pas le localStorage ou un affichage déjà
+chargé : profil jetable, logout et purge obligatoires, données réelles exclues.
+
+Limites restant à valider avant installation
+Permissions réelles/renameat2/fsync et UID/GID 100:101:0700 ; capacité et durée du
+backup/restore (timeout par commande 900 s, plusieurs commandes par exercice),
+schéma restauré/Flyway et cohérence métier DB/documents ; snapshot d'images et
+historiques du vrai Shell ; sessions/cookies, isolation et IA réelle ; horloge UTC
+VM et Linux PDEATHSIG ; propagation des signaux via l'outil d'exploitation.
+Les copies isolées ont des passwords aléatoires distincts, fichiers bind 0644
+sous parent hôte 0700 pour être lisibles par PostgreSQL ; aucune clé active de
+DB n'est injectée dans ces conteneurs. Le staging déchiffré reste privé et doit
+être nettoyé après interruption. Aucun accès VM ni exercice réel n'est déclaré.
+La barrière ferme les NOUVELLES requêtes ; drainer/constater les écritures déjà
+en vol, une extraction IA ou une transaction commencée avant fermeture.
+Les scripts/états de confiance ne protègent pas d'un administrateur root/Docker.
+
+GO POUR REVUE ORCHESTRATEUR PRIVÉ PWA
+
+Corrections finales B1 à B4 (périmètre strict)
+B1 : restore-private.py refuse un FD absent/invalide/d’un autre inode avant
+Operation, impose hostname/daemon local sans override, dotenv canonique, phase
+pending isolée, run/profil/hash du plan et validation privée. Le runner CLI est
+inactif sans --execute-on-approved-host ; private-runtime.sh le transmet après
+ses propres gardes. Utiliser exclusivement l’action restore du moteur.
+B2 : après baseline, refaire préflight, fermeture prouvée et fraîcheur des
+prérequis ; checkedAt représente le DÉBUT de ces vrais contrôles. Si leur durée
+dépasse 60 s, V3 refuse. Snapshot et reçus terminaux sont conservés.
+B3 : refaire les trois attestations après les contrôles lents ; transmettre
+notAfter calculé par le moteur au gate. Pas de lease au-delà de 900 s ni au-delà
+d’une preuve expirée, aucune modification des contrôles HTTPS publics.
+B4 : staging à durée de vie explicite, conservé si cleanup échoue ; métadonnées
+de récupération persistées avant up, preuve finale seulement après down confirmé.
+Les quatre reproductions sont des tests obligatoires, sans skip/expectedFailure.
+
+Procédure VM : utiliser Bash et un checkout approuvé sur master. Le chemin donné
+dans les commandes est celui du checkout canonique réellement présent sur VM ;
+aucune connexion n’est faite ici pour le deviner. Pour préparer /run au bon compte
+(après autorisation d’exploitation) :
+  sudo install -d -m 755 -o "$(id -u)" -g "$(id -g)" /run/wavy-private-pwa-gate
+Ne pas démarrer de service gate manuellement, ne pas lancer le runner restore
+directement. Les commandes R reserve/prepare/restore/deploy/open-test/validate/
+rollback/abandon ci-dessus sont les entrées opérationnelles. Les modèles de
+preuves gardent checks=false jusqu’à vérification opérateur effective.

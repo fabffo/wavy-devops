@@ -1,0 +1,19 @@
+# Candidat uniquement. Ne pas combiner avec compose.activation.yml/public.
+services:
+  wavy-erp-shell-preprod:
+    volumes:
+      - type: bind
+        source: ${WAVY_PRIVATE_PWA_DIR:?absolute candidate directory required}/shell.conf.template
+        target: /etc/nginx/templates/default.conf.template
+        read_only: true
+        bind: {create_host_path: false}
+      - type: bind
+        source: ${WAVY_PRIVATE_PWA_DIR:?required}
+        target: /etc/nginx/private-pwa
+        read_only: true
+        bind: {create_host_path: false}
+      - type: bind
+        source: ${WAVY_PRIVATE_PWA_GATE_DIR:?operator socket directory required}
+        target: /run/wavy-private-pwa-gate
+        read_only: true
+        bind: {create_host_path: false}

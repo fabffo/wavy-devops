@@ -1062,3 +1062,52 @@ La PWA reste désactivée par défaut. Ces validations autorisent une revue du c
 préparation PREPROD réelle. L'horloge UTC correcte, les images utilitaires épinglées déjà présentes,
 les permissions privées, la fiabilité du stockage/fsync et l'identité d'exploitation de confiance
 restent des prérequis ; aucune collecte automatique des reçus terminaux n'est introduite.
+
+
+## Variante privée finale — 24 octobre 2026
+
+Le candidat `private-shell/` dispose désormais d'un orchestrateur distinct :
+`release-private.py` (réservation globale persistante et machine à états),
+`private-backend.py`, `private-runtime.sh`, `backup-private.sh` et
+`restore-private.py`. Les commandes exactes et les modèles de preuves sont décrits
+dans [ORCHESTRATEUR-PRIVE.txt](private-shell/ORCHESTRATEUR-PRIVE.txt). Les résultats
+locaux et l'inventaire sont dans [RESULTATS-ORCHESTRATEUR.txt](private-shell/RESULTATS-ORCHESTRATEUR.txt).
+Ces fichiers remplacent les instructions privées historiques indiquant un adaptateur manquant
+ou une ouverture manuelle du service gate. Les exigences du candidat HTTPS public ci-dessus
+restent inchangées ; aucune preuve privée ne certifie HTTPS, Android/iOS ou cookie Secure public.
+
+Le profil privé conserve Nginx Docker, le tunnel `127.0.0.1:24443`, les quatre digests
+existants et le provisionnement V3 exact (capacité héritée, reçu terminal exclusif, inodes
+et échéances). La fenêtre de test, sous flock et réservation, est liée à une session,
+limitée à 900 secondes et fermée par retrait du socket Unix, indépendamment de PWA/Docker.
+Linux PDEATHSIG ferme l'enfant gate si l'orchestrateur est tué ; les preuves de fermeture
+restent distinctes de l'intention. Le rollback garde le Shell démarré et le verrou Notes fermé.
+
+Préparation locale seulement : aucune commande VM, migration, sauvegarde/restauration
+réelle, modification de volume, build, commit ou push. Le GO porte sur la revue du code,
+pas une installation ; les prérequis et tests métier réels restent obligatoires.
+
+
+## Revue finale privée avant commit — 24 octobre 2026
+
+**NO-GO POUR COMMIT ORCHESTRATEUR PRIVÉ PWA** : voir
+[REVUE-COMMIT-ORCHESTRATEUR.txt](private-shell/REVUE-COMMIT-ORCHESTRATEUR.txt).
+Quatre contre-exemples reproductibles concernent l'entrée directe restore sans
+gardes complets, la fraîcheur des préconditions V3, l'expiration d'un prérequis
+pendant l'ouverture et la suppression de l'environnement de reprise après échec
+du nettoyage isolé. Les nouveaux tests `test-final-review.py` restent rouges.
+Les tests existants verts ne valident pas ces cas. Aucun correctif runtime ou
+changement de manifeste/base/volume/autre dépôt n'est appliqué par cette revue.
+
+
+## Finalisation strictement limitée aux quatre blocages — 24 octobre 2026
+
+Les quatre reproductions de revue sont désormais des non-régressions obligatoires
+vertes : garde propre du runner restore (hôte/FD/configuration), préconditions V3
+réellement renouvelées après baseline, revérification des trois preuves avant
+ouverture avec échéance absolue dans le gate, conservation du staging/envFile
+si le nettoyage isolé échoue. Aucun helper V3 ou mécanisme HTTPS public modifié.
+Le compte rendu unique actuel est
+[RESULTATS-ORCHESTRATEUR.txt](private-shell/RESULTATS-ORCHESTRATEUR.txt) ; les
+commandes VM restent dans [ORCHESTRATEUR-PRIVE.txt](private-shell/ORCHESTRATEUR-PRIVE.txt).
+Les avis NO-GO précédents sont historiques. Aucun commit ou accès VM n’est effectué.

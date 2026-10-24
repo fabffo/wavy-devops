@@ -1,0 +1,13 @@
+{
+  "profile": "private-tunnel-v1",
+  "origin": "http://localhost:24443",
+  "run": null,
+  "planHash": null,
+  "checkedAt": null,
+  "reviewer": null,
+  "checks": {
+    "interrupted-effect-inspected": false
+  },
+  "pending": null,
+  "resumePhase": null
+}

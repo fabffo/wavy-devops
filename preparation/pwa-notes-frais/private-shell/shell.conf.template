@@ -1,0 +1,26 @@
+map $http_x_forwarded_proto $wavy_forwarded_proto { default $scheme; https https; }
+server {
+  listen 80;
+  server_name _;
+  root /usr/share/nginx/html;
+  index index.html;
+
+  # Rejeter chemins API ambigus avant les locations, même doublement encodés.
+  if ($uri ~* "^/api/.*(;|%|\\\\)") { return 403; }
+  if ($request_uri ~* "^/api/[^?]*(%25|%3b|%5c)") { return 403; }
+  set $private_api_origin ${API_UPSTREAM};
+  include /etc/nginx/private-pwa/routes.conf;
+  location = /pwa-integration.json { add_header Cache-Control "no-store" always; }
+  location /api/ { client_max_body_size 64m; proxy_pass ${API_UPSTREAM}; proxy_set_header Host $host; proxy_set_header X-Forwarded-Proto $wavy_forwarded_proto; proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for; }
+
+  location /modules/socle/ { proxy_pass ${SOCLE_FRONT_UPSTREAM}; proxy_set_header Accept-Encoding ""; sub_filter '<base href="/">' '<base href="/modules/socle/">'; sub_filter_once off; }
+  location /modules/tiers/ { proxy_pass ${TIERS_FRONT_UPSTREAM}; proxy_set_header Accept-Encoding ""; sub_filter '<base href="/">' '<base href="/modules/tiers/">'; sub_filter_once off; }
+  location /modules/contrats/ { proxy_pass ${CONTRATS_FRONT_UPSTREAM}; proxy_set_header Accept-Encoding ""; sub_filter '<base href="/">' '<base href="/modules/contrats/">'; sub_filter_once off; }
+  location /modules/factures/ { proxy_pass ${FACTURES_FRONT_UPSTREAM}; proxy_set_header Accept-Encoding ""; sub_filter '<base href="/">' '<base href="/modules/factures/">'; sub_filter_once off; }
+  location /modules/tresorerie/ { proxy_pass ${TRESORERIE_FRONT_UPSTREAM}; proxy_set_header Accept-Encoding ""; sub_filter '<base href="/">' '<base href="/modules/tresorerie/">'; sub_filter_once off; }
+
+  location / { try_files $uri $uri/ /index.html; }
+}
+
+# Listener de redirection interne au conteneur, jamais publié.
+server { listen 127.0.0.1:8087; location / { return 308 /pwa/; } }

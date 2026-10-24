@@ -1,0 +1,14 @@
+{
+  "profile": "private-tunnel-v1",
+  "origin": "http://localhost:24443",
+  "run": null,
+  "planHash": null,
+  "checkedAt": null,
+  "reviewer": null,
+  "checks": {
+    "approved-test-session": false,
+    "synthetic-data-only": false
+  },
+  "backup": {},
+  "observed": {}
+}

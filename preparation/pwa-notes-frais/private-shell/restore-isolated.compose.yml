@@ -1,0 +1,102 @@
+# Exercice uniquement après validation. Projet séparé, aucune ressource PREPROD externe.
+services:
+  socle:
+    image: postgres:16-alpine@sha256:93d55776e04376e19adb2733e3ccebb4392ee7dd86d8ff238503b30fe719c84f
+    network_mode: none
+    read_only: true
+    security_opt: [no-new-privileges:true]
+    tmpfs: [/tmp, /var/run/postgresql]
+    environment:
+      POSTGRES_DB: ${RESTORE_SOCLE_DB:?required}
+      POSTGRES_USER: ${RESTORE_SOCLE_USER:?required}
+      POSTGRES_PASSWORD_FILE: /run/secrets/db-password
+    volumes:
+      - socle-data:/var/lib/postgresql/data
+      - type: bind
+        source: ${RESTORE_SECRET_DIR:?absolute private directory required}/socle.password
+        target: /run/secrets/db-password
+        read_only: true
+        bind: {create_host_path: false}
+  tiers:
+    image: postgres:16-alpine@sha256:93d55776e04376e19adb2733e3ccebb4392ee7dd86d8ff238503b30fe719c84f
+    network_mode: none
+    read_only: true
+    security_opt: [no-new-privileges:true]
+    tmpfs: [/tmp, /var/run/postgresql]
+    environment:
+      POSTGRES_DB: ${RESTORE_TIERS_DB:?required}
+      POSTGRES_USER: ${RESTORE_TIERS_USER:?required}
+      POSTGRES_PASSWORD_FILE: /run/secrets/db-password
+    volumes:
+      - tiers-data:/var/lib/postgresql/data
+      - type: bind
+        source: ${RESTORE_SECRET_DIR:?absolute private directory required}/tiers.password
+        target: /run/secrets/db-password
+        read_only: true
+        bind: {create_host_path: false}
+  contrats:
+    image: postgres:16-alpine@sha256:93d55776e04376e19adb2733e3ccebb4392ee7dd86d8ff238503b30fe719c84f
+    network_mode: none
+    read_only: true
+    security_opt: [no-new-privileges:true]
+    tmpfs: [/tmp, /var/run/postgresql]
+    environment:
+      POSTGRES_DB: ${RESTORE_CONTRATS_DB:?required}
+      POSTGRES_USER: ${RESTORE_CONTRATS_USER:?required}
+      POSTGRES_PASSWORD_FILE: /run/secrets/db-password
+    volumes:
+      - contrats-data:/var/lib/postgresql/data
+      - type: bind
+        source: ${RESTORE_SECRET_DIR:?absolute private directory required}/contrats.password
+        target: /run/secrets/db-password
+        read_only: true
+        bind: {create_host_path: false}
+  factures:
+    image: postgres:16-alpine@sha256:93d55776e04376e19adb2733e3ccebb4392ee7dd86d8ff238503b30fe719c84f
+    network_mode: none
+    read_only: true
+    security_opt: [no-new-privileges:true]
+    tmpfs: [/tmp, /var/run/postgresql]
+    environment:
+      POSTGRES_DB: ${RESTORE_FACTURES_DB:?required}
+      POSTGRES_USER: ${RESTORE_FACTURES_USER:?required}
+      POSTGRES_PASSWORD_FILE: /run/secrets/db-password
+    volumes:
+      - factures-data:/var/lib/postgresql/data
+      - type: bind
+        source: ${RESTORE_SECRET_DIR:?absolute private directory required}/factures.password
+        target: /run/secrets/db-password
+        read_only: true
+        bind: {create_host_path: false}
+  tresorerie:
+    image: postgres:16-alpine@sha256:93d55776e04376e19adb2733e3ccebb4392ee7dd86d8ff238503b30fe719c84f
+    network_mode: none
+    read_only: true
+    security_opt: [no-new-privileges:true]
+    tmpfs: [/tmp, /var/run/postgresql]
+    environment:
+      POSTGRES_DB: ${RESTORE_TRESORERIE_DB:?required}
+      POSTGRES_USER: ${RESTORE_TRESORERIE_USER:?required}
+      POSTGRES_PASSWORD_FILE: /run/secrets/db-password
+    volumes:
+      - tresorerie-data:/var/lib/postgresql/data
+      - type: bind
+        source: ${RESTORE_SECRET_DIR:?absolute private directory required}/tresorerie.password
+        target: /run/secrets/db-password
+        read_only: true
+        bind: {create_host_path: false}
+  documents:
+    image: postgres:16-alpine@sha256:93d55776e04376e19adb2733e3ccebb4392ee7dd86d8ff238503b30fe719c84f
+    network_mode: none
+    read_only: true
+    user: "0:0"
+    security_opt: [no-new-privileges:true]
+    entrypoint: [/bin/sh, -c, "sleep infinity"]
+    volumes: [documents-copy:/documents]
+volumes:
+  socle-data: {}
+  tiers-data: {}
+  contrats-data: {}
+  factures-data: {}
+  tresorerie-data: {}
+  documents-copy: {}
