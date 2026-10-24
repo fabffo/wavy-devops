@@ -1,0 +1,255 @@
+Wavy — Abandon initial et trois prérequis — 24 octobre 2026
+
+PÉRIMÈTRE : correctif minimal abandon + preuves locales + plan PREPROD.
+Aucune connexion VM, modification de manifeste actif, base, volume, commit/push.
+Les trois attestations dans prerequisites.private.example.json restent false.
+Les faits mesurés sont dans msi-prerequisites-facts.json ; ce fichier n'est PAS
+une attestation de run PREPROD et ne doit pas être passé à --evidence.
+
+1. Correctif abandon initial
+Le cas mutationStarted=false, phase reserved/failed, pending absent ou étape
+préflight/verify-images/snapshot, sans completed/observed/backup/baseline/
+storagePreconditions/testStartedAt peut être abandonné sans preuve HTTP d'une
+barrière que ce run n'a pas installée. Le socket privé est retiré (répertoire
+absent admis dans ce seul cas), l'état est archivé et la réservation libérée
+sous le même verrou. Aucun reload/check ERP, aucun faux closureConfirmed=true.
+Le motif no-mutation-barrier-not-required est conservé dans l'archive.
+Ce chemin accepte une mise à jour de sources : nécessaire pour abandonner un
+ancien échec initial avec le correctif installé. Il exige toujours le même run,
+plan/profil/réservation et les gardes hôte. Aucun changement de plan accepté.
+Après une tentative install-barrier (flag écrit AVANT l'appel), mutation ou
+état ambigu : fermeture prouvée et rollback/validation restent obligatoires ;
+aucune dérogation source, symlink, permission ou panne de fermeture n'est introduite.
+
+2. rollback-schema-compatible — preuve MSI et condition PREPROD
+Ancien attendu : 0.1.0-b277edb,
+ ghcr.io/fabffo/wavy-factures-api@sha256:fad65c9b2c1b5326b3fd45c2fd8f19727104a2ace32b481d12ed3872075f261f
+Nouveau : 0.1.0-09fcd98,
+ ghcr.io/fabffo/wavy-factures-api@sha256:a414a866c910bd20a4c8af4018fc0e31db513ffff1cca76b15c913807f75d0e5
+Images locales lues sans réseau/pull/volume : JAR /app/app.jar extraits en mémoire.
+20 fichiers SQL db/migration IDENTIQUES octet/hash ; inventaire/hashes archivés.
+63 classes de modèle : 62 binaires identiques ; NoteFrais.class seule différente.
+Signatures JVM champs/méthodes javap -p -s identiques. Diff Git b277edb..09fcd98 :
+NoteFrais ajoute uniquement @DynamicUpdate/commentaire, pas de table/colonne.
+Les six lignes application.properties nouvelles règlent uniquement stockage
+et limites multipart. Hibernate ddl-auto=validate et gardes Flyway restent actifs.
+Conclusion établie : compatibilité STATIQUE de schéma pour cette paire d'images.
+
+Limite déterminante : ancien appliquerPiece remplace chemin/hash/nom/taille/MIME
+par le payload client ; il ne comprend pas les originaux ndf:<UUID>. L'ancien
+backend ne doit donc JAMAIS reprendre les écritures Notes/justificatifs après
+rollback. Le gate readonly doit survivre au rollback et à l'abandon. Aucun
+nettoyage documentaire ou restore DB automatique ; conserver les originaux.
+La compatibilité SQL n'autorise pas un ancien writer à modifier les métadonnées.
+
+Avant d'attester sur PREPROD : confirmer que l'ancien digest ACTUEL est bien
+celui ci-dessus (sinon refaire la comparaison), historique validé de rollback,
+export schema-only et Flyway history, aucune dérive/pending migration inattendue,
+mêmes profils/locations, restauration des cinq copies/documents et contrôles
+JPA/Flyway réussis sur la cible. L'absence de nouvelle migration dans les images
+ne démontre pas la conformité d'une base réelle non inspectée.
+Cocher rollback-schema-compatible seulement après ces contrôles et acceptation
+explicite d'un rollback Notes readonly ; pas de compatibilité en écriture affirmée.
+
+3. session-isolation-plan — jeu synthétique finalisé
+Deux tenants T-A/T-B ; deux sociétés PAR tenant (A1/A2 et B1/B2, quatre entrées)
+pour distinguer inter-société et inter-tenant. Aucun tenant métier existant.
+Quatre identités distinctes, sans nom/adresse/téléphone réels :
+ alias      connexion synthétique                  tenant   sociétés
+ A-owner    qa.pwa.a.owner@example.invalid           T-A      A1,A2
+ A-peer     qa.pwa.a.peer@example.invalid            T-A      A1
+ B-owner    qa.pwa.b.owner@example.invalid           T-B      B1,B2
+ B-peer     qa.pwa.b.peer@example.invalid            T-B      B1
+IDs attribués par PREPROD après autorisation et consignés uniquement dans un
+mapping privé 0600 ; aucun ID 100/faux ID ne remplace un contexte authentifié.
+Mots de passe générés hors Git, pas de courrier envoyé ; profil navigateur
+jetable par identité. Jeux JPEG/PNG/PDF générés, factices, sans PII ni pièces réelles.
+Rôles : NOTE_DE_FRAIS + droit de passage Gateway GESTIONNAIRE, sans ADMIN_TENANT,
+ADMIN_PLATEFORME ni SUPER_NOTE_DE_FRAIS. Vérifier les rôles EFFECTIFS par la session :
+la Gateway exige GESTIONNAIRE/COMPTABLE/SUPER tandis que l'API exige NOTE_DE_FRAIS
+ou supervision. Un rôle de supervision invaliderait le test de refus entre propriétaires.
+
+Préparer une note et une pièce connues par chaque propriétaire nécessaire sous
+sa propre session autorisée ; vérifier d'abord lecture/empreinte positives.
+Le gate n'autorise qu'une session à la fois : un refus d'écriture pour un autre
+cookie NE prouve PAS les droits métier du backend. Pour les écritures négatives,
+utiliser le cookie de la fenêtre autorisée vers une note appartenant à l'autre
+utilisateur/société/tenant ; le gate passe, le backend doit refuser.
+Pour préparer les originaux des autres propriétaires dans le même run sans
+nouveau mécanisme : fenêtre de préparation dédiée, HTTP de sauvegarde terminé,
+Ctrl-C de l'orchestrateur (interruption volontaire du test, pas de la transaction),
+fermeture confirmée, inspection de pending=test-window et des effets, puis resume
+avec une vraie preuve interrupted-effect-inspected et resumePhase=prepared.
+La nouvelle fenêtre exige une nouvelle autorisation ; aucun état modifié à la main.
+Une interruption non inspectée ne permet pas de poursuivre. Chaque fenêtre <=900 s.
+
+Matrice impérative, mêmes IDs de notes/pièces pour positif puis négatif :
+- A-owner/A1 : créer/modifier, déposer/recharger pièce, GET contenu = octets/hash attendus.
+- A-owner/A2 : changement serveur autorisé puis accès à la note A1 refusé, liste
+  filtrée ; retour A1 rétablit lecture. Pas de donnée A1 conservée dans l'écran A2.
+- A-peer/A1 : note/pièce A-owner refusées, y compris téléchargement/listes ;
+  A-owner vers note A-peer également refusé dans sa fenêtre autorisée.
+- A-peer : changement vers A2 non autorisé refusé ; session reste A1.
+- B-owner/B1 vers note A1 et inversement : refus, aucune donnée dans liste/synthèse,
+  aucun fichier ni métadonnée modifiés. Même contrôle inter-société B1/B2.
+- Headers X-Tenant-Id/X-Societe-Courante-Id/X-Utilisateur-Id falsifiés : contexte
+  recalculé depuis la session, aucun élargissement. Aucun override de sécurité.
+- Sans session/expirée : refus ; après fermeture PWA=404/écritures=403, ERP préservé.
+Attendu négatif : 401 sans authentification, 403/404 selon contrat pour ressource
+interdite, jamais 200/contenu ; comparer aussi le contenu/hash et l'état après refus.
+Les lectures communes restent soumises au backend même gate fermé. Les refus de
+mutation ne doivent pas être attribués au backend si seul le gate a répondu.
+Cocher session-isolation-plan quand comptes/rôles/allocations et protocole sont
+confirmés sur PREPROD. Le check fonctionnel session-isolation reste faux jusqu'aux
+exécutions réelles ci-dessus. Ce plan n'est pas une preuve de tests exécutés.
+
+4. isolated-restore-capacity — préparation et mesures
+MSI : Docker 29.1.3 local Unix, linux/amd64, Compose 2.27.0, 22 CPU, ~31.18 Gio
+mémoire daemon. Les octets libres exacts à l'observation sont dans le JSON ;
+repo et /var/lib/docker sont sur le même filesystem (ne pas doubler l'espace).
+Images utilitaires épinglées présentes : PostgreSQL 16.13 avec pg_dump/pg_restore/
+psql/pg_isready/tar/stat/sha256sum/du/df ; Python 3.12.15 avec symbole renameat2 et constante O_NOFOLLOW ;
+les opérations/droits réels PREPROD restent à éprouver par V3.
+OpenSSL 3.0.13 sur l'hôte, crypto/HMAC vérifiées sur fixtures locales.
+Compose : cinq PostgreSQL + copie documentaire, six volumes propres au projet
+wavy-pwa-restore-<run>-<nonce>, aucun nom fixe/external/port/réseau. Le rendu et
+les règles validate_rendered sont vérifiés, sans démarrer de base ni créer de volume.
+
+Ce qui manque pour attester PREPROD : tailles effectives des cinq DB et documents,
+place libre sur CHAQUE filesystem concerné (backups/staging/DockerRootDir), mémoire
+libre avec l'ERP actif, charge/CPU, taille des WAL/temp/index lors du restore,
+durée (le helper backup/restore ENTIER est borné à 900 s par le backend,
+avec aussi 900 s par commande interne), outils/utilitaires et support volume-subpath.
+Le seuil de garde 1 Gio n'est PAS un dimensionnement de restauration.
+Budget à documenter en octets avant prepare : deux lots chiffrés à conserver +
+cinq copies DB (index/TOAST compris) + WAL/temp de restore + six dumps déchiffrés
+(cinq DB et archive) + copie documentaire + re-archive documentaire + marge de
+croissance/reprise. Ne pas compter deux fois une même partition ni supposer que
+compression égale une taille maximale garantie. Réserver une marge approuvée
+sur estimation conservative, puis revérifier après le backup réel avant restore.
+Pour la mémoire : cinq PostgreSQL supplémentaires, mémoire de pg_restore et
+ré-archivage Python EN PLUS des services ERP ; aucune limite RAM du Compose ne
+constitue une réservation automatique. Aucun budget PREPROD chiffré n'est inventé.
+Cocher isolated-restore-capacity uniquement après mesures PREPROD, budget et
+fenêtre de maintenance approuvés ; le succès du restore réel sera une AUTRE preuve.
+
+5. Commandes futures exactes — uniquement après autorisation VM
+Poste tunnel :
+  ssh -N -L 24443:127.0.0.1:24443 wavy-preprod
+Sur VM (Bash), chemin canonique confirmé :
+  set -euo pipefail
+  umask 077
+  cd "${WAVY_DEVOPS_ROOT:-$HOME/projets/wavy-devops}"
+  test "$(hostname -s)" = wavy-preprod
+  PRIVATE="$PWD/preparation/pwa-notes-frais/private-shell"
+  GATE=/run/wavy-private-pwa-gate
+  R=(python3 -B "$PRIVATE/release-private.py" --env "$PWD/.env.preprod" \
+     --gate-dir "$GATE" --execute-on-approved-host)
+  # Fournir le run réel de la réservation, jamais un nouvel ID inventé :
+  # Ce bloc suppose une réservation existante ; sinon passer aux mesures.
+  RUN="$(python3 -B - <<'PYRUN'
+from pathlib import Path
+import importlib.util
+spec=importlib.util.spec_from_file_location('op',Path('scripts/preprod_operation.py'))
+op=importlib.util.module_from_spec(spec);spec.loader.exec_module(op)
+print(op.read_private(Path('deployments/preprod-reservation.json'))['run'])
+PYRUN
+  )"
+  "${R[@]}" status --run-id "$RUN"
+  # SI phase failed/reserved ET mutationStarted=false ET aucune étape mutante :
+  "${R[@]}" abandon --run-id "$RUN"
+  # L'archive conserve closureConfirmed=false : barrière absente, pas de faux 404.
+  # Si l'état est muté/ambigu, ne pas utiliser cette branche : garder le run,
+  # ses sources/plan, fermeture puis rollback inspecté selon ORCHESTRATEUR-PRIVE.txt.
+  # Ne jamais changer configurationHash/phase ou effacer un verrou/réservation.
+
+Mesures avant nouvelle préparation (lecture seule, sous fenêtre approuvée) :
+  docker info --format '{{.NCPU}} {{.MemTotal}} {{.DockerRootDir}}'
+  DOCKER_ROOT="$(docker info --format '{{.DockerRootDir}}')"
+  df -Pk "$PWD" "$DOCKER_ROOT"
+  free -b
+  docker stats --no-stream --format '{{.Name}} {{.MemUsage}}'
+  for db in socle tiers contrats factures tresorerie; do
+    c="$db-db-preprod"
+    test "$(docker inspect -f '{{index .Config.Labels "com.docker.compose.project"}}' "$c")" = wavy-preprod
+    docker exec "$c" sh -c \
+      'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -At -c "SELECT pg_database_size(current_database())"'
+  done
+  # Dans un répertoire privé hors Git, exporter le schéma et l'historique Factures :
+  EVIDENCE="$HOME/wavy-private-evidence/prechecks"
+  install -d -m 700 "$EVIDENCE"
+  docker inspect --format '{{.Config.Image}} {{.Image}}' wavy-factures-api-preprod
+  API_IMAGE_ID="$(docker inspect -f '{{.Image}}' wavy-factures-api-preprod)"
+  docker image inspect "$API_IMAGE_ID" --format '{{json .RepoDigests}} {{index .Config.Labels "org.opencontainers.image.revision"}}'
+  docker exec factures-db-preprod sh -c \
+    'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" --schema-only --no-owner --no-acl' \
+    > "$EVIDENCE/factures-schema.sql"
+  docker exec factures-db-preprod sh -c \
+    'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -At -c "SELECT installed_rank,version,script,checksum,success FROM flyway_schema_history ORDER BY installed_rank"' \
+    > "$EVIDENCE/factures-flyway.txt"
+  # Pour les tailles documentaires RO et outils, ne pas créer un volume absent :
+  source scripts/_preprod.sh
+  source scripts/_preprod-documents.sh
+  preprod_host_guard
+  preprod_document_volume_guard
+  preprod_document_tool ro 'du -sk /documents/contrats; if test -d /documents/notes-frais; then du -sk /documents/notes-frais; fi'
+  docker image inspect python:3.12-alpine@sha256:b658b05ce9c4eb97ec6fc19424818a1f31993659c2b505a532f470e83807815d >/dev/null
+  docker image inspect postgres:16-alpine@sha256:93d55776e04376e19adb2733e3ccebb4392ee7dd86d8ff238503b30fe719c84f >/dev/null
+
+Nouvelle release, une fois les trois attestations documentées par l'opérateur :
+  sudo install -d -m 755 -o "$(id -u)" -g "$(id -g)" "$GATE"
+  install -d -m 700 "$PRIVATE/control"
+  RUN="$("${R[@]}" reserve)"
+  EVIDENCE="$HOME/wavy-private-evidence/$RUN"
+  install -d -m 700 "$EVIDENCE"
+  "${R[@]}" status --run-id "$RUN" > "$EVIDENCE/status.json"
+  cp "$PRIVATE/prerequisites.private.example.json" "$EVIDENCE/prerequisites.json"
+  chmod 600 "$EVIDENCE/prerequisites.json"
+  # Renseigner run/planHash exacts, reviewer, checkedAt UTC, contrôles réellement
+  # prouvés + références aux mesures ; ni checks=true automatiques ni secret ici.
+  # Faire approuver puis éditer prerequisites.json AVANT les commandes suivantes.
+  "${R[@]}" prepare --run-id "$RUN" --evidence "$EVIDENCE/prerequisites.json"
+  "${R[@]}" restore --run-id "$RUN"
+  "${R[@]}" deploy --run-id "$RUN"
+  "${R[@]}" status --run-id "$RUN" > "$EVIDENCE/status.json"
+Le moteur réutilise les quatre digests de compose.release.private.yml (aucun tag
+flottant) et déploie API -> Factures Front -> PWA -> Shell. Images à acquérir avec
+les commandes docker pull PAR DIGEST du runbook existant après autorisation ;
+aucun build ni pull implicite. Pas de modification de manifeste actif.
+
+Pour ouvrir une seule fenêtre :
+  cp "$PRIVATE/test-authorization.private.example.json" "$EVIDENCE/test.json"
+  chmod 600 "$EVIDENCE/test.json"
+  # Renseigner backup/observed depuis status, run/planHash, autorisation explicite,
+  # checkedAt et reviewer ; fichier session.cookie 0600, parent 0700 hors Git.
+  "${R[@]}" open-test --run-id "$RUN" --evidence "$EVIDENCE/test.json" \
+    --session-cookie-file "$EVIDENCE/session.cookie" --seconds 900
+  "${R[@]}" close --run-id "$RUN"
+Pour changer de propriétaire après la fenêtre de préparation interrompue :
+  "${R[@]}" status --run-id "$RUN" > "$EVIDENCE/status.json"
+  cp "$PRIVATE/resume.private.example.json" "$EVIDENCE/resume.json"
+  chmod 600 "$EVIDENCE/resume.json"
+  # VRAIE inspection des sauvegardes/IDs/effets de pending=test-window, fermeture
+  # confirmée, reviewer/date ; resumePhase=prepared. Pas d'attestation préremplie.
+  "${R[@]}" resume --run-id "$RUN" --evidence "$EVIDENCE/resume.json"
+  # Nouvelle test.json et nouveau fichier cookie par identité, puis open-test.
+Pour rollback : fermer d'abord, fournir une preuve fraîche de compatibilité
+readonly et restaurer uniquement les images snapshot, jamais DB/documents :
+  "${R[@]}" close --run-id "$RUN"
+  "${R[@]}" rollback --run-id "$RUN" --evidence "$EVIDENCE/rollback.json"
+  "${R[@]}" abandon --run-id "$RUN"
+Pour finir un test réussi : preuve functional.json réelle après fermeture et
+purge/logout des profils synthétiques, puis validate et abandon du run.
+
+Les contraintes/faux par défaut des modèles de preuve sont conservés.
+
+6. Vérification locale de cette étape
+225 tests réussis, 1 ignoré (volume Docker jetable non autorisé), aucun échec :
+67 privés, 93 partagés/publics, 65 actifs. Quatre nouvelles régressions ciblent
+l'abandon initial, le répertoire de gate absent, l'upgrade des sources et les
+états ambigus ; les refus après mutation et le mauvais propriétaire restent couverts.
+Compose isolé/cohorte, Nginx, quatre images/digests, syntaxe 45 Python/65 Bash,
+8 contrôles d'historique, scan heuristique et inventaire conformes. Aucun test
+réel d'isolation sur PREPROD, pg_restore métier, extraction IA ou volume effectué.
+
+GO POUR COMMIT ET PRÉPARATION DU DÉPLOIEMENT

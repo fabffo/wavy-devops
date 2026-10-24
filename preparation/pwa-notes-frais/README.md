@@ -1111,3 +1111,15 @@ Le compte rendu unique actuel est
 [RESULTATS-ORCHESTRATEUR.txt](private-shell/RESULTATS-ORCHESTRATEUR.txt) ; les
 commandes VM restent dans [ORCHESTRATEUR-PRIVE.txt](private-shell/ORCHESTRATEUR-PRIVE.txt).
 Les avis NO-GO précédents sont historiques. Aucun commit ou accès VM n’est effectué.
+
+
+## Abandon initial et prérequis PREPROD — finalisation ciblée
+
+Le chemin d'abandon sans mutation ne requiert plus de marqueur Nginx inexistant ;
+il ne valide aucune fermeture HTTP et ne relâche aucun garde après mutation.
+Les preuves MSI, le plan synthétique d'isolation, la capacité à mesurer et les
+commandes de reprise figurent dans
+[PREUVES-MSI-REPRISE.txt](private-shell/PREUVES-MSI-REPRISE.txt) et les faits locaux
+dans [msi-prerequisites-facts.json](private-shell/msi-prerequisites-facts.json).
+Les trois attestations PREPROD demeurent fausses tant que le relecteur n'a pas
+validé l'image réellement en place, les droits/comptes et les ressources de la VM.

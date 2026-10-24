@@ -149,3 +149,5 @@ wavy-devops/preparation/pwa-notes-frais/private-shell/test-session-gate.py
 wavy-devops/preparation/pwa-notes-frais/private-shell/validate-private.py
 wavy-devops/preparation/pwa-notes-frais/private-shell/test-final-review.py
 wavy-devops/preparation/pwa-notes-frais/private-shell/REVUE-COMMIT-ORCHESTRATEUR.txt
+wavy-devops/preparation/pwa-notes-frais/private-shell/PREUVES-MSI-REPRISE.txt
+wavy-devops/preparation/pwa-notes-frais/private-shell/msi-prerequisites-facts.json

@@ -32,7 +32,7 @@ class Backend:
     def identity(self):return 'fixture-sources'
     def select(self,plan):
         self.current_plan=plan;m.op.atomic_json(self.directory/'runtime-plan.json',plan)
-    def close_socket(self):self.opened=False;self.hit('unlink-socket')
+    def close_socket(self,missing_ok=False):self.opened=False;self.hit('unlink-socket')
     def close(self):
         self.close_socket();self.hit('close')
         m.op.atomic_json(self.directory/'edge.json',{'mode':'closed','run':self.run_id,'closureBlocked':False})
@@ -208,6 +208,38 @@ class Orchestration(unittest.TestCase):
         with self.assertRaises(InterruptedError):self.call('close')
         self.assertFalse(self.backend.opened)
         self.assertTrue(self.engine.reservation.exists())
+
+    def test_abandon_before_mutation_needs_no_nginx_marker_or_erp_reload(self):
+        self.backend.fault='preflight'
+        with self.assertRaises(InterruptedError):self.prepare()
+        self.backend.fault='close'  # Barrière non installée : le probe HTTP échouerait.
+        self.call('abandon')
+        self.assertFalse(self.engine.reservation.exists())
+        state=m.op.read_private(self.directory/('archive-'+self.run+'.json'))
+        self.assertEqual(state['phase'],'abandoned')
+        self.assertIs(state['closureConfirmed'],False)
+        self.assertNotIn('checks',self.backend.events)
+
+    def test_early_abandon_accepts_source_fix_and_absent_gate_directory(self):
+        self.backend.fault='images'
+        with self.assertRaises(InterruptedError):self.prepare()
+        def close_socket(missing_ok=False):
+            if not missing_ok:raise FileNotFoundError('fixture gate absent')
+        with patch.object(self.backend,'close_socket',close_socket),patch.object(self.backend,'identity',return_value='fixed-source'):
+            self.call('abandon')
+        self.assertFalse(self.engine.reservation.exists())
+        self.assertEqual(self.engine.state['abandonReason'],'no-mutation-barrier-not-required')
+
+    def test_uncertain_or_attempted_barrier_cannot_use_early_abandon(self):
+        for field,value in (('mutationStarted',None),('mutationStarted',True),('pending','install-barrier'),('backup',{'fixture':True})):
+            with self.subTest(field=field,value=value):
+                state=m.op.read_private(self.engine.path)
+                state.update(phase='failed',mutationStarted=False,pending=None)
+                state.pop('backup',None);state[field]=value
+                m.op.atomic_json(self.engine.path,state)
+                self.backend.fault='close'
+                with self.assertRaises(InterruptedError):self.call('abandon')
+                self.assertTrue(self.engine.reservation.exists())
 
     def test_abandon_refuses_partial_mutation_and_unconfirmed_close(self):
         self.prepare()

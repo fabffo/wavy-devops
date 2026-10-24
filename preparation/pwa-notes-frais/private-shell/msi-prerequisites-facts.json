@@ -1,0 +1,96 @@
+{
+  "kind": "LOCAL_TECHNICAL_FACTS_NOT_PREPROD_ATTESTATION",
+  "observedAtUTC": "2026-10-24T15:51:43.884332+00:00",
+  "machine": "MSI",
+  "schema": {
+    "images": {
+      "old": {
+        "reference": "ghcr.io/fabffo/wavy-factures-api@sha256:fad65c9b2c1b5326b3fd45c2fd8f19727104a2ace32b481d12ed3872075f261f",
+        "repoDigestMatches": true,
+        "revision": "b277edb",
+        "platform": "linux/amd64",
+        "jarSha256": "43428f14be377689030cd2309acfd5f1fe7bdea5f888a1f753c6f4f49c1d97ca",
+        "migrationCount": 20,
+        "modelClassCount": 63
+      },
+      "new": {
+        "reference": "ghcr.io/fabffo/wavy-factures-api@sha256:a414a866c910bd20a4c8af4018fc0e31db513ffff1cca76b15c913807f75d0e5",
+        "repoDigestMatches": true,
+        "revision": "09fcd98",
+        "platform": "linux/amd64",
+        "jarSha256": "b2452d8a99ee99ae8920a0714e5e5b2de3e885726338a68b2760ada5e933a2c9",
+        "migrationCount": 20,
+        "modelClassCount": 63
+      }
+    },
+    "sqlMigrationsIdentical": true,
+    "migrations": {
+      "BOOT-INF/classes/db/migration/common/V18__rapprochement_factures_paiement.sql": "37a076c6a571a7fd31084a209e4cb5389e0077090b00d14686ab0d9b87a00da9",
+      "BOOT-INF/classes/db/migration/common/V10__piece_hash_facture_achat_par_numero_fournisseur.sql": "14ab0a491502fd4a9bf58c401aa88728f017cd13b548137025e7c4e139e760c4",
+      "BOOT-INF/classes/db/migration/common/V20__archive_factures_techniques_rapprochement.sql": "8c0659a1d122114f253d93b7be349ca6648ed0402141985b4214f13ed2af2c2f",
+      "BOOT-INF/classes/db/migration/common/V17__facture_rapprochement_bancaire.sql": "43a8289d39e26e3bff623513467047a252abf047284f57f14e85cd74f02b1d0a",
+      "BOOT-INF/classes/db/migration/common/V15__famille_activite_factures_vente_defaut.sql": "baf151b88431cffc2ff5a3b6c0f65358fe9c1c83969af525a304deef5337bafb",
+      "BOOT-INF/classes/db/migration/common/V3__reference_contractuelle_budget.sql": "5b00f79ee8719d1ca4751b4c3f5a911d9b0fa8d92fe9fd59f72ff3b4a994155f",
+      "BOOT-INF/classes/db/migration/common/V8__note_frais_beneficiaire_depenses_remboursement.sql": "7a111cb42adb04c024411458b9eede41c29859086906c745528a3af9e2234011",
+      "BOOT-INF/classes/db/migration/common/V16__type_regle_rapprochement_fournisseur.sql": "498346fb20f114856fedfdf64267232b96351bd7eb7030437bdf2eff3a90ec4e",
+      "BOOT-INF/classes/db/migration/common/V12__indexes_dashboard_financier.sql": "66dc16a0e27fe33cad10ab0522bd519377594ed4b62e41100c67ac8846899fd7",
+      "BOOT-INF/classes/db/migration/common/V5__audit_creation_automatique_facture_achat.sql": "49f1f9796b7c88f09105c28a409425fe546fd2e2a0522a6a99531ccae525039a",
+      "BOOT-INF/classes/db/migration/common/V1__schema_initial_factures.sql": "61dfafbd864a896ad0c6014f01b8a90b9fd378f2685b77a892e78edc07560099",
+      "BOOT-INF/classes/db/migration/common/V11__compteur_numero_facture_achat_fournisseur.sql": "d396dea30217a90b3bc8b53efd62bbb50f7c3c835b175c747ef446f453b0ea0d",
+      "BOOT-INF/classes/db/migration/common/V2__budget_vente_contrat_client.sql": "84513837160685c6e199a5d0d5b5b4348a0c3254d36abf9a6ef05ca1dca21329",
+      "BOOT-INF/classes/db/migration/common/V4__quantite_generique_budget_echeance.sql": "f5315efb51d59f3c59a6ce24d36ce3b9d145c5673b36597840b9e8d0206d68ae",
+      "BOOT-INF/classes/db/migration/common/V14__famille_activite_factures.sql": "1e5f20b93b5889a88aa3b2b48afe0bf380bea6fb4a6a34d7e2b5a65b11a80c6d",
+      "BOOT-INF/classes/db/migration/common/V7__marchand_note_frais.sql": "795f4ea7b6005de380aaac4c3a2bea933802912fbded3c38ba58a5560860bdde",
+      "BOOT-INF/classes/db/migration/common/V9__note_frais_multi_pieces_achat_carte_entreprise.sql": "868800ba4954aee7d768724c585add8165e7ab216c93cc1fe3d80afe9a4379f7",
+      "BOOT-INF/classes/db/migration/common/V13__tiers_affilie_ligne_facture_achat.sql": "384a9183040fbc925cb581aedbd87778678e67357a910a94f9bc217851642131",
+      "BOOT-INF/classes/db/migration/common/V6__audit_suppression_facture_achat.sql": "48bcf4eaca437a7481b919e0067068210e9aa5bf7a4ccc65ee1d89643dae3471",
+      "BOOT-INF/classes/db/migration/common/V19__paiement_rapprochement_salaires.sql": "c2e120e239a39f6bc2ee1cbdbdfac0fb026a3a4124fb33632849703ac1b6251c"
+    },
+    "modelClassesChanged": [
+      "BOOT-INF/classes/fr/wavy/factures/notefrais/model/NoteFrais.class"
+    ],
+    "changedModelHashes": {
+      "old": {
+        "BOOT-INF/classes/fr/wavy/factures/notefrais/model/NoteFrais.class": "e37cc647af4553e9fe6a53b69a154ed24edced386641caed4d43859172b9ca4c"
+      },
+      "new": {
+        "BOOT-INF/classes/fr/wavy/factures/notefrais/model/NoteFrais.class": "16a05beb120c516c9eca8d11c5edcd40602fcf02b397946b466b4df60f9e34b3"
+      }
+    },
+    "noteFraisJvmSignaturesIdentical": true,
+    "noteFraisSignatureSha256": "da2981022b39a35ab858bf03959ac60ee661807e64c049df9824d9b91595d4a8",
+    "sourceDifference": "NoteFrais: ajout @DynamicUpdate, aucun champ/table/colonne ajouté",
+    "conclusion": "Compatibilité statique pour cette paire uniquement ; anciens writers Notes interdits après rollback"
+  },
+  "capacityMSI": {
+    "dockerVersion": "29.1.3",
+    "dockerComposeVersion": "2.27.0",
+    "cpus": 22,
+    "dockerMemoryBytes": 33478340608,
+    "freeRepoBytes": 903308312576,
+    "freeDockerBytes": 903308312576,
+    "sameFilesystem": true,
+    "postgresVersion": "16.13",
+    "pythonUtilityVersion": "3.12.15",
+    "postgresToolsPresent": [
+      "pg_dump",
+      "pg_restore",
+      "psql",
+      "pg_isready",
+      "tar",
+      "stat",
+      "sha256sum",
+      "du",
+      "df"
+    ],
+    "linuxONofollowAvailable": true,
+    "sizingConclusion": "Aucune conclusion de capacité PREPROD ; tailles et charge réelles inconnues",
+    "hostMemAvailableBytes": 29706657792,
+    "linuxRenameat2SymbolAvailable": true
+  },
+  "preprodAttestations": {
+    "rollback-schema-compatible": false,
+    "session-isolation-plan": false,
+    "isolated-restore-capacity": false
+  }
+}

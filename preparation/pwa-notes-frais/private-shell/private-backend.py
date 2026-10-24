@@ -117,17 +117,21 @@ class Backend(shared.DockerBackend):
         self.command(cmd+['up','-d','--no-deps','--no-build','--pull','never','--force-recreate',
                           'wavy-'+component+'-preprod'],env)
 
-    def close_socket(self):
-        info=self.gate_dir.lstat()
-        if (not stat.S_ISDIR(info.st_mode) or info.st_uid!=os.getuid()
-                or stat.S_IMODE(info.st_mode)!=0o755): raise ValueError('Répertoire gate non sûr')
-        path=self.gate_dir/'gate.sock'
-        try:
-            info=path.lstat()
-            if not stat.S_ISSOCK(info.st_mode) or info.st_uid!=os.getuid():
-                raise ValueError('Socket substitué')
-            path.unlink();shared.operation.sync_directory(self.gate_dir)
-        except FileNotFoundError: pass
+    def close_socket(self,missing_ok=False):
+        try:info=self.gate_dir.lstat()
+        except FileNotFoundError:
+            if not missing_ok:raise
+            info=None
+        if info is not None:
+            if (not stat.S_ISDIR(info.st_mode) or info.st_uid!=os.getuid()
+                    or stat.S_IMODE(info.st_mode)!=0o755): raise ValueError('Répertoire gate non sûr')
+            path=self.gate_dir/'gate.sock'
+            try:
+                info=path.lstat()
+                if not stat.S_ISSOCK(info.st_mode) or info.st_uid!=os.getuid():
+                    raise ValueError('Socket substitué')
+                path.unlink();shared.operation.sync_directory(self.gate_dir)
+            except FileNotFoundError: pass
         if self.child is not None:
             self.child.terminate()
             try:self.child.wait(timeout=3)

@@ -107,6 +107,13 @@ class Backend(unittest.TestCase):
             with self.assertRaises(InterruptedError):self.b.test_window({'notAfter':time.time()+60})
             child.assert_not_called()
 
+    def test_missing_gate_directory_is_tolerated_only_for_explicit_early_abandon(self):
+        (self.root/'socket').rmdir()
+        with self.assertRaises(FileNotFoundError):self.b.close_socket()
+        self.b.close_socket(missing_ok=True)
+        (self.root/'socket').symlink_to(self.root/'state')
+        with self.assertRaises(ValueError):self.b.close_socket(missing_ok=True)
+
     def test_invalid_duration_and_newline_cookie_rejected(self):
         self.assertIsNone(m.gate.session_hash('WAVY_SESSION=fixture\nInjected: yes'))
         with self.assertRaises(ValueError):m.Backend(self.root/'unused',self.root/'state',self.root/'socket',seconds=901)

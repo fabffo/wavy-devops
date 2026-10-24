@@ -210,11 +210,25 @@ class Engine(public.Engine):
         self.backend.checks(); self.closed()
         self.state['phase'] = 'rolled-back'; self.save()
 
+    def unmutated_abandon(self):
+        # Seules les étapes connues en lecture seule peuvent être abandonnées sans
+        # barrière HTTP. Le flag est persisté AVANT toute tentative install-barrier.
+        return (self.state.get('mutationStarted') is False
+                and self.state.get('phase') in ('reserved','failed')
+                and self.state.get('pending') in (None,'preflight','verify-images','snapshot')
+                and not any(self.state.get(key) for key in
+                            ('completed','observed','baseline','backup','storagePreconditions','testStartedAt')))
+
     def abandon(self, proof=None):
-        self.closed()
-        if self.state['mutationStarted'] and self.state['phase'] not in ('rolled-back','validated'):
-            raise ValueError('Rollback ou validation complète requis')
-        self.backend.checks()
+        if self.unmutated_abandon():
+            self.backend.close_socket(missing_ok=True)
+            self.state['closureConfirmed'] = False  # Aucune preuve Nginx inventée.
+            self.state['abandonReason'] = 'no-mutation-barrier-not-required'
+        else:
+            self.closed()
+            if self.state['mutationStarted'] and self.state['phase'] not in ('rolled-back','validated'):
+                raise ValueError('Rollback ou validation complète requis')
+            self.backend.checks()
         self.state['phase'] = 'abandoned'; self.save()
         op.atomic_json(self.directory/('archive-'+self.run_id+'.json'), self.state)
         self.owner.release(self.run_id)
@@ -244,19 +258,24 @@ class Engine(public.Engine):
             try:
                 # Propriétaire établi avant de fermer ; aucun besoin de Docker ou de
                 # charger un état éventuellement interrompu pour retirer le socket.
-                if action != 'status': self.backend.close_socket()
+                if action != 'status':
+                    try:self.backend.close_socket()
+                    except FileNotFoundError:
+                        if action!='abandon':raise  # Décision après lecture de l'état propriétaire.
                 self.state = op.read_private(self.path)
                 if (self.state['run'] != run_id or self.state.get('profile') != PROFILE
                         or self.state['planHash'] != fingerprint(self.plan)):
                     raise ValueError('État/profil incompatible')
                 if action == 'status':
-                    return {key:self.state[key] for key in ('run','profile','planHash','phase','pending','backup',
+                    return {key:self.state[key] for key in ('run','profile','planHash','phase','pending','mutationStarted','backup',
                             'observed','testStartedAt','testClosedAt','testOwnerPid') if key in self.state}
                 self.backend.host_guard()
                 # Fermer AVANT lecture de preuve/config : une preuve illisible ne laisse
                 # jamais l'ancien test ouvert. Les refus de propriétaire restent hors try.
-                self.backend.close_socket()
-                if self.state['configurationHash'] != self.backend.identity(): raise ValueError('Configuration modifiée')
+                early_abandon = action=='abandon' and self.unmutated_abandon()
+                self.backend.close_socket(missing_ok=early_abandon)
+                if not early_abandon and self.state['configurationHash'] != self.backend.identity():
+                    raise ValueError('Configuration modifiée')
                 self.backend.select(self.plan)
                 proof = op.read_private(evidence) if isinstance(evidence, (str,Path)) else evidence
                 self.event(action, 'START')

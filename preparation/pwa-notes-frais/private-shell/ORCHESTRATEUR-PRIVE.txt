@@ -298,3 +298,12 @@ Ne pas démarrer de service gate manuellement, ne pas lancer le runner restore
 directement. Les commandes R reserve/prepare/restore/deploy/open-test/validate/
 rollback/abandon ci-dessus sont les entrées opérationnelles. Les modèles de
 preuves gardent checks=false jusqu’à vérification opérateur effective.
+
+
+Abandon initial et trois prérequis — complément ciblé
+Voir PREUVES-MSI-REPRISE.txt pour le correctif d'abandon avant mutation et les
+preuves MSI/relevés PREPROD de rollback-schema-compatible, session-isolation-plan
+et isolated-restore-capacity. Un abandon certain avant mutation ne nécessite
+pas de marqueur HTTP d'une barrière non installée ; il ne recharge pas l'ERP et
+n'affirme aucune fermeture réseau. Après mutation/état ambigu, toutes les
+exigences précédentes de fermeture, source identique et rollback demeurent.
