@@ -1,14 +1,17 @@
 #!/usr/bin/env python3
 """Restauration d'exercice seulement, copies jetables sans réseau/port ; jamais PREPROD."""
 import argparse
+import ctypes
 from contextlib import contextmanager
 import hashlib
 import importlib.util
 import json
 import os
+import re
 from pathlib import Path
 import secrets
 import shutil
+import signal
 import socket
 import stat
 import subprocess
@@ -19,6 +22,7 @@ import time
 P=Path(__file__).resolve().parent
 ROOT=P.parents[2]
 DATABASES=('socle','tiers','contrats','factures','tresorerie')
+_DEADLINE=None
 
 
 def load(path,name):
@@ -29,10 +33,13 @@ op=load(ROOT/'scripts/preprod_operation.py','isolated_operation')
 base=load(ROOT/'scripts/preprod_config.py','isolated_base')
 archive=load(P.parent/'scripts/preprod_document_archive.py','isolated_archive')
 manifest=load(ROOT/'scripts/preprod_backup_manifest.py','isolated_manifest')
+validator=load(P/'isolated-validator.py','isolated_schema_validator')
 
 
 def command(args, **kwargs):
-    result=subprocess.run(args,capture_output=True,timeout=900,**kwargs)
+    remaining=90 if _DEADLINE is None else _DEADLINE-time.monotonic()
+    if remaining<=0:raise TimeoutError('Budget restauration épuisé')
+    result=subprocess.run(args,capture_output=True,timeout=min(900,remaining),**kwargs)
     if result.returncode:raise ValueError('Exercice isolé refusé')
     return result.stdout
 
@@ -91,10 +98,81 @@ def recovery_staging(directory):
     recovery={'required':False}
     try:yield tmp,recovery
     finally:
-        if not recovery['required']:shutil.rmtree(tmp)
+        if not recovery['required']:
+            shutil.rmtree(tmp)
+            attempt_path=Path(directory)/'restore-attempt.json'
+            if attempt_path.exists():
+                attempt=op.read_private(attempt_path)
+                if attempt.get('phase')=='docker-cleaned' and attempt.get('envFile')==str(tmp/'restore.env'):
+                    attempt['phase']='cleaned';op.atomic_json(attempt_path,attempt)
+
+
+def recover_previous(directory,run,backup):
+    """Only called INSIDE the inherited owner lock after run/plan/phase checks."""
+    path=directory/'restore-attempt.json'
+    if not path.exists():return
+    attempt=op.read_private(path)
+    if attempt.get('phase')=='cleaned':return
+    project=attempt.get('project','')
+    if (attempt.get('run')!=run or attempt.get('backup')!=backup
+            or not re.fullmatch('wavy-pwa-restore-'+re.escape(run)+r'-[a-f0-9]{8}',project)):
+        raise ValueError('Reprise isolée hors propriétaire/lot')
+    config=Path(attempt.get('envFile',''))
+    if (config.name!='restore.env' or config.parent.parent!=directory
+            or not config.parent.name.startswith('restore-private-')
+            or config.is_symlink() or config.parent.is_symlink()):
+        raise ValueError('Chemin de reprise isolée refusé')
+    if attempt.get('phase')=='docker-cleaned':
+        if config.parent.exists():
+            info=config.parent.lstat()
+            if not stat.S_ISDIR(info.st_mode) or info.st_uid!=os.getuid() or stat.S_IMODE(info.st_mode)!=0o700:
+                raise ValueError('Staging reprise non sûr')
+            shutil.rmtree(config.parent)
+        attempt['phase']='cleaned';op.atomic_json(path,attempt);return
+    for target,mode in ((config,0o600),(config.parent,0o700)):
+        info=target.lstat()
+        if (info.st_uid!=os.getuid() or stat.S_IMODE(info.st_mode)!=mode
+                or (target==config and not stat.S_ISREG(info.st_mode))
+                or (target==config.parent and not stat.S_ISDIR(info.st_mode))):
+            raise ValueError('Permissions de reprise isolée refusées')
+    cmd=['docker','compose','--env-file',str(config),'-p',project,'-f',str(P/'restore-isolated.compose.yml')]
+    clean={k:v for k,v in os.environ.items() if not k.startswith(('RESTORE_','COMPOSE_'))}
+    rendered=json.loads(command(cmd+['config','--format','json'],env=clean))
+    validate_rendered(rendered,project,config.parent)
+    report_path=directory/'schema-validation.json'
+    report=op.read_private(report_path) if report_path.exists() else None
+    names=[] if report is None else report.get('containers',[])
+    # A fully cleaned report from an earlier attempt is historical evidence,
+    # not a registry of children belonging to the current failed attempt.
+    if report is not None and report.get('project')!=project and report.get('cleanup') is True and report.get('containers',[])==[]:
+        report=None;names=[]
+    if report is not None and (report.get('run')!=run or report.get('backup')!=backup or report.get('project')!=project):
+        raise ValueError('Rapport reprise hors propriétaire')
+    attempt['phase']='recovering';op.atomic_json(path,attempt)
+    for name in names:
+        if not re.fullmatch(r'wavy-validator-(extract-)?[a-f0-9]{24}',name):
+            raise ValueError('Nom validateur de reprise refusé')
+        exists=command(['docker','ps','-aq','--filter','name=^/'+name+'$']).strip()
+        if not exists:continue
+        container=json.loads(command(['docker','inspect',name]))[0]
+        if (container['Config'].get('Labels',{}).get('wavy.validator.project')!=project
+                or container['Config']['Image'] not in {pair[0] for pair in validator.IMAGES.values()}
+                or not container['HostConfig'].get('ReadonlyRootfs')
+                or container['Name']!='/'+name):
+            raise ValueError('Validateur de reprise étranger')
+        command(['docker','rm','-f',name])
+    command(cmd+['down','--volumes'],env=clean)
+    if report is not None:
+        report.update(status='failed-recovered',cleanup=True,containers=[])
+        op.atomic_json(report_path,report)
+    attempt['phase']='docker-cleaned';op.atomic_json(path,attempt)
+    shutil.rmtree(config.parent)
+    attempt['phase']='cleaned';op.atomic_json(path,attempt)
 
 
 def restore(envfile,folder):
+    global _DEADLINE
+    _DEADLINE=time.monotonic()+840
     directory=ROOT/'deployments/pwa-release'
     run=os.environ['PWA_RELEASE_RUN'];fd=int(os.environ['PWA_RELEASE_LOCK_FD'])
     runtime_guard(envfile,fd)
@@ -115,6 +193,10 @@ def restore(envfile,folder):
         if state['backup']!=backup:raise ValueError('Lot différent de la réservation')
         private_config=load(P/'validate-private.py','restore_private_config')
         private_config.validate(envfile,Path(os.environ['WAVY_PRIVATE_PWA_GATE_DIR']),True)
+        validator.configuration_guard(base.render(envfile)['services']['wavy-factures-api-preprod']['environment'])
+        recover_previous(directory,run,backup)
+        # Stale proof can never authorize a new failed attempt.
+        (directory/'restore-proof.json').unlink(missing_ok=True)
         env=base.dotenv(envfile)
         # Copies privées, aucun accès aux credentials de base actifs dans les services d'exercice.
         with recovery_staging(directory) as (tmp,recovery):
@@ -152,6 +234,7 @@ def restore(envfile,folder):
                 for db in DATABASES:
                     ready=False
                     for attempt in range(60):
+                        if time.monotonic()>=_DEADLINE-30:raise TimeoutError('Budget readiness épuisé')
                         result=subprocess.run(cmd+['exec','-T',db,'pg_isready','-U','restore_operator','-d',db],env=clean,capture_output=True,timeout=10)
                         if result.returncode==0:ready=True;break
                         time.sleep(1)
@@ -173,20 +256,31 @@ def restore(envfile,folder):
                 copy=tmp/'copy.tar'
                 copy.write_bytes(command(cmd+['exec','-T','documents','tar','-cpf','-','-C','/documents','contrats','notes-frais'],env=clean))
                 if document_hashes(copy)!=hashes:raise ValueError('Copies documentaires différentes')
+                validation=validator.validate_copies(cmd,project,tmp,directory/'schema-validation.json',
+                    {'run':run,'planHash':state['planHash'],'backup':backup},
+                    timeout_seconds=min(240,_DEADLINE-time.monotonic()-30))
                 proof={'profile':'private-tunnel-v1','run':run,'planHash':state['planHash'],
                        'origin':'http://localhost:24443','checkedAt':time.strftime('%Y-%m-%dT%H:%M:%S+00:00',time.gmtime()),
                        'reviewer':'isolated-restore-runner','backup':backup,'project':project,
+                       'schemaValidation':{'reportSha256':validator.digest(directory/'schema-validation.json'),
+                                           'images':validation['images'],'cleanup':validation['cleanup']},
                        'documentSetHash':hashlib.sha256(json.dumps(hashes,sort_keys=True).encode()).hexdigest(),
                        'checks':{k:True for k in ('five-databases','contracts-and-notes','hmac','catalogues',
-                                                 'document-hashes','notes-permissions')}}
+                                                 'document-hashes','notes-permissions',*validator.CHECKS)}}
             finally:
+                _DEADLINE=time.monotonic()+30
                 # Jamais prune : seul le projet unique dont la config a été contrôlée.
+                validation_path=directory/'schema-validation.json'
+                if validation_path.exists():
+                    current=op.read_private(validation_path)
+                    if current.get('run')==run and current.get('cleanup') is not True:
+                        raise ValueError('Validateur encore présent ; reprise isolée requise avant down')
                 command(cmd+['down','--volumes'],env=clean)
-                op.atomic_json(directory/'restore-attempt.json',{'run':run,'project':project,'backup':backup,'phase':'cleaned'})
+                op.atomic_json(directory/'restore-attempt.json',{'run':run,'project':project,'backup':backup,'phase':'docker-cleaned','envFile':str(config)})
                 recovery['required']=False
-            # Publier uniquement APRÈS nettoyage réussi. En panne : attempt durable, pas de preuve.
-            op.atomic_json(directory/'restore-proof.json',proof)
-            op.atomic_json(directory/'restore-attempt.json',{'run':run,'project':project,'backup':backup,'phase':'cleaned'})
+        # Publier uniquement APRÈS down ET suppression du staging, même après erreur.
+        op.atomic_json(directory/'restore-proof.json',proof)
+        op.atomic_json(directory/'restore-attempt.json',{'run':run,'project':project,'backup':backup,'phase':'cleaned'})
 
 if __name__=='__main__':
     parser=argparse.ArgumentParser(description=__doc__)
@@ -194,5 +288,10 @@ if __name__=='__main__':
     parser.add_argument('--env',required=True,type=Path);parser.add_argument('--backup',required=True,type=Path)
     args=parser.parse_args()
     if not args.execute_on_approved_host:parser.exit(2,'Runner inactif sans autorisation explicite.\n')
+    def interrupted(signum,frame):raise InterruptedError('Restauration interrompue')
+    signal.signal(signal.SIGTERM,interrupted)
+    parent=os.getppid()
+    if ctypes.CDLL(None,use_errno=True).prctl(1,signal.SIGTERM,0,0,0)!=0 or os.getppid()!=parent:
+        parser.exit(2,'Surveillance du parent indisponible.\n')
     try:restore(args.env,args.backup)
     except BaseException:raise SystemExit('Restauration isolée refusée ; voir état privé, aucune preuve publiée.')

@@ -1,0 +1,438 @@
+{
+  "kind": "MSI_SYNTHETIC_VALIDATOR_RESULTS_NOT_PREPROD_ATTESTATION",
+  "observedAtUTC": "2026-10-24T17:49:22.263503+00:00",
+  "baseCommit": "3da04f4e6f59926d42b939ce0452a63c5bb0c9b8",
+  "workingTreeNotCommitted": true,
+  "primaryCampaign": {
+    "passed": 164,
+    "skipped": 1,
+    "failed": 0,
+    "suites": [
+      {
+        "suite": "preparation/pwa-notes-frais/private-shell/test-assets.py",
+        "returnCode": 0,
+        "tests": 1,
+        "skipped": 0,
+        "seconds": 0.041,
+        "logSha256": "24cefc2bc38a1c71e18591075993695fc72546b32ff6b5baab3d98032ce96fb5"
+      },
+      {
+        "suite": "preparation/pwa-notes-frais/private-shell/test-backup-private.py",
+        "returnCode": 0,
+        "tests": 2,
+        "skipped": 0,
+        "seconds": 0.447,
+        "logSha256": "d8e44d52509e8b4406c962d3e8d930d40c1c01f4f4c4cfef084698af560d0e61"
+      },
+      {
+        "suite": "preparation/pwa-notes-frais/private-shell/test-compose.py",
+        "returnCode": 0,
+        "tests": 3,
+        "skipped": 0,
+        "seconds": 1.388,
+        "logSha256": "67a9ce27396cf2d80f262d31b1cc6bc5eee39eae96febf21cff120f4f68aa28a"
+      },
+      {
+        "suite": "preparation/pwa-notes-frais/private-shell/test-correction-plan.py",
+        "returnCode": 0,
+        "tests": 6,
+        "skipped": 0,
+        "seconds": 0.107,
+        "logSha256": "0c4c5c2184d00bb1a2cc8247d010064830edfd9055be88923c8c8f632a6b3dcd"
+      },
+      {
+        "suite": "preparation/pwa-notes-frais/private-shell/test-final-review.py",
+        "returnCode": 0,
+        "tests": 9,
+        "skipped": 0,
+        "seconds": 5.436,
+        "logSha256": "c8a76d2e33ae566461146687469429d1ce2cfd321277d90684105b329805da4e"
+      },
+      {
+        "suite": "preparation/pwa-notes-frais/private-shell/test-isolated-restore.py",
+        "returnCode": 0,
+        "tests": 1,
+        "skipped": 0,
+        "seconds": 0.097,
+        "logSha256": "d0f1e19a9fc2c6be1d6fe29c0bad01f1e99e75f01cc9cf013d7dc82a760babb7"
+      },
+      {
+        "suite": "preparation/pwa-notes-frais/private-shell/test-isolated-validator.py",
+        "returnCode": 0,
+        "tests": 20,
+        "skipped": 0,
+        "seconds": 81.626,
+        "logSha256": "a889d43192831bb3de6ebccff360b891790aa480b7eaa7c0d07f3a6f72b93815"
+      },
+      {
+        "suite": "preparation/pwa-notes-frais/private-shell/test-private-backend.py",
+        "returnCode": 0,
+        "tests": 13,
+        "skipped": 0,
+        "seconds": 2.89,
+        "logSha256": "0cdc818116da7f5797f095cfdd3b493eb05e41176d791f206e4dcf5c239b7bff"
+      },
+      {
+        "suite": "preparation/pwa-notes-frais/private-shell/test-private-orchestrator.py",
+        "returnCode": 0,
+        "tests": 16,
+        "skipped": 0,
+        "seconds": 25.097,
+        "logSha256": "9dcb06ae632e0fb1c58b1d671e71a1cb0183c17c1a70fc4aa7f0bf94e2693b00"
+      },
+      {
+        "suite": "preparation/pwa-notes-frais/private-shell/test-private-runtime.py",
+        "returnCode": 0,
+        "tests": 3,
+        "skipped": 0,
+        "seconds": 1.196,
+        "logSha256": "e1b88634c719b535b485a913ff048c0d6fc77002529e77d1693f317c44915d51"
+      },
+      {
+        "suite": "preparation/pwa-notes-frais/private-shell/test-private.py",
+        "returnCode": 0,
+        "tests": 4,
+        "skipped": 0,
+        "seconds": 4.979,
+        "logSha256": "0a6e5578dafaf3d8dc6afbb0bf45d9a77ac0fbff9ff6c1791eb2e11728a7c5f3"
+      },
+      {
+        "suite": "preparation/pwa-notes-frais/private-shell/test-restore-private.py",
+        "returnCode": 0,
+        "tests": 4,
+        "skipped": 0,
+        "seconds": 0.146,
+        "logSha256": "5881331cc57622b2884914c47f46385e1fe99dd2438d03a49e89ce2f4d18d043"
+      },
+      {
+        "suite": "preparation/pwa-notes-frais/private-shell/test-review-regressions.py",
+        "returnCode": 0,
+        "tests": 6,
+        "skipped": 0,
+        "seconds": 8.654,
+        "logSha256": "6f548f3b3a2187a443497538bf5223c9a9aba902c8012e6662d62392fd9ae58c"
+      },
+      {
+        "suite": "preparation/pwa-notes-frais/private-shell/test-session-gate.py",
+        "returnCode": 0,
+        "tests": 7,
+        "skipped": 0,
+        "seconds": 0.561,
+        "logSha256": "3464ebc66a5fc80788225167d1e7561e1c44867480091f166a3127bee0383789"
+      },
+      {
+        "suite": "preparation/pwa-notes-frais/private-shell/test-validator-integration.py",
+        "returnCode": 0,
+        "tests": 10,
+        "skipped": 0,
+        "seconds": 7.347,
+        "logSha256": "a589ba4c135e42bf8116c2bf60c2cdda5a221601dbd1096f65b82726a2f3ca9b"
+      },
+      {
+        "suite": "preparation/pwa-notes-frais/test-orchestrator.py",
+        "returnCode": 0,
+        "tests": 25,
+        "skipped": 0,
+        "seconds": 40.883,
+        "logSha256": "6f293b56b9c82868dcdb172a22853bd75971eb8abb91a4d118967ba344fabfdd"
+      },
+      {
+        "suite": "preparation/pwa-notes-frais/test-storage-authorization-concurrency.py",
+        "returnCode": 0,
+        "tests": 12,
+        "skipped": 0,
+        "seconds": 1.784,
+        "logSha256": "b626ecf86d1cadcf85e056a912e47fc1e5434b35461ed37dadcdc859184d3ba1"
+      },
+      {
+        "suite": "preparation/pwa-notes-frais/test-storage-security.py",
+        "returnCode": 0,
+        "tests": 18,
+        "skipped": 1,
+        "seconds": 2.629,
+        "logSha256": "603b9a37cd98b82f31241557f6aaf32a25f066927d1c2070abe58f7d7b434e71"
+      },
+      {
+        "suite": "preparation/pwa-notes-frais/test-storage-runtime.py",
+        "returnCode": 0,
+        "tests": 5,
+        "skipped": 0,
+        "seconds": 2.017,
+        "logSha256": "c1618c01d2c8fc34dc8b9741dee80da908a1e6afcf73c16eb56e7043964d0626"
+      }
+    ]
+  },
+  "targetedConfirmation": [
+    {
+      "scope": "targeted regression after final I/O/durability changes",
+      "testsPassed": 11,
+      "logSha256": "d8f1c5491a2c146631c98ff3e7947880eeb90798fb07f19d6bb571a7a156c9be"
+    },
+    {
+      "scope": "targeted regression after final I/O/durability changes",
+      "testsPassed": 7,
+      "logSha256": "0f99d26d291300a82e86c7ee96592f67717affa285bea6ab0aca4ed8b27e7bd9"
+    },
+    {
+      "scope": "Least SQL privileges: both images, cycle, missing column, checksum",
+      "testsPassed": 4,
+      "logSha256": "780e661856f1c60853ace1f297b746d75b8aa2eaf4912513a413348ec48a7c4e"
+    },
+    {
+      "scope": "Final restore integration and guarded recovery",
+      "testsPassed": 15,
+      "logSha256": "adc19901e2aafdb7b9c9a6ffd626d9b002775a7fd435f19ddabceba30fa9d8b9"
+    },
+    {
+      "scope": "Prior security reproductions after recovery integration",
+      "testsPassed": 9,
+      "logSha256": "a7750c23ef0cbd21773ad6c321f70fc9dab129e6e04868bfea6255f0438be832"
+    },
+    {
+      "scope": "Final guards and real complete validation cycle",
+      "testsPassed": 8,
+      "logSha256": "e935f9eb4b8d6fc29797ac3977ba6f32157936626d94551fe8ca87911a0f7775"
+    },
+    {
+      "scope": "Final private backend proof and cleanup guards",
+      "testsPassed": 13,
+      "logSha256": "c5f6b9e414a1ca8bccba2c27340ac113419d75376219d8a3d907f1f35e4b8ed3"
+    },
+    {
+      "scope": "Final private orchestrator concurrency and rollback",
+      "testsPassed": 16,
+      "logSha256": "8860633f2a704f70b9468db1644014bd523daed212f6e6ff95f9f3848777da57"
+    }
+  ],
+  "hostCompiler": "javac 17.0.20.1",
+  "embeddedLibraries": {
+    "Flyway": "11.14.1",
+    "Hibernate": "7.2.7.Final",
+    "PostgreSQLDriver": "42.7.10"
+  },
+  "validatedPair": {
+    "old": "b277edb",
+    "new": "09fcd98",
+    "migrations": 20,
+    "entities": 23
+  },
+  "limits": [
+    "synthetic-local-only",
+    "no-real-backup-restore-proof",
+    "no-spring-runtime-proof",
+    "no-session-isolation-executed"
+  ],
+  "sourceSha256": {
+    "IsolatedSchemaValidator.java": "4de2ed6ea35e119fd381e556b4016c6a009d8bd2eb7b8b83de245dfadc2075a3",
+    "isolated-validator.py": "5ab3605368dda519fcfdc64d3096d4c37bcc0c658e1287b5570d1bc83c68826d",
+    "restore-private.py": "7664ad13e2bc2fdfda7b744b029ca379ebe3c5d6c61000c877c50366014c19bc",
+    "release-private.py": "65513735a8678cbaa717316b70e853ed9dbb61701f624a3d83fc18013561c9f2",
+    "private-backend.py": "bda47bf33f53617b27c9c10ffba60b85414a1c1b26053fccbd06330048f8f758",
+    "prepare-isolation-cases.py": "7adc8ad7e0daa1def4e13c1ef5e50907553807689414d3021d8c0f2bb6a81b84",
+    "test-isolated-validator.py": "faee9f7cb0949d9644f9c743e3b549d483059e660b88cfc1eee1a5d63082cb99",
+    "test-validator-integration.py": "b80c1239ee8c5d4d89227c713d76a6a1431aceef981ff6bdc44c399f1172d493"
+  },
+  "preprodAttestations": {
+    "rollback-schema-compatible": false,
+    "session-isolation-plan": false,
+    "isolated-restore-capacity": false
+  },
+  "cleanupRecovery": "owner-guarded restore after inspected resume; project/image/path checked; no manual marker deletion",
+  "finalReview": {
+    "kind": "LOCAL_REGRESSION_RESULTS_NOT_SESSION_ISOLATION_PROOF",
+    "observedAtUTC": "2026-10-24T19:28:34.540394+00:00",
+    "passed": 173,
+    "skipped": 1,
+    "failed": 0,
+    "suites": [
+      {
+        "suite": "preparation/pwa-notes-frais/private-shell/test-assets.py",
+        "returnCode": 0,
+        "tests": 1,
+        "skipped": 0,
+        "seconds": 0.086,
+        "log": "/tmp/wavy-finalisation-evidence-5qi4r5d9/wavy-jpa-campaign-test-assets.log",
+        "logSha256": "c346f1228fe88f4ab3cb336ffa610dc3a34ec7c7bb7d05df7a1c222f2d928881"
+      },
+      {
+        "suite": "preparation/pwa-notes-frais/private-shell/test-backup-private.py",
+        "returnCode": 0,
+        "tests": 2,
+        "skipped": 0,
+        "seconds": 0.877,
+        "log": "/tmp/wavy-finalisation-evidence-5qi4r5d9/wavy-jpa-campaign-test-backup-private.log",
+        "logSha256": "d572438ac793bc06c677f3f2092c8118f5e6db50b870d5260e9f73f035f6b58e"
+      },
+      {
+        "suite": "preparation/pwa-notes-frais/private-shell/test-compose.py",
+        "returnCode": 0,
+        "tests": 3,
+        "skipped": 0,
+        "seconds": 2.584,
+        "log": "/tmp/wavy-finalisation-evidence-5qi4r5d9/wavy-jpa-campaign-test-compose.log",
+        "logSha256": "aa1c9dc6ba9fc27186a8c189151307ae0d6e9e5538b2e23f080f86015b8de7db"
+      },
+      {
+        "suite": "preparation/pwa-notes-frais/private-shell/test-correction-plan.py",
+        "returnCode": 0,
+        "tests": 6,
+        "skipped": 0,
+        "seconds": 0.223,
+        "log": "/tmp/wavy-finalisation-evidence-5qi4r5d9/wavy-jpa-campaign-test-correction-plan.log",
+        "logSha256": "735fc7f2e517f944dc01ededa38b74ac3f68e61944cd289af21d9babd61ebadb"
+      },
+      {
+        "suite": "preparation/pwa-notes-frais/private-shell/test-final-review.py",
+        "returnCode": 0,
+        "tests": 9,
+        "skipped": 0,
+        "seconds": 5.892,
+        "log": "/tmp/wavy-finalisation-evidence-5qi4r5d9/wavy-jpa-campaign-test-final-review.log",
+        "logSha256": "fb3783718eaa5f6a60338dd4c300a3e157c7ecb417ee497224f2a508a7bd511b"
+      },
+      {
+        "suite": "preparation/pwa-notes-frais/private-shell/test-isolated-restore.py",
+        "returnCode": 0,
+        "tests": 1,
+        "skipped": 0,
+        "seconds": 0.173,
+        "log": "/tmp/wavy-finalisation-evidence-5qi4r5d9/wavy-jpa-campaign-test-isolated-restore.log",
+        "logSha256": "9b0822f9fafb99b50a13f47c10a91d95313bed1a2fc15c1427f0ee417d050100"
+      },
+      {
+        "suite": "preparation/pwa-notes-frais/private-shell/test-isolated-validator.py",
+        "returnCode": 0,
+        "tests": 22,
+        "skipped": 0,
+        "seconds": 123.128,
+        "log": "/tmp/wavy-finalisation-evidence-5qi4r5d9/wavy-jpa-campaign-test-isolated-validator.log",
+        "logSha256": "2f68a55d82c382991f09c7d563c7bd945134c7db945085e6012a9a66afc2e601"
+      },
+      {
+        "suite": "preparation/pwa-notes-frais/private-shell/test-private-backend.py",
+        "returnCode": 0,
+        "tests": 13,
+        "skipped": 0,
+        "seconds": 3.205,
+        "log": "/tmp/wavy-finalisation-evidence-5qi4r5d9/wavy-jpa-campaign-test-private-backend.log",
+        "logSha256": "9be62621673a8b323700047ecd38692148fab6d9347befe6598a9b9a26a5143b"
+      },
+      {
+        "suite": "preparation/pwa-notes-frais/private-shell/test-private-orchestrator.py",
+        "returnCode": 0,
+        "tests": 17,
+        "skipped": 0,
+        "seconds": 23.728,
+        "log": "/tmp/wavy-finalisation-evidence-5qi4r5d9/wavy-jpa-campaign-test-private-orchestrator.log",
+        "logSha256": "f095ed8969b117bea073122b9dc2e45c00a5a45c2e24ae9e84db1db5c6d530a4"
+      },
+      {
+        "suite": "preparation/pwa-notes-frais/private-shell/test-private-runtime.py",
+        "returnCode": 0,
+        "tests": 3,
+        "skipped": 0,
+        "seconds": 1.764,
+        "log": "/tmp/wavy-finalisation-evidence-5qi4r5d9/wavy-jpa-campaign-test-private-runtime.log",
+        "logSha256": "3147c750de7f96c7c038b43bd3b5c6ae35faf1bef0e3fa38d784dfd2642dced8"
+      },
+      {
+        "suite": "preparation/pwa-notes-frais/private-shell/test-private.py",
+        "returnCode": 0,
+        "tests": 4,
+        "skipped": 0,
+        "seconds": 6.506,
+        "log": "/tmp/wavy-finalisation-evidence-5qi4r5d9/wavy-jpa-campaign-test-private.log",
+        "logSha256": "37d51cafbda8ea438838dd0ca471d5699f2650599ebc0836e4f2d0b6193f412e"
+      },
+      {
+        "suite": "preparation/pwa-notes-frais/private-shell/test-restore-private.py",
+        "returnCode": 0,
+        "tests": 4,
+        "skipped": 0,
+        "seconds": 0.28,
+        "log": "/tmp/wavy-finalisation-evidence-5qi4r5d9/wavy-jpa-campaign-test-restore-private.log",
+        "logSha256": "eab6688107371a143ac2480edd5d0478271ece2057bf8b4e37a522bf8cfc69e0"
+      },
+      {
+        "suite": "preparation/pwa-notes-frais/private-shell/test-review-regressions.py",
+        "returnCode": 0,
+        "tests": 6,
+        "skipped": 0,
+        "seconds": 13.325,
+        "log": "/tmp/wavy-finalisation-evidence-5qi4r5d9/wavy-jpa-campaign-test-review-regressions.log",
+        "logSha256": "fe955702001648f4ed0a4772208e5a60e50cd815c7316912d1d5800e45ba47c6"
+      },
+      {
+        "suite": "preparation/pwa-notes-frais/private-shell/test-session-gate.py",
+        "returnCode": 0,
+        "tests": 7,
+        "skipped": 0,
+        "seconds": 0.628,
+        "log": "/tmp/wavy-finalisation-evidence-5qi4r5d9/wavy-jpa-campaign-test-session-gate.log",
+        "logSha256": "e58502c15347743db9f373ccc0e24e694f95fad7fcb961325ba409f6f4669f76"
+      },
+      {
+        "suite": "preparation/pwa-notes-frais/private-shell/test-validator-integration.py",
+        "returnCode": 0,
+        "tests": 16,
+        "skipped": 0,
+        "seconds": 8.444,
+        "log": "/tmp/wavy-finalisation-evidence-5qi4r5d9/wavy-jpa-campaign-test-validator-integration.log",
+        "logSha256": "994502ba4f2196fa0dcb813b65386fe2dc5a0d1641241cee54b705b6f00db871"
+      },
+      {
+        "suite": "preparation/pwa-notes-frais/test-orchestrator.py",
+        "returnCode": 0,
+        "tests": 25,
+        "skipped": 0,
+        "seconds": 36.263,
+        "log": "/tmp/wavy-finalisation-evidence-5qi4r5d9/wavy-jpa-campaign-test-orchestrator.log",
+        "logSha256": "bb5f42b3c17f1c3acfd2e21fbe389253c25264a8f9a785653e1ef1a6af4ad4fb"
+      },
+      {
+        "suite": "preparation/pwa-notes-frais/test-storage-authorization-concurrency.py",
+        "returnCode": 0,
+        "tests": 12,
+        "skipped": 0,
+        "seconds": 2.073,
+        "log": "/tmp/wavy-finalisation-evidence-5qi4r5d9/wavy-jpa-campaign-test-storage-authorization-concurrency.log",
+        "logSha256": "56a1e0db956c559ce43fc3d45a0ba70dffe0e53ef66a1ce5e3b352685558a40f"
+      },
+      {
+        "suite": "preparation/pwa-notes-frais/test-storage-security.py",
+        "returnCode": 0,
+        "tests": 18,
+        "skipped": 1,
+        "seconds": 4.141,
+        "log": "/tmp/wavy-finalisation-evidence-5qi4r5d9/wavy-jpa-campaign-test-storage-security.log",
+        "logSha256": "eebba85c6439e9a7d32535b6235bda77cd629c5d5bf147796a32aeadfde00eaf"
+      },
+      {
+        "suite": "preparation/pwa-notes-frais/test-storage-runtime.py",
+        "returnCode": 0,
+        "tests": 5,
+        "skipped": 0,
+        "seconds": 2.938,
+        "log": "/tmp/wavy-finalisation-evidence-5qi4r5d9/wavy-jpa-campaign-test-storage-runtime.log",
+        "logSha256": "34ef39f5741651f802404a27735c84b4753048131d1c0c1e3326508300204826"
+      }
+    ],
+    "sourceSha256": {
+      "IsolatedSchemaValidator.java": "4de2ed6ea35e119fd381e556b4016c6a009d8bd2eb7b8b83de245dfadc2075a3",
+      "isolated-validator.py": "21c279f557b317c0e693b7902c58164bbe228d7863515865d4871a0a3c384de8",
+      "restore-private.py": "be09e80ee3706bb4c324100e58e9775518a8a6464d9d6e3909395cc88c889b77",
+      "release-private.py": "65513735a8678cbaa717316b70e853ed9dbb61701f624a3d83fc18013561c9f2",
+      "private-backend.py": "449598fea0bc7010062171a4f3b49f43c6adb32ce1f6a467dd77b1f76e23aa36",
+      "prepare-isolation-cases.py": "7adc8ad7e0daa1def4e13c1ef5e50907553807689414d3021d8c0f2bb6a81b84",
+      "test-isolated-validator.py": "3d0489835b05e6bea36a566ee14dc5f21211263bcf563eb9efb9560018868bce",
+      "test-validator-integration.py": "cc9dc124692a4faefcf2532d8d417dd1995b578fc587769790f04bcf9d923aa1",
+      "test-private-backend.py": "ce57c2002a3d03e31c9291afa1a15b9f8ffe5a47d62d1819620613efe6906260",
+      "test-private-orchestrator.py": "2040fc154dc6fc2071dd2712e868deddab429b79b3207f7b0e296b487b40531c"
+    },
+    "requiredIsolationCases": {
+      "executed": 0,
+      "blocked": 247
+    },
+    "commitDecision": "NO_GO_REQUIRED_ISOLATION_CASES_UNEXECUTED"
+  }
+}

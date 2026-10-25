@@ -1,0 +1,201 @@
+Wavy — Revue technique indépendante du dossier CONTROLES-PREPROD.txt
+24 octobre 2026 — locale MSI uniquement
+Référence code : 3da04f4e6f59926d42b939ce0452a63c5bb0c9b8.
+Objet : qualité et suffisance du protocole de décision ; aucune attestation PREPROD.
+Aucun script applicatif ou DevOps modifié par cette revue. Aucun accès VM,
+conteneur/volume créé, déploiement, commit ou push. Trois attestations false.
+Le dossier examiné reste intact : les corrections ci-dessous sont recommandées,
+pas appliquées implicitement. Une anomalie de preuve n'est pas une vulnérabilité
+runtime démontrée ; les scénarios PREPROD n'ont pas été exécutés.
+
+VERDICT : NO GO pour une décision de déploiement fondée sur ce dossier seul.
+Deux lacunes bloquantes du protocole, cinq majeures et deux modérées ci-dessous.
+Les protections existantes ne doivent pas être contournées pour les résoudre.
+
+Périmètre et méthode
+Lecture du dossier complet, facts JSON, runbooks, overlay quatre images, routes
+Nginx, restore-isolated.compose.yml, restore-private.py, tests et validate-bundle.py.
+Lecture Git seule du dépôt Factures API aux révisions b277edb et 09fcd98 ; aucun
+changement dans l'autre dépôt. Comparaison ciblée pom, migrations, modèles,
+application.properties et contrôleurs à ces révisions (pas seulement le checkout).
+Pas de nouvelle extraction des JAR : leurs hashes et l'inventaire binaire détaillé
+sont des faits MSI préexistants du JSON, pas une mesure binaire refaite par la revue.
+Contrôle local images relancé : quatre RepoDigests/labels/plateformes conformes.
+Tests relancés : isolation Compose 1/1 ; restauration fixtures/gardes 4/4.
+Aucun pg_restore réel, bootstrap JPA, test utilisateur, IA ou navigateur réalisé.
+
+B1 — BLOQUANT : le contrat de consultation après rollback est incomplet
+Références : dossier §2 lignes 75–79 et §6 ; ancienne NoteFraisControleur à b277edb ;
+nouvelle NoteFraisJustificatifControleur à 09fcd98 ; routes.conf @private_notes_read.
+Fait : b277edb expose GET collection, GET /{id}, GET /synthese-mensuelle, avec
+contexte tenant/société/utilisateur ; aucun contrôleur justificatif n'est présent
+dans l'arbre de cette ancienne révision. Les nouvelles routes GET /{id}/justificatif
+et /{id}/justificatif/contenu sont dans le nouveau contrôleur seulement.
+Les GET/HEAD passent le gate fermé vers l'API : Nginx n'ajoute pas ces capacités.
+Le retour de métadonnées pieceCheminStockage ne restitue pas les octets ndf:<UUID>.
+Conséquence : sécurité des originaux et compatibilité SQL ne valent pas continuité
+fonctionnelle des pièces. L'affirmation « Notes en lecture seule » doit distinguer
+liste/détail/synthèse, rendu de l'ancien Front et téléchargement des nouveaux fichiers.
+Action : documenter le contrat de service dégradé après rollback ; le faire accepter
+explicitement si le téléchargement est indisponible. Ne jamais réactiver les écritures
+anciennes ni exposer le volume pour compenser. Si consultation des pièces obligatoire,
+NO GO jusqu'à solution préalablement autorisée et testée, hors de cette revue.
+Critère mesurable : sur copie contenant note historique ET note/pièce créées par la
+nouvelle API, ancienne API + ancien Front affichent les champs attendus sans mutation ;
+GET/listes/synthèses et refus croisés testés. Résultat explicite de chaque GET pièce ;
+indisponibilité acceptée ou blocage, jamais 404 compté comme succès de lecture.
+Preuves manquantes : scénario ancienne API/ancien Front, statuts, captures synthétiques,
+hash des originaux et métadonnées avant/après, acceptation du mode dégradé.
+
+B2 — BLOQUANT : validation JPA/Flyway/logique sans point d'exécution défini
+Références : dossier §2 lignes 64–74, §5 ; restore-private.py lignes 154–190.
+Fait : helper démarre cinq PG sans réseau, restaure, vérifie tables/documents,
+puis down --volumes en finally ; proof publiée uniquement après nettoyage réussi.
+Il ne lance aucune API ni validation Flyway/JPA et ne garde pas les copies après succès.
+Le dossier exige ces contrôles mais ne fournit ni commande ni protocole approuvé
+permettant de les effectuer avant destruction. Les faire après restore est impossible
+sur les volumes supprimés. Joindre l'API au réseau PREPROD serait un contournement.
+Action : préparer et autoriser un protocole complémentaire isolé avant tout GO.
+Définir dépendances, credentials éphémères, profils, réseau isolé sans ressource active,
+point de contrôle avant nettoyage, validations anciennes/nouvelles et revue des logs.
+Ne pas modifier le helper sans autorisation. Ne pas déclarer son proof JPA-compatible.
+Clarifier l'ordre des attestations : isolated-restore-capacity est un dimensionnement
+avant prepare ; preuve de restauration du lot de ce run se produit ensuite, avant deploy.
+Si rollback-schema-compatible exige préalablement une restauration réelle, identifier
+un exercice préalable approuvé ; ne pas attendre du lot créé par prepare qu'il prouve
+rétroactivement son propre prérequis. Aucun true anticipé pour débloquer le cycle.
+Critère : procédure exécutable approuvée + succès Flyway validate et JPA validate pour
+les versions/profils effectivement utilisés, sans migration/repair/DDL non autorisés.
+Preuves manquantes : protocole, sorties, topologie/dépendances et ordre exact.
+
+M1 — MAJEUR : contrôles des cinq bases trop faibles pour une intégrité démontrée
+Références : dossier §5 ; restore-private.py count(public tables)>0 et proof checks.
+Un pg_restore transactionnel réussi est utile ; une seule table suffit cependant à
+la garde. Pas de comparaison schémas/tables/volumétrie, contraintes ou séquences à
+une référence cohérente de sauvegarde. documentSetHash couvre les octets, pas le lien
+DB->fichier, les doublons, les fichiers manquants ni toutes les références ndf:.
+Action : inventaire source au point de quiescence (tables attendues, migrations,
+comptages, contraintes et séquences utiles), comparaison des cinq copies, contrôles
+de références Notes/pièces tenant/société/propriétaire, inventaire manquants/orphelins.
+Critère : zéro divergence inexpliquée, zéro contrainte invalide ou lien manquant ;
+orphelins recensés et acceptés, jamais supprimés automatiquement.
+Preuves manquantes : requêtes SQL approuvées par schéma, résultats et baseline cohérente.
+Résoudre aussi le point d'exécution B2 ; restaurer sans erreur ne suffit pas.
+
+M2 — MAJEUR : Flyway et JPA restent sans comparaison reproductible complète
+Références : dossier §2 ; msi-prerequisites-facts.json ; Git API b277edb..09fcd98.
+Conforme localement : diff migrations/pom vide ; seul modèle modifié NoteFrais,
+ajout @DynamicUpdate/commentaire ; propriétés ajoutées stockage et multipart.
+Cela soutient une compatibilité statique, pas l'équivalence DB effective.
+Les SHA256 des fichiers SQL ne sont PAS les checksums Flyway de l'historique.
+Le SELECT proposé exige implicitement public.flyway_schema_history et ne tranche
+pas les locations spécifiques au profil, checksums Flyway ou extensions/schémas.
+Le dossier prévoit de confirmer la location, sans donner une procédure alternative.
+Action : relever les locations et schémas effectifs sans secret, inventaire migrations
+chargées et checksums via le moteur Flyway approprié ; comparer les exports sur copies
+après normalisation contrôlée des versions pg_dump/owners/grants. Aucun repair/clean.
+Critère : zéro migration failed/pending/inattendue ou checksum non expliqué ; validation
+JPA réussie (elle ne démontre pas à elle seule tous index, contraintes et sémantiques).
+Preuves manquantes : mapping profils/locations, commande versionnée, diff commenté.
+
+M3 — MAJEUR : matrice d'isolation pertinente mais pas complètement déclinée
+Références : dossier §7 et §8, contrôleurs API, repository filtré.
+Points solides : 2 tenants, 4 sociétés, 4 utilisateurs distincts, pas de supervision,
+session autorisée du gate pour les mutations négatives ; aucune donnée personnelle.
+Manques : B-peer vers note B-owner en lecture/écriture pas explicite ; pas de tableau
+par endpoint/méthode : collection/recherche/filtres/synthèse, détail, métadonnées,
+contenu/apercu, dépôt, JSON et multipart, suppression/actions/transformations.
+Absence de rôle NOTE_DE_FRAIS et absence de droit Gateway ne sont pas distinguées ;
+expiration/logout/révocation des habilitations durant fenêtre pas opérationnalisés.
+Une note en mauvais statut peut produire un refus métier, sans prouver l'isolation.
+Action : sous-cas nommés par dimension et route, positif même méthode/statut d'abord ;
+requête négative ne change QUE le contexte ou l'ID cible. Cas droits manquants séparés.
+Inclure cookies multiples/malformés, société falsifiée/non allouée et lectures après
+logout ; ne pas utiliser un ID inexistant comme seule preuve anti-IDOR.
+Critère : 100 % cases applicables exécutées ; zéro octet/métadonnée hors périmètre,
+zéro mutation après refus ; 401 ou 403/404 selon contrat précis, origine gate/backend
+identifiée sans exposer un port supplémentaire.
+Preuves manquantes : URLs contractuelles, droits/IDs réels, grille de résultats.
+
+M4 — MAJEUR : certains critères GO/NO GO ne sont pas chiffrés
+Références : dossier §3, §8–10.
+« marge approuvée », « comparables au baseline », « montants cohérents » et
+« aucune ouverture au-delà » ne sont pas assez opérationnels sans mesures/seuils.
+Le timeout total de 900 s est explicite ; aucun débit/taille VM n'a été mesuré.
+Action : avant autorisation mutante, consigner budget disque par filesystem en octets,
+RAM disponible minimale et pic admissible, charge ERP tolérée, durée maximale avec
+marge (strictement <900 s pour helper entier), codes/contenus ERP et tolérances
+latence, attentes IA/montants document par document. Ne pas inventer les seuils MSI.
+Expiration : noter deadline effective (minimum des durées de preuves et de 900 s),
+mesurer horloges/écart, probes avant/après sans confondre délai curl et autorisation.
+La fenêtre peut être PLUS COURTE que 15 min si un prérequis expire auparavant.
+Critère : toutes valeurs remplies et approuvées ; zéro budget inconnu au GO.
+Preuves manquantes : relevés VM sous charge, budget signé, horodatages et codes.
+
+M5 — MAJEUR : procédures IA et fermeture ne suffisent pas seules comme preuve
+Références : dossier §8–9, application.properties, docker-compose.preprod.yml.
+Le manifeste actif injecte WAVY_AI_ACHAT_AUTO_CREATION_ENABLED avec défaut false ;
+la propriété applicative a un défaut true. L'overlay privé ne force pas cette valeur.
+Pas de bug établi : une valeur explicite true dans l'env reste possible ; le dossier
+demande « aucune facture automatique » sans contrôle effectif de cette configuration.
+La matrice mutation fermée mentionne des méthodes sans payload exact ; un échec
+validation avant mutation n'est pas une preuve de filtrage par gate.
+Action : vérifier la valeur effective non sensible AVANT appel IA et l'absence de
+facture créée après appel. Rejouer des requêtes synthétiques valides sous session
+valide, contrôler X-Wavy-Private-Gate:closed +403, puis état/hash après requêtes en vol.
+Préserver les tests gate absent, inaccessible, conteneur PWA arrêté, rollback partiel,
+expiration et Ctrl-C sur fixtures ; aucun test panne VM implicitement autorisé.
+Critère : auto-création désactivée, zéro facture inattendue, zéro mutation post-gate ;
+ERP sensible/non sensible évalué séparément ; aucun cache sensible récupérable après
+purge réelle. Une réponse 404 anonyme seule ne démontre pas le comportement authentifié.
+Preuves manquantes : valeur effective filtrée, baseline écritures, requêtes/résultats,
+mesures expiration et nettoyage navigateur. Ne jamais exporter .env/docker inspect complet.
+
+R1 — MODÉRÉ : validate_rendered défensif mais pas contrat structurel exhaustif
+Références : restore-private.py validate_rendered ; test-restore-private.py fixture.
+YAML actuel correct : six volumes séparés, cinq PG+documents, none/RO/no-ports,
+secrets bind RO sans création de chemin, image PG par digest, pas de ressource externe.
+Mais validator n'impose pas une bijection service->volume distinct ni toute la forme
+des mounts : la fixture de test fait partager un volume aux six services et est acceptée.
+Pas de régression du YAML actuel démontrée ; risque d'évolution future masquée.
+Action : recommander tests de structure (six volumes distincts, destinations attendues,
+seuls binds secrets autorisés, create_host_path:false, sécurité/tmpfs attendus).
+Aucune modification de code proposée n'est appliquée ici sans autorisation.
+Critère : rendu réel exact + tests négatifs alias/mount inattendu avant toute évolution.
+
+R2 — MODÉRÉ : registre et preuves pas encore prêts à être remplis sans ambiguïté
+Références : dossier §0, §10–11 ; runbooks historiques.
+Le dossier décrit un registre mais ne fournit pas de lignes par sous-cas/commande.
+Certaines commandes n'enregistrent pas leurs sorties ni leurs codes. Les identifiants
+schema/table/company peuvent être sensibles même sans clé : classification requise.
+La section « 41 fichiers » est une mesure historique, évoluera avec ce rapport.
+Action : produire un registre privé par sous-cas, statut NON EXÉCUTÉ par défaut,
+commandes/résultats attendus/code retour/temps/run/plan/reviewer/hash preuve,
+conservation/accès/purge. Conserver logs assainis, jamais cookies/HAR/documents réels.
+Critère : 100 % contrôles tracés ; aucun NON APPLICABLE non justifié, aucun blanc
+interprété comme succès. Aucun nouveau commit demandé dans cette phase.
+
+Synthèse des éléments conformes
+- Quatre images locales épinglées conformes au plan ; ordre API->Front->PWA->Shell.
+- Compatibilité statique migrations/modèles soutenue par source et preuves MSI.
+  Front/PWA/Shell ne portent pas des entités JPA : leur compatibilité est un contrat
+  HTTP/assets/session à vérifier, pas une équivalence de migration à inventer.
+- Fermeture et garde lecture seule prévues ; les modèles n'attestent aucun contrôle VM.
+- Restore vérifie HMAC avant déchiffrement, catalogues, transaction, contenu documentaire
+  et permissions ; garde hôte/FD/verrou/réservation ; volumes propres au projet.
+- Nettoyage échoué conserve la reprise/staging et ne publie pas la preuve de succès.
+- Les durées et capacités MSI ne sont pas présentées comme capacité PREPROD.
+
+Ordre recommandé avant décision
+1. Arrêter le contrat rollback (B1), puis protocole isolé/ordre de preuves (B2).
+2. Décliner comparaisons SQL/logiques et matrice endpoints/droits (M1–M3).
+3. Définir seuils et observations effectives IA/fermeture (M4–M5).
+4. Compléter registre et régressions structurelles sous autorisation (R1–R2).
+5. Seulement après nouveau GO accès VM : mesures/identités/baselines réelles.
+6. Attestations privées, datées et liées au run seulement après preuves suffisantes ;
+   modèles/facts MSI restent false. Installation/ouverture requièrent GO distinct.
+
+Conclusion : NO GO POUR VALIDATION TECHNIQUE PREPROD EN L'ÉTAT.
+Ce verdict n'invalide pas le commit local validé ; il interdit de transformer la
+préparation documentaire ou les cinq tests locaux en attestation de restauration,
+compatibilité fonctionnelle rollback ou isolation réelle.

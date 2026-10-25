@@ -114,6 +114,43 @@ class Backend(unittest.TestCase):
         (self.root/'socket').symlink_to(self.root/'state')
         with self.assertRaises(ValueError):self.b.close_socket(missing_ok=True)
 
+    def test_incomplete_isolated_cleanup_prevents_reservation_release(self):
+        self.b.isolated_cleanup_guard()
+        attempt=self.root/'state/restore-attempt.json'
+        m.shared.write_json(attempt,{'phase':'creating'})
+        with self.assertRaises(ValueError):self.b.isolated_cleanup_guard()
+        m.shared.write_json(attempt,{'phase':'cleaned'})
+        report=self.root/'state/schema-validation.json'
+        m.shared.write_json(report,{'cleanup':False})
+        with self.assertRaises(ValueError):self.b.isolated_cleanup_guard()
+        m.shared.write_json(report,{'cleanup':True})
+        self.b.isolated_cleanup_guard()
+
+    def test_schema_report_hash_run_images_and_source_are_verified(self):
+        schema=m.load(P/'isolated-validator.py','fixture_schema')
+        report={'status':'passed','cleanup':True,'run':self.b.run_id,'backup':{'directory':'fixture'},
+                'project':'wavy-pwa-restore-'+self.b.run_id+'-1234abcd',
+                'planHash':'b'*64,'runnerSourceSha256':schema.digest(P/'IsolatedSchemaValidator.java'),'images':{}}
+        path=self.root/'state/schema-validation.json'
+        m.shared.write_json(path,report)
+        attempt={'run':self.b.run_id,'backup':report['backup'],'project':report['project'],'phase':'cleaned'}
+        m.shared.write_json(self.root/'state/restore-attempt.json',attempt)
+        proof={'backup':report['backup'],'planHash':report['planHash'],'project':report['project'],
+               'schemaValidation':{'reportSha256':schema.digest(path),'images':{}}}
+        self.b.verify_schema(proof)
+        for key,value in (('phase','creating'),('phase','docker-cleaned'),('run','foreign'),('backup',{}),('project','foreign')):
+            m.shared.write_json(self.root/'state/restore-attempt.json',dict(attempt,**{key:value}))
+            with self.assertRaises(ValueError):self.b.verify_schema(proof)
+        m.shared.write_json(self.root/'state/restore-attempt.json',attempt)
+        for key,value in (('run','foreign'),('status','failed'),('cleanup',False),('planHash','wrong'),
+                          ('runnerSourceSha256','changed'),('images',{'foreign':{}})):
+            altered=dict(report,**{key:value});m.shared.write_json(path,altered)
+            candidate=dict(proof,schemaValidation=dict(proof['schemaValidation'],reportSha256=schema.digest(path)))
+            with self.assertRaises(ValueError):self.b.verify_schema(candidate)
+        m.shared.write_json(path,report)
+        proof['schemaValidation']['reportSha256']='f'*64
+        with self.assertRaises(ValueError):self.b.verify_schema(proof)
+
     def test_invalid_duration_and_newline_cookie_rejected(self):
         self.assertIsNone(m.gate.session_hash('WAVY_SESSION=fixture\nInjected: yes'))
         with self.assertRaises(ValueError):m.Backend(self.root/'unused',self.root/'state',self.root/'socket',seconds=901)

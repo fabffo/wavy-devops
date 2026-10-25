@@ -1,0 +1,293 @@
+Wavy — Dossier de décision technique PREPROD privée — 24 octobre 2026
+Référence validée : 3da04f4e6f59926d42b939ce0452a63c5bb0c9b8.
+DOSSIER PRÉPARÉ SUR MSI. Aucune commande VM ci-dessous exécutée.
+Aucun nouveau commit, push, déploiement, changement de manifeste actif, DB ou volume.
+Les trois attestations restent false. Chaque contrôle VM est NON EXÉCUTÉ.
+Un nouveau GO explicite est nécessaire avant accès VM, puis pour les opérations
+mutantes de préparation/restauration/déploiement et les fenêtres de test.
+Ce document complète ORCHESTRATEUR-PRIVE.txt et PREUVES-MSI-REPRISE.txt ; aucune
+commande directe ne remplace l'orchestrateur, les autorisations V3 ou son FD hérité.
+
+Convention : C=commande/action, A=attendu, G=GO/NO GO, P=preuve, R=correction.
+Les commandes navigateur sont des actions manuelles sur le backend réel.
+Les durées sont des budgets de planification, jamais des mesures PREPROD.
+
+0. Préparation des preuves et contexte (sur VM APRÈS autorisation)
+C :
+  set -euo pipefail
+  umask 077
+  cd "${WAVY_DEVOPS_ROOT:-$HOME/projets/wavy-devops}"
+  test "$(hostname -s)" = wavy-preprod
+  git rev-parse HEAD
+  git status --short
+  PRIVATE="$PWD/preparation/pwa-notes-frais/private-shell"
+  EVIDENCE="$HOME/wavy-private-evidence/prechecks-$(date -u +%Y%m%dT%H%M%SZ)"
+  install -d -m 700 "$EVIDENCE"
+  date -u +%FT%TZ > "$EVIDENCE/observed-at.txt"
+A : livraison approuvée du commit, hôte canonique et checkout propre ; dossier privé.
+G : NO GO si code/plan inattendu, hôte différent ou preuves sans date/reviewer/run.
+P : commit, inventaire, heure UTC, identité reviewer ; fichiers 0600 hors Git.
+R : faire approuver la livraison ; aucun git reset, édition d'état ou retrait de lock.
+Ne jamais archiver docker inspect complet, .env, cookies, tokens ou HAR brut.
+Un échec d'une commande interrompt le bloc : ne pas transformer une sortie vide en GO.
+
+1. Images locales MSI et image réellement active PREPROD
+C MSI (lecture seule) :
+  python3 -B preparation/pwa-notes-frais/validate-bundle.py --local-images
+A : RepoDigests, plateforme et labels OCI conformes. Déjà réussi sur MSI.
+G : NO GO si image absente ou digest/label différent ; pas de substitution par tag.
+P : sortie validateur datée et compose.release.private.yml.
+R : acquisition PAR DIGEST seulement après autorisation ; aucun build demandé.
+Quatre références immuables :
+ API 0.1.0-09fcd98 : ghcr.io/fabffo/wavy-factures-api@sha256:a414a866c910bd20a4c8af4018fc0e31db513ffff1cca76b15c913807f75d0e5
+ Front 0.1.0-a201858 : ghcr.io/fabffo/wavy-factures-front@sha256:92afeb07b95e08fcd3379d70c4b02bb984fb0dd2afba9f0aa1bd74c262448470
+ PWA 0.1.0-6944c31 : ghcr.io/fabffo/wavy-pwa@sha256:95c0cbb999708b40cd20ddc66a719e796d38d8d90c97835410a74f3d432f751b
+ Shell 0.1.0-0cfb699 : ghcr.io/fabffo/wavy-erp-shell@sha256:0182ea7a16a1c0d665e98df0b2bc4e318d96534ea11b4c9de0aee825f9ad8022
+C PREPROD (lecture seule) :
+  docker inspect --format '{{.Config.Image}} {{.Image}}' wavy-factures-api-preprod > "$EVIDENCE/api-active.txt"
+  API_IMAGE_ID="$(docker inspect -f '{{.Image}}' wavy-factures-api-preprod)"
+  docker image inspect "$API_IMAGE_ID" --format '{{json .RepoDigests}} {{index .Config.Labels "org.opencontainers.image.revision"}}' >> "$EVIDENCE/api-active.txt"
+A : ancienne API attendue 0.1.0-b277edb, digest
+ ghcr.io/fabffo/wavy-factures-api@sha256:fad65c9b2c1b5326b3fd45c2fd8f19727104a2ace32b481d12ed3872075f261f.
+G : NO GO si autre image ; comparaison MSI valable uniquement pour cette paire.
+P : api-active.txt, snapshot orchestrateur des QUATRE anciennes images.
+R : comparer la paire réellement active, conserver toutes les images de rollback.
+
+2. Flyway, schémas et limites du rollback
+C PREPROD (lecture seule, fenêtres sans DDL concurrent) :
+  docker exec factures-db-preprod sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" --schema-only --no-owner --no-acl' > "$EVIDENCE/factures-schema.sql"
+  docker exec factures-db-preprod sh -c 'psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -At -c "SELECT installed_rank,version,script,checksum,success FROM flyway_schema_history ORDER BY installed_rank"' > "$EVIDENCE/factures-flyway.txt"
+A : toutes migrations success=true ; versions/checksums correspondent aux migrations
+embarquées et à l'historique approuvé. Vérifier les locations/profils effectifs sans
+exporter les secrets. Si historique dans autre schéma, faire confirmer la location,
+ne pas inventer un historique vide. Contrôler les cinq copies après restauration.
+G : NO GO sur checksum modifié, migration manquante/inattendue, dérive ou validate
+Flyway/JPA refusé. Un export SQL seul ne démontre pas l'absence de dérive.
+P : schema-only, historique, rapport de comparaison revue et journaux assainis de
+validation Flyway/JPA sur copies isolées. Ne pas démarrer l'API avec réseau PREPROD.
+R : revue des différences et protocole isolé approuvé ; aucun repair/baseline/clean,
+ddl-auto=update ou migration manuelle sur base active.
+Preuve MSI existante : 20 migrations identiques ; 63 modèles, seule NoteFrais
+modifiée, signatures identiques, ajout @DynamicUpdate ; voir facts JSON et hashes.
+Limite : le Compose isolé actuel restaure PostgreSQL/documents, pas l'API. Le helper
+ne lance PAS de validation JPA/Flyway applicative. Cette preuve supplémentaire
+requiert un protocole isolé approuvé avec dépendances maîtrisées ; elle reste manquante.
+Rollback sûr : PWA fermée AVANT action, écritures Notes bloquées, snapshot complet,
+compatibilité attestée récemment, réservation/verrou maintenus, DB/documents gardés.
+L'ancienne API ne comprend pas sûrement les métadonnées ndf:<UUID> : Notes et pièces
+RESTENT EN LECTURE SEULE après rollback, même si les schémas sont compatibles.
+Aucun downgrade SQL, restauration active automatique ni nettoyage des originaux.
+
+3. Capacité VM, outils et sécurité (lecture seule)
+C :
+  nproc
+  uptime
+  free -b
+  docker version --format '{{.Server.Version}}'
+  docker compose version
+  docker context inspect --format '{{.Endpoints.docker.Host}}'
+  docker info --format '{{.NCPU}} {{.MemTotal}} {{.DockerRootDir}}'
+  DOCKER_ROOT="$(docker info --format '{{.DockerRootDir}}')"
+  df -PB1 "$PWD" "$DOCKER_ROOT"
+  findmnt -T "$PWD"
+  findmnt -T "$DOCKER_ROOT"
+  docker stats --no-stream --format '{{.Name}} {{.CPUPerc}} {{.MemUsage}}'
+  command -v openssl flock python3 curl tar stat sha256sum df du
+  for db in socle tiers contrats factures tresorerie; do
+    c="$db-db-preprod"
+    test "$(docker inspect -f '{{index .Config.Labels "com.docker.compose.project"}}' "$c")" = wavy-preprod
+    docker exec "$c" sh -c 'psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -At -c "SELECT pg_database_size(current_database())"'
+  done
+  source scripts/_preprod.sh
+  source scripts/_preprod-documents.sh
+  preprod_host_guard
+  preprod_document_volume_guard
+  preprod_document_tool ro 'du -sk /documents/contrats; if test -d /documents/notes-frais; then du -sk /documents/notes-frais; fi'
+  ss -ltn
+A : daemon unix:///var/run/docker.sock local, pas de DOCKER_HOST/CONTEXT distant ;
+24443 lié à 127.0.0.1, aucun nouveau 80/443. Permissions Notes 100:101:0700 contrôlées
+par V3 lors du provisionnement ; autorisations à usage unique jamais rejouées.
+G : NO GO sans budget octets/RAM approuvé sur CHAQUE filesystem réellement utilisé
+(backups, staging, Docker), sans outils/images utilitaires ou support volume-subpath.
+P : sorties ci-dessus, tableaux budget/mesures sous charge ERP, durée et marge.
+R : libération/extension approuvée, maintenance ; aucune suppression/prune automatique.
+Budget disque : deux lots chiffrés, cinq DB restaurées + index/TOAST/WAL/temp,
+six fichiers déchiffrés, copie et réarchive documents, marge croissance/reprise.
+Ne pas compter deux fois un filesystem partagé. Le seuil 1 Gio n'est pas un budget.
+RAM : cinq PG supplémentaires + pg_restore/Python, sans affamer ERP ; CPU sous charge.
+Images utilitaires à vérifier par docker image inspect (pas de pull implicite) :
+ postgres:16-alpine@sha256:93d55776e04376e19adb2733e3ccebb4392ee7dd86d8ff238503b30fe719c84f
+ python:3.12-alpine@sha256:b658b05ce9c4eb97ec6fc19424818a1f31993659c2b505a532f470e83807815d
+V3 reste l'autorité sur droits réels, FD, renameat2/fsync et chemins ; la présence
+d'un symbole sur MSI ne prouve pas le fonctionnement de ces opérations sur VM.
+
+4. Compose isolé (MSI, sans création de conteneur ou volume)
+C :
+  python3 -B preparation/pwa-notes-frais/private-shell/test-isolated-restore.py
+  python3 -B preparation/pwa-notes-frais/private-shell/test-restore-private.py
+A : rendu config validé ; cinq PG + documents, network_mode:none, aucun port,
+aucun container_name, six volumes propres au projet unique, aucun external,
+rootfs read_only, secrets bind RO et create_host_path:false, image épinglée.
+G : NO GO si test échoue ou rendu réel référence une ressource active.
+P : logs tests et validate_rendered du helper lors du véritable exercice.
+R : arrêter avant up ; corriger/revoir le candidat, jamais lancer compose isolé
+manuellement pour contourner l'état, le FD ou le verrou de l'orchestrateur.
+
+5. Sauvegarde chiffrée et restauration isolée (MUTANT, futur GO distinct)
+C : après prérequis réels, utiliser l'initialisation R/RUN/EVIDENCE du runbook :
+  "${R[@]}" prepare --run-id "$RUN" --evidence "$EVIDENCE/prerequisites.json"
+  "${R[@]}" status --run-id "$RUN" > "$EVIDENCE/status-after-prepare.json"
+  "${R[@]}" restore --run-id "$RUN"
+  "${R[@]}" status --run-id "$RUN" > "$EVIDENCE/status-after-restore.json"
+A : précontrôles -> fermeture -> sauvegarde initiale -> provisionnement V3 ->
+sauvegarde complète (ordre implémenté, ne pas le remplacer). Quiescence/reprise
+des backends, cinq dumps custom + archive Contrats/Notes, chiffrement AES256/PBKDF2,
+manifest HMAC vérifié AVANT déchiffrement, hash du manifest lié au run.
+Restauration de copies seulement : pg_restore --list puis transaction/exit-on-error,
+tables non vides, empreintes de CHAQUE document identiques, permissions 100:101:700.
+Aucune preuve publiée avant down --volumes du SEUL projet unique contrôlé.
+G : NO GO si dump absent, HMAC/hash faux, DB vide, archive dangereuse, empreinte ou
+permission divergente, reprise backend ou nettoyage incomplet. Restaurer les cinq
+DB ne démontre pas toutes les contraintes/cohérences métier ni JPA/Flyway.
+P : status, manifest sans clé, restore-proof.json, restore-attempt.json, codes retour,
+durées, inventaires/hash, contrôle logique des tables/relations Notes/pièces sur copies.
+R : fermer, garder réservation et staging/reprise ; inspection puis reprise documentée.
+Ne jamais supprimer restore-attempt/staging sur cleanup échoué, ni utiliser prune.
+Les secrets déchiffrés et documents restent hors Git dans l'espace privé ; ne pas
+copier les pièces métier dans le rapport. Rétention/apurement après revue approuvée.
+
+6. Réservation, abandon, interruption, reprise (futur GO pour mutation)
+C :
+  RUN="$("${R[@]}" reserve)"
+  "${R[@]}" status --run-id "$RUN"
+  "${R[@]}" abandon --run-id "$RUN"
+A : avant toute mutation certaine, archive/libération sans dépendre d'une barrière
+absente ; closureConfirmed reste false. Deuxième réservation concurrente refusée.
+G : NO GO si réservation effaçable, verrou contournable ou état ambigu abandonné.
+P : codes retour, statuts/archives datés, propriétaire/pending/mutationStarted.
+R : ne pas retirer deployments/preprod.lock ou preprod-reservation.json à la main.
+Après mutation : close, inspection effets/pending, preuve resume fraîche et explicite :
+  "${R[@]}" resume --run-id "$RUN" --evidence "$EVIDENCE/resume.json"
+Rollback :
+  "${R[@]}" close --run-id "$RUN"
+  "${R[@]}" rollback --run-id "$RUN" --evidence "$EVIDENCE/rollback.json"
+  "${R[@]}" abandon --run-id "$RUN"
+A : aucune restauration DB active ; en rollback incomplet, gate fermé/réservation
+conservée. Réessai inspecté, jamais nouveau run pour masquer l'échec.
+G/P/R : NO GO sur fermeture non prouvée ; conserver diagnostics assainis et état.
+Les pannes Docker/reboot/SIGKILL doivent d'abord être testées sur fixtures MSI ;
+aucun arrêt/reboot VM réelle n'est implicitement autorisé par ce dossier.
+
+7. Comptes et matrice d'isolation (actions navigateur, aucune identité réelle)
+Prévoir T-A sociétés A1/A2, T-B sociétés B1/B2 ; quatre comptes :
+ A-owner qa.pwa.a.owner@example.invalid : A1/A2
+ A-peer  qa.pwa.a.peer@example.invalid  : A1
+ B-owner qa.pwa.b.owner@example.invalid : B1/B2
+ B-peer  qa.pwa.b.peer@example.invalid  : B1
+Rôles effectifs : NOTE_DE_FRAIS + passage Gateway GESTIONNAIRE ; aucun ADMIN,
+SUPER ou rôle de supervision. Secrets hors Git ; profils navigateur distincts.
+C : connexion ERP par tunnel, vérifier session et société active côté serveur.
+Créer note/pièce synthétiques par propriétaire dans sa fenêtre autorisée ; capturer
+les requêtes depuis DevTools, puis répéter EXACTEMENT les URLs/IDs positifs avec
+l'autre contexte. Ne pas inventer des endpoints pour obtenir un refus sans valeur.
+Matrice C -> A (GO si tous vrais, NO GO sinon) :
+ A-owner/A1 -> sa note/pièce : lecture/création/modification/téléchargement réussis.
+ A-owner/A2 -> note A1 : refus 403/404, listes/synthèses vides de données A1.
+ A-owner retour A1 -> lecture rétablie, aucune donnée A1 laissée dans écran A2.
+ A-peer/A1 -> note/pièce A-owner : refus ; inverse owner vers peer refusé aussi.
+ A-peer -> sélection A2 : refus, société serveur reste A1.
+ B-owner/B1 -> note A1 et inverse : refus inter-tenant, aucune métadonnée révélée.
+ B-owner/B2 -> note B1 : refus ; B-peer -> B2 : refus d'habilitation.
+ Cookie absent/expiré -> session/données : 401 ou refus contractuel, aucun contenu.
+ Headers tenant/société/utilisateur forgés -> aucun élargissement de droits.
+P : alias/IDs privés, droits effectifs, heure, fenêtre/run, méthodes/URLs assainies,
+codes retour, état et hash avant/après les refus ; jamais cookie ni HAR brut.
+R : fermeture immédiate et revue backend ; ne pas accorder SUPER pour faire passer.
+Important : pour les mutations négatives, utiliser LA session autorisée du gate,
+visant une ressource d'un autre propriétaire ; un 403 du gate n'est pas la preuve
+d'un refus backend. Préparer chaque propriétaire avec fenêtre dédiée et reprise
+inspectée conformément à PREUVES-MSI-REPRISE.txt, sans édition manuelle d'état.
+
+8. Parcours fonctionnels et IA (actions navigateur sous fenêtre <=900 s)
+C : ouvrir via open-test du runbook avec cookie fichier 0600 et preuve fraîche.
+Photographier/importer JPEG, PNG, PDF synthétiques ; extraction IA réelle,
+correction champs -> création -> modification -> rechargement pièce -> ERP.
+A : contenu/hash fidèle après reconnexion, société correcte, montants cohérents,
+aucune facture créée automatiquement ; changement société et refus section 7.
+Tester MIME interdit, dépassement 10 Mio/limite requête, erreur/quota IA : refus
+explicite sans écriture partielle ni fuite ; comparer états avant/après.
+G : NO GO fonctionnel si mock/fallback pris pour IA réelle, pièce perdue, contexte
+incorrect, fuite de données ou erreur non maîtrisée. Exiger modèle/provider et
+configuration approuvés sans afficher les clés ; documents synthétiques uniquement.
+P : référence requête IA assainie, modèle, heure/durée, IDs notes/pièces, hash,
+statuts et captures synthétiques. real-ai-extraction reste false avant résultat réel.
+R : fermer, diagnostiquer backend/stockage/provider ; pas de contournement session.
+
+9. Fermeture, expiration et continuité ERP
+C poste tunnel (lecture seule, aucun suivi de redirection automatique) :
+  BASE=http://localhost:24443
+  for path in /pwa/ /pwa/manifest.webmanifest /pwa/ngsw-worker.js /pwa/ngsw.json /api/pwa/session; do
+    curl --silent --show-error --max-time 10 -o /dev/null -w '%{http_code}\n' "$BASE$path"
+  done
+  for path in / /modules/socle/ /modules/tiers/ /modules/contrats/ /modules/factures/ /modules/tresorerie/ /api/auth/session; do
+    curl --silent --show-error --max-time 10 -o /dev/null -w '%{http_code}\n' "$BASE$path"
+  done
+A : après installation barrière et fermeture, PWA/API PWA=404 ; modules/root
+comparables au baseline, session anonyme refusée selon contrat, authentifiée valide.
+Avant installation, ne jamais prétendre que le run a prouvé une barrière absente.
+C mutations : exécuter la matrice routes/méthodes de test-private.py sur fixtures ;
+sur VM après autorisation, rejouer uniquement les requêtes SYNTHÉTIQUES capturées
+section 7, fermeture confirmée, pour POST/PUT/PATCH/DELETE et autres méthodes non
+GET/HEAD sur /api/notes-frais, sous-routes et justificatifs, variantes de chemin.
+A : 403 au gate, zéro modification DB/pièce ; GET/HEAD métier restent contrôlés
+par backend, ils ne sont pas globalement bloqués quand la PWA est fermée.
+G : NO GO si méthode/alias contourne le gate ou ERP non sensible interrompu.
+P : baseline et après fermeture, méthodes/codes, état/hash, horodatage serveur.
+R : garder gate fermé et réservation, ne pas restaurer une config permettant écritures.
+Expiration : open-test --seconds 900 au premier plan, noter t0/échéance UTC ;
+contrôler avant puis à/après échéance sans prolonger. Gate absent/inaccessible,
+processus interrompu et conteneur PWA indisponible couverts localement ; effets
+réels VM seulement après autorisation spécifique et sans toucher aux autres modules.
+A : aucune ouverture au-delà de l'échéance ; retrait socket sans reload Nginx,
+indépendant de PWA ; statut/closure confirmés, Notes verrouillées même rollback.
+Une requête déjà engagée avant fermeture peut terminer : attendre sa terminaison
+et vérifier état final ; la fermeture n'annule pas une transaction ou extraction IA.
+Client : logout serveur, purge cache/SW/IndexedDB/localStorage du profil jetable,
+fermer/réouvrir puis tester hors ligne ; aucune donnée sensible récupérable.
+Un serveur fermé ne supprime pas des données déjà téléchargées : prouver la purge.
+
+10. Durées, décision et suivi
+Budgets indicatifs : relevés/images/schéma 15–30 min, revue capacité 15–30 min,
+comptes/protocole 30–60 min, contrôle copies/logique/JPA 30–60 min hors transfert,
+plus N fenêtres d'au plus 15 min pour scénarios et identités. Pas d'estimation fiable
+de backup/restore sans taille/débit VM ; chronométrer les vrais lots.
+Chaque helper backup/restore ENTIER doit finir en moins de 900 s (timeout externe),
+pas 900 s par DB. Si budget mesuré dépasse : NO GO, ne pas augmenter ni contourner
+les timeouts dans ce dossier. Maintenir une marge approuvée et temps de rollback.
+Registre à compléter pour CHAQUE ID 0–9 : NON EXÉCUTÉ / CONFORME / NON CONFORME /
+NON APPLICABLE motivé, début/fin UTC, reviewer, run/planHash, chemin/hash preuves,
+action corrective et décision. Un test ignoré ne vaut pas preuve.
+Les trois prérequis restent false dans les modèles et facts MSI ; seuls des
+fichiers de preuve privés, frais, rattachés au vrai run, peuvent refléter des contrôles
+réellement établis. Pas de recopie automatique de true ni de faux attesteur MSI.
+GO préparation du dossier ; NO GO déploiement tant que prérequis, capacité,
+compatibilité, identités et autorisations ne sont pas démontrés/approuvés.
+
+11. Vérifications effectivement exécutées SUR MSI pour ce dossier
+- test-isolated-restore.py : 1 test réussi (rendu Compose uniquement).
+- test-restore-private.py : 4 tests réussis (gardes/fixtures, pas de DB réelle).
+- validate-bundle.py --local-images : lot statique/RepoDigests/labels conformes.
+- audit-local.py : 41 fichiers texte, 0 détection heuristique.
+- git diff --check : conforme ; aucun changement de code ou manifeste actif.
+Aucun conteneur/volume créé, aucune sauvegarde réelle restaurée, aucun accès VM.
+Fichiers de cette étape non indexés : ce dossier, README.md et FILES.txt.
+Les caches préexistants restent exclus ; aucun commit supplémentaire demandé/créé.
+
+12. Complément de correction après revue technique
+Pour interpréter les critères, lire PLAN-CORRECTIONS-PREPROD.txt et la matrice
+MATRICE-CORRECTIONS-PREPROD.json. B1 propose un rollback dégradé : nouveaux
+justificatifs conservés mais non téléchargeables par ancienne API, acceptation
+explicite requise. B2 spécifie un hook futur AVANT nettoyage : pas disponible
+dans les commandes actuelles. Aucun succès local ne lève ces blocages.
+Les seuils obligatoires, sous-cas de droits et preuves manquantes sont précisés
+dans le plan ; ne pas interpréter les commandes historiques comme preuve JPA.

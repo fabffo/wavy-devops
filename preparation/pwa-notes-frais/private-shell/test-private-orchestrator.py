@@ -38,7 +38,13 @@ class Backend:
         m.op.atomic_json(self.directory/'edge.json',{'mode':'closed','run':self.run_id,'closureBlocked':False})
     def preflight(self,plan):self.hit('preflight')
     def images(self,plan):self.hit('images')
-    def snapshot(self,plan):self.hit('snapshot');self.snapshot_count+=1;return json.loads(json.dumps(plan))
+    def snapshot(self,plan):
+        self.hit('snapshot');self.snapshot_count+=1
+        previous=json.loads(json.dumps(plan))
+        previous['images']['factures-api']['reference']=m.SCHEMA.IMAGES['old'][0]
+        return previous
+    def verify_schema(self,proof):self.hit('verify-schema')
+    def isolated_cleanup_guard(self):self.hit('isolated-cleanup-guard')
     def barrier(self,plan):self.hit('barrier')
     def provision_storage(self,fd):
         m.public.storage_auth.consume(self.root,self.directory/'runtime-plan.json',self.run_id,self.lock_fd,fd)
@@ -50,7 +56,9 @@ class Backend:
     def verify_backup(self,backup):self.hit('verify-backup')
     def restore(self,backup):
         self.hit('restore')
-        return dict(self.proof(['five-databases','contracts-and-notes','hmac','catalogues','document-hashes','notes-permissions']),backup=backup)
+        return dict(self.proof(m.RESTORE_CHECKS),backup=backup,
+                    schemaValidation={'cleanup':True,'reportSha256':'a'*64,
+                      'images':{key:{'reference':ref,'jarSha256':sha,'passed':True} for key,(ref,sha) in m.SCHEMA.IMAGES.items()}})
     def proof(self,checks):
         return {'run':self.run_id,'planHash':m.fingerprint(self.current_plan),'profile':m.PROFILE,
                 'origin':'http://localhost:24443','reviewer':'fixture','checkedAt':LOGICAL_TIME.isoformat(),
@@ -208,6 +216,23 @@ class Orchestration(unittest.TestCase):
         with self.assertRaises(InterruptedError):self.call('close')
         self.assertFalse(self.backend.opened)
         self.assertTrue(self.engine.reservation.exists())
+
+    def test_before_mutation_failure_requires_abandon_then_fresh_reservation(self):
+        self.backend.fault='images'
+        with self.assertRaises(InterruptedError):self.prepare()
+        self.assertIs(self.engine.state['mutationStarted'],False)
+        self.assertNotIn('barrier',self.backend.events)
+        proof=dict(self.proof(['interrupted-effect-inspected']),pending='verify-images',resumePhase='awaiting-restore')
+        with self.assertRaises(ValueError):self.call('resume',proof)
+        self.backend.fault=None
+        self.call('abandon')
+        self.assertFalse(self.engine.reservation.exists())
+        self.assertTrue((self.directory/('archive-'+self.run+'.json')).is_file())
+        fresh=self.engine.run('reserve')
+        self.assertNotEqual(fresh,self.run)
+        self.assertEqual(self.engine.state['phase'],'reserved')
+        self.assertFalse(self.engine.state['mutationStarted'])
+        self.assertEqual(self.backend.snapshot_count,0)
 
     def test_abandon_before_mutation_needs_no_nginx_marker_or_erp_reload(self):
         self.backend.fault='preflight'

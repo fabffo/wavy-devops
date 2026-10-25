@@ -1123,3 +1123,29 @@ commandes de reprise figurent dans
 dans [msi-prerequisites-facts.json](private-shell/msi-prerequisites-facts.json).
 Les trois attestations PREPROD demeurent fausses tant que le relecteur n'a pas
 validé l'image réellement en place, les droits/comptes et les ressources de la VM.
+
+Dossier de décision technique PREPROD privée :
+[CONTROLES-PREPROD.txt](private-shell/CONTROLES-PREPROD.txt).
+Commandes futures, critères GO/NO GO, preuves et corrections ; aucune validation
+PREPROD ni autorisation de déploiement implicite.
+
+Préparation des corrections après revue (aucune attestation PREPROD) :
+[plan](private-shell/PLAN-CORRECTIONS-PREPROD.txt),
+[protocole JPA/Flyway proposé](private-shell/PROTOCOLE-JPA-FLYWAY-ISOLE.txt),
+[matrice de suivi et sessions](private-shell/MATRICE-CORRECTIONS-PREPROD.json),
+[résultats locaux et blocages](private-shell/RESULTATS-CORRECTIONS-PREPROD.txt).
+Le hook candidat JPA/Flyway est désormais intégré à la restauration isolée,
+avant nettoyage des copies, sous verrou et réservation. Aucun déploiement effectué.
+
+Implémentation candidate locale du validateur JPA/Flyway isolé :
+[RESULTATS-VALIDATEUR-JPA.txt](private-shell/RESULTATS-VALIDATEUR-JPA.txt).
+Les preuves MSI synthétiques et la worklist des247 cas ne valident aucune
+attestation PREPROD et n’autorisent aucun déploiement.
+
+Revue finale MSI et décision de commit :
+[FINALISATION-COMMIT.txt](private-shell/FINALISATION-COMMIT.txt).
+Les [résultats RECETTE réels](private-shell/RESULTATS-RECETTE-247.json) valident
+247/247 cas en deux campagnes (144 puis103), dont19 expirations HTTP401 après
+30 minutes réelles d’inactivité. Aucun rejeu lors de la revue finale.
+Le rapport RESULTATS-ISOLATION-247.json conserve le blocage historique antérieur.
+Les trois attestations PREPROD restent false ; aucun déploiement n’est autorisé.

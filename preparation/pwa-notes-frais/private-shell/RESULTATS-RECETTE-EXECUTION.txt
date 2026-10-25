@@ -1,0 +1,64 @@
+Wavy — Finalisation réelle des103 cas RECETTE restants
+
+247/247 scénarios validés :144 validations réelles de la campagne précédente
+conservées,103 scénarios réellement rejoués et réussis dans cette reprise.
+0 échec courant,0 ignoré,0 non validé. Les18 assertions anciennes non concluantes
+restent historiques ; elles ne sont pas transformées rétroactivement en succès.
+Provenance, heures, statuts HTTP, hashes et résultats par ID : RESULTATS-RECETTE-247.json.
+
+Corrections strictement nécessaires
+-6 tiers porteurs synthétiques créés par la vraie API Tiers, plus6 associations
+ Socle utilisateur/tiers/société, exclusivement dans les2 nouveaux tenants du run.
+-Politique Socle inchangée :1800s d’inactivité. Aucun timeout partagé modifié,
+ aucune horloge simulée, aucun faux cookie/logout présenté comme expiration.
+-19 cookies de sessions réelles, d’abord vérifiés valides200, laissés inactifs puis
+ rejoués après 1811.46 à 1830.87 secondes : refus réels.
+
+Exécution et portée
+Véritables Gateway/Socle/Tiers/Factures RECETTE existants,2 tenants/4 sociétés/
+8 comptes synthétiques distincts. Factures09fcd98 par digest a414a866c910bd20a4c8af4018fc0e31db513ffff1cca76b15c913807f75d0e5.
+Les103 cas couvrent les7 familles métier jusque-là bloquées et les19 expirations.
+Contrôle positif réel pour chaque scénario, contexte canonique de session,
+refus croisés, filtres liste/synthèse, hashes des octets de justificatifs et oracle
+SQL READ ONLY de non-mutation. JPEG/PNG/PDF fictifs, sans données personnelles.
+Les8 refus de pairs sur routes réservées SUPER prouvent le contrôle de permission,
+pas un contrôle propriétaire additionnel ; lecture/édition/pièces couvrent ce dernier.
+Pas d’extraction IA externe, de test navigateur PWA ni d’attestation PREPROD.
+Compteurs de la reprise (setup et contrôles compris) :{'requests': 1399, 'logins': 636, 'notes': 254, 'files': 255, 'invoices': 39}.
+Ces compteurs ne sont pas des scénarios ; plafonds du plan respectés.
+
+Non-régression locale :71 tests réussis,14 ignorés,0 échec,7 suites.
+14 tests JPA Docker sur fixtures isolées nécessitent WAVY_LOCAL_JPA_TESTS=1 ;
+non activés ici. Détail dans le JSON ; ignorés non revendiqués exécutés.
+
+Sauvegarde, nettoyage et restitution
+3 dumps Socle/Tiers/Factures chiffrés avant mutation ; déchiffrement et catalogues
+pg_restore vérifiés. Aucune restauration opérationnelle réalisée ni revendiquée.
+Nettoyage uniquement des créations du run :{'carriersRemoved': 6, 'carrierAssociationsRemoved': 6, 'accountsLoggedOut': 8, 'filesRemoved': 252, 'notesRemoved': 253, 'linesRemoved': 253, 'invoicesRemoved': 39, 'emptyStorageRootRetained': True}.
+46 tables préexistantes identiques par comptage et empreintes avant/après ; aucune
+séquence remise à zéro. Aucun tenant, compte ou tiers synthétique restant en DB.
+Empreinte documentaire lecture seule prise après setup puis après nettoyage :
+aucun fichier préexistant observé hors sous-répertoire du run ; comparaison identique.
+Ce contrôle tardif ne constitue pas une empreinte prise avant toute mutation.
+Documents du run purgés ; sa racine vide100:101:0700 reste comme autorisé.
+Gateway/Socle/Tiers/Factures arrêtés ; images initiales Socle/Factures restituées
+par digest sans redémarrer l’ancien writer.5 PostgreSQL existants restent démarrés.
+Cookies supprimés après contrôle ; journal d’origine chiffré, secrets retirés.
+Aucun manifeste actif, code métier, PREPROD, environnement neuf, Supabase,
+commit ou push. Index Git préexistant conservé ; modifications documentaires non indexées.
+
+Preuves privées :/tmp/wavy-recette-103-vvqazd4i
+Ne publier ni clé, dump, cookie, journal privé ou identifiants. Hashes des preuves
+assainies et des exécuteurs dans le rapport JSON. Préserver ce dossier pour revue.
+
+Restent obligatoires avant un déploiement PREPROD : contrôles VM des sauvegardes/
+restaurations isolées, capacité, schémas/API réellement active et rollback dégradé,
+validation d’isolation sur le contexte cible et tests fonctionnels/IA réels,
+fermeture/blocage des écritures/ouverture15min ; nouveau GO explicite requis.
+Git diff/check et index inchangé vérifiés ;28 chemins conformes à FILES.txt.
+Scan des secrets réellement utilisés et motifs clés/jetons : aucun résultat ;
+pas de scanner spécialisé installé. Caches locaux conservés hors index ;un cache
+Python régénéré par les tests. Aucun commit ni push.
+Les trois attestations PREPROD restent false ; les cas PREPROD ne sont pas marqués exécutés.
+
+GO POUR REVUE FINALE ET COMMIT

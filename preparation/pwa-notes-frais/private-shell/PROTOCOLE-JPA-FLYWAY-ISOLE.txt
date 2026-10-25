@@ -1,0 +1,103 @@
+MISE À JOUR IMPLÉMENTATION LOCALE — lire RESULTATS-VALIDATEUR-JPA.txt.
+Le hook candidat et le runner existent désormais ; aucune autorisation PREPROD.
+Les mentions NON IMPLÉMENTÉ du texte de conception ci-dessous sont historiques.
+Runtime JVM : image API épinglée réutilisée ; compilation par JDK17 hôte, pas de nouvelle image outillage.
+
+Wavy — Spécification du protocole JPA/Flyway isolé
+Statut : CONÇU, NON IMPLÉMENTÉ, NON EXÉCUTABLE PAR LE CLI ACTUEL.
+But : définir une réalisation exécutable future sans démarrer une API de production
+contre PREPROD et sans changer le code applicatif. Autorisation de développement
+candidate nécessaire ; aucun faux binaire/flag de validation fourni ici.
+
+Entrée orchestrateur UNIQUEMENT : R restore --run-id RUN, une fois autorisé/modifié.
+Le CLI conserve hôte canonique, daemon Unix, FD global hérité, réservation, sources,
+profil, run/planHash, phase awaiting-restore et pending isolated-restore.
+Pas de commande docker parallèle par l'opérateur pour créer/inspecter les copies.
+Point de branchement exact : restore-private.py après les cinq pg_restore et contrôle
+documents, avant la construction proof et le finally down --volumes.
+Le budget 900s couvre restore + validations + nettoyage entier ; dépasser interdit deploy.
+
+Isolation proposée conservant le Compose existant
+Les cinq PG restent network_mode:none ; un validateur éphémère partage UNIQUEMENT
+le namespace réseau du conteneur PG factures du projet contrôlé (équivalent Docker
+--network container:<ID_PROJET_VERIFIE>). Il rejoint localhost:5432 dans ce namespace
+sans réseau wavy-preprod, DNS métier, port publié ni accès Internet. Vérifier labels,
+ID, projet, mounts et NetworkMode effectif juste avant lancement, sinon refus.
+Les quatre autres PG sont contrôlés par docker compose exec -T via helper propriétaire.
+Le validateur n'a ni socket Docker ni volume actif ; rootfs RO, cap-drop ALL,
+no-new-privileges, user non root, tmpfs borné, durée/mémoire/CPU bornées et approuvées.
+Documents copie RO seulement, aucun credential actif, aucune clé IA, aucune donnée
+métier dans stdout. Pas besoin de joindre l'API au réseau PREPROD.
+
+Validateur proposé (outil de contrôle hors code applicatif)
+Un runner JVM minimal futur, versionné/revu et épinglé par hash, charge depuis
+CHAQUE JAR extrait de l'image par digest les versions EXACTES Flyway/Hibernate/JPA,
+PostgreSQL driver, ressources migration et classes entités. Ne pas substituer un
+Flyway CLI latest ou partager le classloader entre ancienne et nouvelle version.
+Image outillage JDK/JRE également par digest à approuver ; digest encore inconnu =
+NO GO implémentation/exécution. Aucun build/téléchargement réalisé à cette étape.
+Contrats d'appel du runner à implémenter (pas commandes disponibles aujourd'hui) :
+- mode flyway-info-validate : Flyway.configure, datasource copie, locations/schemas/
+  table/placeholders explicitement identiques au profil ; info() et
+  validateWithResult(). AUCUN migrate(), baseline(), repair(), clean().
+- mode jpa-schema-validate : bootstrap Hibernate avec toutes les entités et converters
+  embarqués, naming strategies/dialect/timezone du runtime effectif ;
+  hbm2ddl.auto=validate, aucune génération SQL/DDL ni Spring Boot complet.
+Aucun scheduler JustificatifReconciliation, client Socle/Tiers/Contrats ou IA lancé.
+Un simple scan de signatures JVM ne remplace pas ce bootstrap.
+Avant implémentation, inventaire exhaustif de la configuration JPA effective à revoir.
+Si écart runner/runtime non résolu, résultat INCONCLUSIF et NO GO, pas d'assimilation.
+Une preuve boot Spring/JPA réelle supplémentaire peut rester requise ; elle nécessite
+protocole séparé approuvé (mocks dépendances ne prouvent pas leur fonctionnement réel).
+Le runner ci-dessus prouve la compatibilité mapping/schéma, pas la santé de toute l'API.
+
+Credentials de copie
+Après restore, le helper génère un rôle validateur aléatoire NON superuser, sans
+CREATEDB/CREATEROLE/BYPASSRLS ; grants CONNECT, USAGE schémas et SELECT strictement
+nécessaires à info/historique/catalogues. Aucun INSERT/UPDATE/DELETE/DDL, pas de droit
+sur volume documentaire. Secret fichier éphémère parent0700, pas argv/env/log.
+Configurer transaction/default_transaction_read_only ; les permissions sont la
+barrière d'écriture, pas seulement le paramètre read_only modifiable par utilisateur.
+Si infos/validation nécessitent davantage de droits, NO GO et revue ciblée, jamais
+repli sur le superuser restore_operator. Contrôle d'accès de connexion sur copie à
+vérifier : rôle et secrets ne doivent pas être contournables par règle trust locale.
+Le réseau partagé et le runner hors production n'autorisent pas un test session ERP.
+
+Séquence normative, implémentation future dans le même helper
+1. Vérifier guards, backup HMAC/hash et ressources ; restaurer cinq DB/documents.
+2. Capturer fingerprints schéma/historique/données/séquences avant validation.
+3. Contrôles M1 sur cinq copies ; statut explicite par DB, aucune base omise.
+4. Flyway info/validate ancienne API puis nouvelle, classloaders/processus séparés.
+5. JPA schema validate ancienne API puis nouvelle, configuration effective revue.
+6. Comparer fingerprints après chaque étape ; 0 mutation ; contrôler liens pièces,
+   hashes et permissions. Pas de nouvelles fixtures métier dans ce lot réel.
+7. Arrêter/remove les validateurs AVANT down du projet PG ; cleanup sous même owner.
+8. Publier proof uniquement si étapes conformes ET nettoyage entier réussi.
+Sur erreur/interruption/cleanup échoué : gate fermé, réservation et reprise/staging
+conservés, aucune preuve de réussite ; valider ne peut pas transformer un échec en GO.
+
+Contrat de preuve proposé à ajouter après autorisation
+run, planHash, backup.manifestSha256, project, checkedAt/reviewer, images old/new
+avec digests/JAR hashes, runner/outillage hashes, mapping config sans secret,
+par DB inventaire/comptages/cohérence, par image Flyway/JPA résultats, invariance DB,
+documentSetHash/notes-permissions, durées et cleanupCompleted.
+Le deploy doit exiger ces nouveaux résultats frais du même lot : publier un fichier
+annexe non exigé par deploy serait insuffisant. Tests sur la consommation obligatoire,
+la fraîcheur et l'échec des validations nécessaires avant autoriser le changement.
+Ne pas modifier le candidat HTTPS public ni ses exigences HTTPS/cookies.
+
+Tests futurs obligatoires du hook, non exécutés ici
+- schéma incompatible, checksum différent, migration pending et histoire absente : refus ;
+- profil/naming erroné, mauvais JAR/runner/digest : refus avant deploy ;
+- tentative DDL/DML par runner : permission refusée, aucun changement des copies ;
+- manque de preuve, mauvais run/lot, expiration pendant validation : refus ;
+- processus interrompu ou down échoué : reprise durable, pas de proof succès ;
+- faux conteneur/projet réseau, volume externe ou Docker socket : refus ;
+- validation réussie deux images, cinq DB/documents, nettoyage : seule voie succès.
+Ces tests demandent une implémentation candidate autorisée. Les tests documentaires
+ou le rendu Compose actuels ne les remplacent pas.
+
+MISE À JOUR REPRISE CANDIDATE : resume inspecté vers awaiting-restore, puis restore.
+Le nettoyage owner/project est repris avant de créer de nouvelles copies ; preuve
+conservée, marqueurs non édités, reprise staging après docker-cleaned. Consulter le
+rapport implémentation et les tests ; aucune commande VM exécutée.

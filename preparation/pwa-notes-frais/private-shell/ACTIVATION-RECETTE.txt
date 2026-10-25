@@ -1,0 +1,130 @@
+MISE À JOUR : campagne initiale partielle puis reprise des103 cas explicitement
+autorisée ;247 cas validés en deux campagnes réelles. Nettoyage et restitution
+terminés. Lire RESULTATS-RECETTE-EXECUTION.txt et RESULTATS-RECETTE-247.json.
+Le texte ci-dessous est la proposition initiale HISTORIQUE : son timeout60s
+a été démontré inefficace et remplacé dans la reprise par l’attente réelle1800s,
+sans modification de la politique Socle. Ne pas exécuter cette proposition ancienne.
+
+Wavy — Activation RECETTE existante : proposition avant toute mutation
+
+Statut : NON AUTORISÉ À EXÉCUTER. Aucun démarrage API, login, INSERT ou upload.
+GO précédent limité aux cinq PostgreSQL et audit read-only respecté.
+Plan de mutations : /tmp/wavy-recette-activation-ttnyorry/PLAN-MUTATIONS-RECETTE.json
+SHA256 : 77b1c1931d7e939391a65dd04e698b425a5910e672c5182b4220539b8ad8e976
+Override candidat : /tmp/wavy-recette-activation-ttnyorry/factures-override.proposed.json
+Contrat247 cas : /tmp/wavy-recette-activation-ttnyorry/scenario-contract.proposed.json
+Ces fichiers sont locaux, privés et ne sont pas des manifestes actifs.
+
+Preuves établies sans écriture RECETTE
+-5 DB existantes prêtes ; projet/réseau wavy-recette et volumes conservés.
+-API actuelle4e5a390 et nouvelle09fcd98 :20 SQL migrations IDENTIQUES octet/hash.
+-Flyway natif et Hibernate des JAR réels : validations en lecture seule sur la DB
+ Factures existante réussies pour LES DEUX versions :20 migrations,23 entités.
+ URL JDBC impose default_transaction_read_only=on, aucune initialisation Spring,
+ migrate/repair/clean ou rôle SQL créé. Cela ne prouve pas tout le démarrage applicatif.
+-Les6 séquences de provisionnement ont leur prochain ID au-delà des lignes existantes ;
+ aucun nextval/setval exécuté. Aucun compteur par défaut ne manque aux sociétés existantes.
+-Bootstrap Socle actuellement désactivé ; conserver ce paramètre explicitement false.
+-Base Compose reproduit l'environnement initial Socle/Factures. Override rendu seulement :
+ 2 services ciblés, aucun autre service/port/réseau/base/volume déclaré ne change.
+-JPEG et PNG synthétiques relus par ImageIO ; PDF validé par pdftotext. Aucun visage,
+ personne réelle, EXIF/GPS, justificatif réel ou donnée personnelle. Note JSON modèle
+ 12EUR TTC/10HT/2TVA, CARTE_ENTREPRISE, origine SCAN_PWA (IMPORT_PDF pour variante PDF).
+
+Commandes existantes et choix retenu après validation
+scripts/start-docker-recette.sh réalise build et compose up --build : NE PAS LANCER.
+Démarrage simple existant identifié : docker start wavy-socle-api-recette
+wavy-gateway-recette wavy-factures-api-recette ; insuffisant pour la nouvelle API et
+l'expiration réelle des sessions (ancienne image Factures et timeout non borné au test).
+Commande ciblée proposée, à ne lancer qu'après accord et provisionnement du stockage :
+ docker compose -p wavy-recette --env-file .env.recette --env-file versions/recette.env \
+   -f docker-compose.recette.yml -f /tmp/wavy-recette-activation-ttnyorry/factures-override.proposed.json \
+   up -d --no-deps --no-build --pull never --force-recreate \
+   wavy-socle-api-recette wavy-factures-api-recette
+ docker start wavy-gateway-recette
+Socle conserve son image actuelle PAR DIGEST ; timeout session temporaire60s pour
+expirer réellement19 sessions dédiées sans faux cookie d'expiration. Leurs cookies
+ne sont pas réutilisés par les contrôles positifs (réauthentification dédiée).
+Factures : ghcr.io/fabffo/wavy-factures-api@sha256:a414a866c910bd20a4c8af4018fc0e31db513ffff1cca76b15c913807f75d0e5
+Gateway conserve son conteneur et son image ; aucun frontend, autre API ou DB recréé.
+Les publications existantes28080/28083/28088 sur toutes interfaces sont réactivées ;
+aucun nouveau port déclaré. Pas de Nginx natif, DNS, PREPROD ou Supabase.
+
+Mutations proposées — périmètre borné et contrôlé
+1. Sauvegardes privées chiffrées Socle et Factures avant mutation, clé hors Git.
+   Les3 autres DB ne sont pas écrites. Aucun restore global automatique autorisé.
+2. Provisionnement ADDITIF Socle, transaction distincte, namespace de run absent :
+   2 tenants partagés (aucune nouvelle base),4 sociétés,8 utilisateurs,16 affectations
+   de rôles existants,12 affectations sociétés,12 compteurs pour les4 sociétés.
+   Total54 lignes nouvelles ; aucun compte existant réinitialisé, aucune affectation
+   existante modifiée, aucun upsert DO UPDATE, aucune séquence remise à zéro.
+   Valeurs légales/coordonnées uniquement factices ; SIREN réservés de test vérifiés
+   sans collision, aucun lookup registre externe. Secrets BCrypt générés hors Git.
+3. Acteurs :4 comptes Notes+GESTIONNAIRE (deux propriétaires et deux pairs),
+   un compte GESTIONNAIRE seul, un compte NOTE_DE_FRAIS seul, deux reviewers
+   NOTE_DE_FRAIS+GESTIONNAIRE+SUPER_NOTE_DE_FRAIS. Aucun ADMIN ou SUPER global.
+   Propriétaires sur2 sociétés chacun, pairs sur1 ; reviewers limités à leur tenant.
+   Les reviewers ne servent jamais de négatif pour prétendre à l'isolation propriétaire.
+4. Stockage : un sous-répertoire unique du volume documentaire EXISTANT, monté
+   exclusivement par subpath dans Factures, owner100:101/mode0700. Création via
+   archive Docker contrôlée dans le conteneur Contrats existant STOPPÉ ; aucun
+   helper/container supplémentaire. Aucun fichier Contrats existant ouvert/modifié.
+   Racine vide peut être conservée après purge des seuls fichiers de ce run ; elle
+   est recensée explicitement, pas présentée comme un nettoyage de tout le volume.
+5. Recréation de Socle et Factures API uniquement, démarrage Gateway ; les5 DB
+   demeurent existantes. Flyway doit rester validate-on-migrate et ne rien appliquer
+   (aucune migration nouvelle attendue) ; toute dérive arrête l'opération.
+   API Factures reçoit stockage/limites multipart et auto-création factures=false ;
+   provider/modèle/clé IA vidés temporairement : aucun appel IA externe/payant.
+6. Authentifications réelles /api/auth/session, changements société serveur,
+   logout, expirations réelles et révocations/restaurations sur LES8 comptes seuls.
+   Ces opérations écrivent dernier_acces/associations synthétiques et sessions mémoire.
+   Pas de Basic/header forgé en remplacement de session, pas de ProfilSocle mock.
+7. Fixtures de note créées à la demande via API réelle : au plus741 notes,741 lignes,
+   988 versions de fichiers et52 factures d'achat SYNTHÉTIQUES issues des actions
+   explicites de transformation. Lignes/liens/TVA/audits/compteurs correspondants
+   uniquement dans les2 tenants nouveaux. Aucun paiement ou création de tiers prévu.
+   Max5000 requêtes,2048 logins,64 révocations/restaurations de rôles synthétiques ;
+   toute extension de périmètre ou besoin de dépendance non prévue impose un arrêt.
+   Ce sont des plafonds, pas des créations en masse ni des résultats exécutés.
+
+Contrat de preuve des247 scénarios
+247 cas réels planifiés,0 exécuté ; méthode/URL/acteurs/payloads/résultat attendu et
+fixture résolus avant chaque requête. Contrôle positif même état métier, ensuite
+accès interdit/filtrage/scoping attendu. HTTP seuls insuffisants : hash octets/état,
+propriétaire, tenant/société et absence de mutation comparés avec mapping privé.
+8 combinaisons peer/owner sur actions réservées aux superviseurs auront pour oracle
+le refus de permission SUPER_NOTE_DE_FRAIS ; elles ne prouvent pas le filtrage owner.
+Les contrôles owner restent portés par lecture, modification et justificatifs.
+Création : vérifier contexte/owner issus de la session, ne pas exiger un403 d'une
+création légitimement bornée à la session. Liste/synthèse :200 filtré peut être correct.
+Cookie ambigu : rejet OU contexte resté strictement celui d'une session valide,
+jamais élargissement ; variante malformée sans session valide refusée.
+Un défaut métier ou un404 d'endpoint absent n'est jamais compté comme succès
+anti-IDOR. Un cas non résolu reste bloqué, pas PASS. Journaux par scénario sans
+cookie, mot de passe, identité personnelle ni corps de réponse non assaini.
+
+Nettoyage et retour à l'état initial après essais
+Déconnexion des seules sessions de test, suppression contrôlée des lignes et fichiers
+créés par CE run : IDs retournés, tenant/company/namespace et graphe FK contrôlés.
+Suppression SQL dédiée nécessaire aux notes non brouillon et factures transformées ;
+elle est administrative, distincte des assertions API. Aucun TRUNCATE/DELETE global,
+CASCADE large, remise à zéro de séquence ou restauration globale des bases.
+Si référence à un objet préexistant ou divergence de propriété : nettoyage refusé,
+preuves conservées pour revue ; aucune suppression pour faire passer le test.
+Origine des créations journalisée en0600 ; credentials/cookies détruits après logout,
+mapping/preuves sensibles conservés chiffrés seulement pendant la revue approuvée.
+Après nettoyage : arrêt des3 APIs et restitution des configurations/images originales
+PAR DIGEST comme conteneurs arrêtés, via base+override de rollback et up --no-start
+--no-deps --no-build --pull never. Les5 DB restent démarrées (état pré-activation).
+Si nettoyage échoue : ne pas redémarrer l'ancien writer sur des justificatifs ndf: ;
+laisser les APIs arrêtées et conserver le journal, sans modifier les données existantes.
+
+État Git et autorisations
+Aucun manifeste actif/.env/version modifié. Aucun commit/push ni écriture RECETTE
+réalisés par cette préparation. Les24 fichiers indexés précédemment sont préservés.
+Les trois attestations PREPROD restent false ; compatibilité RECETTE ne vaut pas
+restauration PREPROD ou validation des sessions. L'exécuteur doit respecter ce plan
+avant chaque mutation ; l'accord doit porter sur ce périmètre et ses plafonds.
+
+NO-GO POUR EXÉCUTION DES TESTS D'ISOLATION — VALIDATION EXPLICITE DES MUTATIONS ATTENDUE.

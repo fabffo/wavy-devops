@@ -1,0 +1,52 @@
+Wavy — Préparation des corrections : résultats locaux — 24 octobre 2026
+Aucun accès VM, déploiement, build, commit ou push ; code/manifestes runtime inchangés.
+
+Livrables
+PLAN-CORRECTIONS-PREPROD.txt : solutions B1/B2, corrections M1–M5 et R1–R2.
+PROTOCOLE-JPA-FLYWAY-ISOLE.txt : spécification de l'intégration pré-nettoyage.
+MATRICE-CORRECTIONS-PREPROD.json : 9 anomalies avec criticité, proposition, test,
+preuve, statut de préparation ET statut d'exécution distinct ; 19 familles de
+requêtes x13 axes =247 cases de travail, toutes NON_EXECUTE. Applicabilité à revoir,
+aucune revendication de 247 tests réalisés ; N/A motivé et accepté avant conclusion.
+test-correction-plan.py : régression structure exacte du YAML rendu et mutations
+en mémoire ; complète sans modifier le validateur runtime.
+README/FILES et CONTROLES-PREPROD.txt relient les nouveaux documents.
+
+Matrice de synthèse (la grille JSON porte les champs complets et traces privées)
+ID | Criticité | Proposition | Test | Preuve attendue | Statut
+B1 | Bloquant | rollback dégradé pièces indisponibles | ancien API/Front + droits/hash | acceptation et résultats | proposé, non accepté/non exécuté
+B2 | Bloquant | hook propriétaire avant down + runner RO | schéma/Flyway/JPA, refus/cleanup | même run/lot, deux images, invariance | conçu, implémentation à autoriser
+M1 | Majeur | baseline quiescente et liens DB/pièces | cinq inventaires/cohérence | zéro divergence inexpliquée | conçu, mapping SQL à revoir
+M2 | Majeur | Flyway natif exact + mappings JPA | deux versions/profils | résultats validate + config | dépend de B2
+M3 | Majeur | grille endpoints/dimensions/droits | 247 cases à qualifier | codes/origine/état/hash | matrice préparée, aucune case exécutée
+M4 | Majeur | budgets/seuils obligatoires | capacité/latence/durée/TTL | mesures et budget approuvés | valeurs VM inconnues
+M5 | Majeur | config IA false et preuves fermeture | IA réelle, refus gate/état | config filtrée et preuves métier | tests réels manquants
+R1 | Modéré | contrat Compose exact et négatifs | YAML + mutations mémoire | logs tests locaux | test local réussi, runtime inchangé
+R2 | Modéré | registre par commande/sous-cas | couverture/champs/statuts | registre complété/revu | modèle prêt, preuves VM absentes
+
+Tests effectivement exécutés
+Suite                                      Réussis  Ignorés  Échoués
+ test-correction-plan.py                         6       0       0
+ test-isolated-restore.py                        1       0       0
+ test-restore-private.py                         4       0       0
+ TOTAL                                         11       0       0
+Les 11 tests n'exécutent aucune restauration PostgreSQL ; Compose config seul,
+fixtures et gardes ; aucun conteneur/volume créé. Le test de structure inclut
+14 mutations négatives en sous-cas (3 volumes, 5 mounts/secrets, 6 sécurité/réseau).
+Validation du lot --local-images conforme ; quatre images locales/digests/labels.
+Syntaxe du nouveau test compilée en mémoire, aucun cache ajouté pour cette étape.
+Contrôles de fin : diff/inventaire, scan heuristique et immutabilité runtime.
+Le scan ne constitue pas un audit exhaustif des secrets/historique.
+
+Blocages résiduels (non levés)
+- Acceptation explicite du service rollback dégradé et preuve ancienne API/Front.
+- Autorisation d'implémenter puis revue du hook, runner épinglé, preuve consommée
+  obligatoirement par deploy, erreurs/interruption/nettoyage et durcissement runtime.
+- Revue de la politique de prérequis pour éviter la circularité prepare/restauration.
+- Choix digest outillage runner, version exacte libs et configuration JPA effective.
+- Requêtes cohérence métier/naming/schema, baseline au point quiescent à finaliser.
+- Comptes/droits/IDs, budgets ressources/temps et configurations réellement mesurés.
+- Restaurations, droits session, IA et fermeture/client à démontrer en environnement
+  autorisé. Aucune nouvelle route ni extension de confiance n'est autorisée ici.
+Les trois attestations restent false dans modèles, faits MSI et matrice.
+NO GO DÉPLOIEMENT ; GO REVUE DU PLAN DE CORRECTION uniquement.

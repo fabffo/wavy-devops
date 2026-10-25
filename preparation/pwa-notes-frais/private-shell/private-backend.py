@@ -42,7 +42,7 @@ class Backend(shared.DockerBackend):
 
     def identity(self):
         source={str(p):hashlib.sha256(p.read_bytes()).hexdigest() for p in P.iterdir()
-                if p.is_file() and p.suffix in ('.py','.sh','.yml','.conf','.template','.json')}
+                if p.is_file() and p.suffix in ('.py','.sh','.yml','.conf','.template','.json','.java')}
         return shared.fingerprint({'shared':super().identity(),'private':source,
                                    'gate':str(self.gate_dir)})
 
@@ -174,7 +174,34 @@ class Backend(shared.DockerBackend):
         self.verify_backup(backup)
         self.helper('restore-isolated',str(ROOT/backup['directory']))
         proof=shared.private_json(self.directory/'restore-proof.json')
+        self.verify_schema(proof)
         return proof
+
+    def isolated_cleanup_guard(self):
+        attempt=self.directory/'restore-attempt.json'
+        if attempt.exists() and shared.private_json(attempt).get('phase')!='cleaned':
+            raise ValueError('Copies isolées non nettoyées ; réservation conservée')
+        report=self.directory/'schema-validation.json'
+        if report.exists() and shared.private_json(report).get('cleanup') is not True:
+            raise ValueError('Validateurs non nettoyés ; réservation conservée')
+
+    def verify_schema(self,proof):
+        report_path=self.directory/'schema-validation.json'
+        report=shared.private_json(report_path)
+        attempt=shared.private_json(self.directory/'restore-attempt.json')
+        if (attempt.get('phase')!='cleaned' or attempt.get('run')!=self.run_id
+                or attempt.get('backup')!=proof.get('backup')
+                or attempt.get('project')!=report.get('project')
+                or proof.get('project')!=report.get('project')):
+            raise ValueError('Preuve isolée hors tentative nettoyée')
+        schema=load(P/'isolated-validator.py','backend_schema_validator')
+        if (schema.digest(report_path)!=proof.get('schemaValidation',{}).get('reportSha256')
+                or report.get('status')!='passed' or report.get('cleanup') is not True
+                or report.get('run')!=self.run_id or report.get('backup')!=proof.get('backup')
+                or report.get('planHash')!=proof.get('planHash')
+                or report.get('runnerSourceSha256')!=schema.digest(P/'IsolatedSchemaValidator.java')
+                or report.get('images')!=proof.get('schemaValidation',{}).get('images')):
+            raise ValueError('Rapport isolé absent, différent ou refusé')
 
     def test_window(self,proof):
         if self.stop_requested: raise InterruptedError('Fenêtre annulée avant ouverture')

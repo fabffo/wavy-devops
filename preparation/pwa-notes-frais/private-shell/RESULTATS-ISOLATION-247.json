@@ -1,0 +1,2007 @@
+{
+  "kind": "ISOLATION_EXECUTION_BLOCKED_NOT_TEST_SUCCESS",
+  "referenceCommit": "3da04f4e6f59926d42b939ce0452a63c5bb0c9b8",
+  "scope": "MSI_LOCAL_ONLY_NO_PREPROD_ACCESS",
+  "requestedCases": 247,
+  "executedCases": 0,
+  "passedCases": 0,
+  "failedCases": 0,
+  "blockedCases": 247,
+  "blockingPrerequisites": [
+    "no-running-local-Wavy-Gateway-Socle-Factures-stack",
+    "synthetic-accounts-role-grants-and-cookie-fixtures-not-provided",
+    "note-and-attachment-IDs-and-valid-workflow-payloads-not-resolved",
+    "applicability-of-247-family-axis-pairs-not-reviewed"
+  ],
+  "observations": [
+    "local Docker inventory inspected: only unrelated Supabase services active; left untouched",
+    "available Factures security integration test mocks ProfilSocleClient; not an end-to-end session proof",
+    "prepare-isolation-cases.py has no HTTP execution mode; generated work items are not executed tests"
+  ],
+  "cases": [
+    {
+      "id": "list__owner-positive",
+      "family": "list",
+      "axis": "owner-positive",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "list__same-tenant-other-company",
+      "family": "list",
+      "axis": "same-tenant-other-company",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "list__A-peer-to-owner-and-inverse",
+      "family": "list",
+      "axis": "A-peer-to-owner-and-inverse",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "list__B-peer-to-owner-and-inverse",
+      "family": "list",
+      "axis": "B-peer-to-owner-and-inverse",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "list__cross-tenant-both-directions",
+      "family": "list",
+      "axis": "cross-tenant-both-directions",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "list__forged-context-headers",
+      "family": "list",
+      "axis": "forged-context-headers",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "list__missing-note-role",
+      "family": "list",
+      "axis": "missing-note-role",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "list__missing-gateway-role",
+      "family": "list",
+      "axis": "missing-gateway-role",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "list__no-session",
+      "family": "list",
+      "axis": "no-session",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "list__expired-session",
+      "family": "list",
+      "axis": "expired-session",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "list__logged-out-session",
+      "family": "list",
+      "axis": "logged-out-session",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "list__revoked-grants",
+      "family": "list",
+      "axis": "revoked-grants",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "list__duplicate-or-malformed-cookie",
+      "family": "list",
+      "axis": "duplicate-or-malformed-cookie",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "summary__owner-positive",
+      "family": "summary",
+      "axis": "owner-positive",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "summary__same-tenant-other-company",
+      "family": "summary",
+      "axis": "same-tenant-other-company",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "summary__A-peer-to-owner-and-inverse",
+      "family": "summary",
+      "axis": "A-peer-to-owner-and-inverse",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "summary__B-peer-to-owner-and-inverse",
+      "family": "summary",
+      "axis": "B-peer-to-owner-and-inverse",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "summary__cross-tenant-both-directions",
+      "family": "summary",
+      "axis": "cross-tenant-both-directions",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "summary__forged-context-headers",
+      "family": "summary",
+      "axis": "forged-context-headers",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "summary__missing-note-role",
+      "family": "summary",
+      "axis": "missing-note-role",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "summary__missing-gateway-role",
+      "family": "summary",
+      "axis": "missing-gateway-role",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "summary__no-session",
+      "family": "summary",
+      "axis": "no-session",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "summary__expired-session",
+      "family": "summary",
+      "axis": "expired-session",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "summary__logged-out-session",
+      "family": "summary",
+      "axis": "logged-out-session",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "summary__revoked-grants",
+      "family": "summary",
+      "axis": "revoked-grants",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "summary__duplicate-or-malformed-cookie",
+      "family": "summary",
+      "axis": "duplicate-or-malformed-cookie",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "detail__owner-positive",
+      "family": "detail",
+      "axis": "owner-positive",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "detail__same-tenant-other-company",
+      "family": "detail",
+      "axis": "same-tenant-other-company",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "detail__A-peer-to-owner-and-inverse",
+      "family": "detail",
+      "axis": "A-peer-to-owner-and-inverse",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "detail__B-peer-to-owner-and-inverse",
+      "family": "detail",
+      "axis": "B-peer-to-owner-and-inverse",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "detail__cross-tenant-both-directions",
+      "family": "detail",
+      "axis": "cross-tenant-both-directions",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "detail__forged-context-headers",
+      "family": "detail",
+      "axis": "forged-context-headers",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "detail__missing-note-role",
+      "family": "detail",
+      "axis": "missing-note-role",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "detail__missing-gateway-role",
+      "family": "detail",
+      "axis": "missing-gateway-role",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "detail__no-session",
+      "family": "detail",
+      "axis": "no-session",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "detail__expired-session",
+      "family": "detail",
+      "axis": "expired-session",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "detail__logged-out-session",
+      "family": "detail",
+      "axis": "logged-out-session",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "detail__revoked-grants",
+      "family": "detail",
+      "axis": "revoked-grants",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "detail__duplicate-or-malformed-cookie",
+      "family": "detail",
+      "axis": "duplicate-or-malformed-cookie",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "metadata__owner-positive",
+      "family": "metadata",
+      "axis": "owner-positive",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "metadata__same-tenant-other-company",
+      "family": "metadata",
+      "axis": "same-tenant-other-company",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "metadata__A-peer-to-owner-and-inverse",
+      "family": "metadata",
+      "axis": "A-peer-to-owner-and-inverse",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "metadata__B-peer-to-owner-and-inverse",
+      "family": "metadata",
+      "axis": "B-peer-to-owner-and-inverse",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "metadata__cross-tenant-both-directions",
+      "family": "metadata",
+      "axis": "cross-tenant-both-directions",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "metadata__forged-context-headers",
+      "family": "metadata",
+      "axis": "forged-context-headers",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "metadata__missing-note-role",
+      "family": "metadata",
+      "axis": "missing-note-role",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "metadata__missing-gateway-role",
+      "family": "metadata",
+      "axis": "missing-gateway-role",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "metadata__no-session",
+      "family": "metadata",
+      "axis": "no-session",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "metadata__expired-session",
+      "family": "metadata",
+      "axis": "expired-session",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "metadata__logged-out-session",
+      "family": "metadata",
+      "axis": "logged-out-session",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "metadata__revoked-grants",
+      "family": "metadata",
+      "axis": "revoked-grants",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "metadata__duplicate-or-malformed-cookie",
+      "family": "metadata",
+      "axis": "duplicate-or-malformed-cookie",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "content__owner-positive",
+      "family": "content",
+      "axis": "owner-positive",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "content__same-tenant-other-company",
+      "family": "content",
+      "axis": "same-tenant-other-company",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "content__A-peer-to-owner-and-inverse",
+      "family": "content",
+      "axis": "A-peer-to-owner-and-inverse",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "content__B-peer-to-owner-and-inverse",
+      "family": "content",
+      "axis": "B-peer-to-owner-and-inverse",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "content__cross-tenant-both-directions",
+      "family": "content",
+      "axis": "cross-tenant-both-directions",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "content__forged-context-headers",
+      "family": "content",
+      "axis": "forged-context-headers",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "content__missing-note-role",
+      "family": "content",
+      "axis": "missing-note-role",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "content__missing-gateway-role",
+      "family": "content",
+      "axis": "missing-gateway-role",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "content__no-session",
+      "family": "content",
+      "axis": "no-session",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "content__expired-session",
+      "family": "content",
+      "axis": "expired-session",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "content__logged-out-session",
+      "family": "content",
+      "axis": "logged-out-session",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "content__revoked-grants",
+      "family": "content",
+      "axis": "revoked-grants",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "content__duplicate-or-malformed-cookie",
+      "family": "content",
+      "axis": "duplicate-or-malformed-cookie",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "preview__owner-positive",
+      "family": "preview",
+      "axis": "owner-positive",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "preview__same-tenant-other-company",
+      "family": "preview",
+      "axis": "same-tenant-other-company",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "preview__A-peer-to-owner-and-inverse",
+      "family": "preview",
+      "axis": "A-peer-to-owner-and-inverse",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "preview__B-peer-to-owner-and-inverse",
+      "family": "preview",
+      "axis": "B-peer-to-owner-and-inverse",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "preview__cross-tenant-both-directions",
+      "family": "preview",
+      "axis": "cross-tenant-both-directions",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "preview__forged-context-headers",
+      "family": "preview",
+      "axis": "forged-context-headers",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "preview__missing-note-role",
+      "family": "preview",
+      "axis": "missing-note-role",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "preview__missing-gateway-role",
+      "family": "preview",
+      "axis": "missing-gateway-role",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "preview__no-session",
+      "family": "preview",
+      "axis": "no-session",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "preview__expired-session",
+      "family": "preview",
+      "axis": "expired-session",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "preview__logged-out-session",
+      "family": "preview",
+      "axis": "logged-out-session",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "preview__revoked-grants",
+      "family": "preview",
+      "axis": "revoked-grants",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "preview__duplicate-or-malformed-cookie",
+      "family": "preview",
+      "axis": "duplicate-or-malformed-cookie",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "create-json__owner-positive",
+      "family": "create-json",
+      "axis": "owner-positive",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "create-json__same-tenant-other-company",
+      "family": "create-json",
+      "axis": "same-tenant-other-company",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "create-json__A-peer-to-owner-and-inverse",
+      "family": "create-json",
+      "axis": "A-peer-to-owner-and-inverse",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "create-json__B-peer-to-owner-and-inverse",
+      "family": "create-json",
+      "axis": "B-peer-to-owner-and-inverse",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "create-json__cross-tenant-both-directions",
+      "family": "create-json",
+      "axis": "cross-tenant-both-directions",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "create-json__forged-context-headers",
+      "family": "create-json",
+      "axis": "forged-context-headers",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "create-json__missing-note-role",
+      "family": "create-json",
+      "axis": "missing-note-role",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "create-json__missing-gateway-role",
+      "family": "create-json",
+      "axis": "missing-gateway-role",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "create-json__no-session",
+      "family": "create-json",
+      "axis": "no-session",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "create-json__expired-session",
+      "family": "create-json",
+      "axis": "expired-session",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "create-json__logged-out-session",
+      "family": "create-json",
+      "axis": "logged-out-session",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "create-json__revoked-grants",
+      "family": "create-json",
+      "axis": "revoked-grants",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "create-json__duplicate-or-malformed-cookie",
+      "family": "create-json",
+      "axis": "duplicate-or-malformed-cookie",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "create-multipart__owner-positive",
+      "family": "create-multipart",
+      "axis": "owner-positive",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "create-multipart__same-tenant-other-company",
+      "family": "create-multipart",
+      "axis": "same-tenant-other-company",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "create-multipart__A-peer-to-owner-and-inverse",
+      "family": "create-multipart",
+      "axis": "A-peer-to-owner-and-inverse",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "create-multipart__B-peer-to-owner-and-inverse",
+      "family": "create-multipart",
+      "axis": "B-peer-to-owner-and-inverse",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "create-multipart__cross-tenant-both-directions",
+      "family": "create-multipart",
+      "axis": "cross-tenant-both-directions",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "create-multipart__forged-context-headers",
+      "family": "create-multipart",
+      "axis": "forged-context-headers",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "create-multipart__missing-note-role",
+      "family": "create-multipart",
+      "axis": "missing-note-role",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "create-multipart__missing-gateway-role",
+      "family": "create-multipart",
+      "axis": "missing-gateway-role",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "create-multipart__no-session",
+      "family": "create-multipart",
+      "axis": "no-session",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "create-multipart__expired-session",
+      "family": "create-multipart",
+      "axis": "expired-session",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "create-multipart__logged-out-session",
+      "family": "create-multipart",
+      "axis": "logged-out-session",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "create-multipart__revoked-grants",
+      "family": "create-multipart",
+      "axis": "revoked-grants",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "create-multipart__duplicate-or-malformed-cookie",
+      "family": "create-multipart",
+      "axis": "duplicate-or-malformed-cookie",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "update-json__owner-positive",
+      "family": "update-json",
+      "axis": "owner-positive",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "update-json__same-tenant-other-company",
+      "family": "update-json",
+      "axis": "same-tenant-other-company",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "update-json__A-peer-to-owner-and-inverse",
+      "family": "update-json",
+      "axis": "A-peer-to-owner-and-inverse",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "update-json__B-peer-to-owner-and-inverse",
+      "family": "update-json",
+      "axis": "B-peer-to-owner-and-inverse",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "update-json__cross-tenant-both-directions",
+      "family": "update-json",
+      "axis": "cross-tenant-both-directions",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "update-json__forged-context-headers",
+      "family": "update-json",
+      "axis": "forged-context-headers",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "update-json__missing-note-role",
+      "family": "update-json",
+      "axis": "missing-note-role",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "update-json__missing-gateway-role",
+      "family": "update-json",
+      "axis": "missing-gateway-role",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "update-json__no-session",
+      "family": "update-json",
+      "axis": "no-session",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "update-json__expired-session",
+      "family": "update-json",
+      "axis": "expired-session",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "update-json__logged-out-session",
+      "family": "update-json",
+      "axis": "logged-out-session",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "update-json__revoked-grants",
+      "family": "update-json",
+      "axis": "revoked-grants",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "update-json__duplicate-or-malformed-cookie",
+      "family": "update-json",
+      "axis": "duplicate-or-malformed-cookie",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "update-multipart__owner-positive",
+      "family": "update-multipart",
+      "axis": "owner-positive",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "update-multipart__same-tenant-other-company",
+      "family": "update-multipart",
+      "axis": "same-tenant-other-company",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "update-multipart__A-peer-to-owner-and-inverse",
+      "family": "update-multipart",
+      "axis": "A-peer-to-owner-and-inverse",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "update-multipart__B-peer-to-owner-and-inverse",
+      "family": "update-multipart",
+      "axis": "B-peer-to-owner-and-inverse",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "update-multipart__cross-tenant-both-directions",
+      "family": "update-multipart",
+      "axis": "cross-tenant-both-directions",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "update-multipart__forged-context-headers",
+      "family": "update-multipart",
+      "axis": "forged-context-headers",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "update-multipart__missing-note-role",
+      "family": "update-multipart",
+      "axis": "missing-note-role",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "update-multipart__missing-gateway-role",
+      "family": "update-multipart",
+      "axis": "missing-gateway-role",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "update-multipart__no-session",
+      "family": "update-multipart",
+      "axis": "no-session",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "update-multipart__expired-session",
+      "family": "update-multipart",
+      "axis": "expired-session",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "update-multipart__logged-out-session",
+      "family": "update-multipart",
+      "axis": "logged-out-session",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "update-multipart__revoked-grants",
+      "family": "update-multipart",
+      "axis": "revoked-grants",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "update-multipart__duplicate-or-malformed-cookie",
+      "family": "update-multipart",
+      "axis": "duplicate-or-malformed-cookie",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "upload__owner-positive",
+      "family": "upload",
+      "axis": "owner-positive",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "upload__same-tenant-other-company",
+      "family": "upload",
+      "axis": "same-tenant-other-company",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "upload__A-peer-to-owner-and-inverse",
+      "family": "upload",
+      "axis": "A-peer-to-owner-and-inverse",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "upload__B-peer-to-owner-and-inverse",
+      "family": "upload",
+      "axis": "B-peer-to-owner-and-inverse",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "upload__cross-tenant-both-directions",
+      "family": "upload",
+      "axis": "cross-tenant-both-directions",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "upload__forged-context-headers",
+      "family": "upload",
+      "axis": "forged-context-headers",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "upload__missing-note-role",
+      "family": "upload",
+      "axis": "missing-note-role",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "upload__missing-gateway-role",
+      "family": "upload",
+      "axis": "missing-gateway-role",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "upload__no-session",
+      "family": "upload",
+      "axis": "no-session",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "upload__expired-session",
+      "family": "upload",
+      "axis": "expired-session",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "upload__logged-out-session",
+      "family": "upload",
+      "axis": "logged-out-session",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "upload__revoked-grants",
+      "family": "upload",
+      "axis": "revoked-grants",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "upload__duplicate-or-malformed-cookie",
+      "family": "upload",
+      "axis": "duplicate-or-malformed-cookie",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "delete__owner-positive",
+      "family": "delete",
+      "axis": "owner-positive",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "delete__same-tenant-other-company",
+      "family": "delete",
+      "axis": "same-tenant-other-company",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "delete__A-peer-to-owner-and-inverse",
+      "family": "delete",
+      "axis": "A-peer-to-owner-and-inverse",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "delete__B-peer-to-owner-and-inverse",
+      "family": "delete",
+      "axis": "B-peer-to-owner-and-inverse",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "delete__cross-tenant-both-directions",
+      "family": "delete",
+      "axis": "cross-tenant-both-directions",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "delete__forged-context-headers",
+      "family": "delete",
+      "axis": "forged-context-headers",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "delete__missing-note-role",
+      "family": "delete",
+      "axis": "missing-note-role",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "delete__missing-gateway-role",
+      "family": "delete",
+      "axis": "missing-gateway-role",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "delete__no-session",
+      "family": "delete",
+      "axis": "no-session",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "delete__expired-session",
+      "family": "delete",
+      "axis": "expired-session",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "delete__logged-out-session",
+      "family": "delete",
+      "axis": "logged-out-session",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "delete__revoked-grants",
+      "family": "delete",
+      "axis": "revoked-grants",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "delete__duplicate-or-malformed-cookie",
+      "family": "delete",
+      "axis": "duplicate-or-malformed-cookie",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "valider__owner-positive",
+      "family": "valider",
+      "axis": "owner-positive",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "valider__same-tenant-other-company",
+      "family": "valider",
+      "axis": "same-tenant-other-company",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "valider__A-peer-to-owner-and-inverse",
+      "family": "valider",
+      "axis": "A-peer-to-owner-and-inverse",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "valider__B-peer-to-owner-and-inverse",
+      "family": "valider",
+      "axis": "B-peer-to-owner-and-inverse",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "valider__cross-tenant-both-directions",
+      "family": "valider",
+      "axis": "cross-tenant-both-directions",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "valider__forged-context-headers",
+      "family": "valider",
+      "axis": "forged-context-headers",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "valider__missing-note-role",
+      "family": "valider",
+      "axis": "missing-note-role",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "valider__missing-gateway-role",
+      "family": "valider",
+      "axis": "missing-gateway-role",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "valider__no-session",
+      "family": "valider",
+      "axis": "no-session",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "valider__expired-session",
+      "family": "valider",
+      "axis": "expired-session",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "valider__logged-out-session",
+      "family": "valider",
+      "axis": "logged-out-session",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "valider__revoked-grants",
+      "family": "valider",
+      "axis": "revoked-grants",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "valider__duplicate-or-malformed-cookie",
+      "family": "valider",
+      "axis": "duplicate-or-malformed-cookie",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "refuser__owner-positive",
+      "family": "refuser",
+      "axis": "owner-positive",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "refuser__same-tenant-other-company",
+      "family": "refuser",
+      "axis": "same-tenant-other-company",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "refuser__A-peer-to-owner-and-inverse",
+      "family": "refuser",
+      "axis": "A-peer-to-owner-and-inverse",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "refuser__B-peer-to-owner-and-inverse",
+      "family": "refuser",
+      "axis": "B-peer-to-owner-and-inverse",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "refuser__cross-tenant-both-directions",
+      "family": "refuser",
+      "axis": "cross-tenant-both-directions",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "refuser__forged-context-headers",
+      "family": "refuser",
+      "axis": "forged-context-headers",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "refuser__missing-note-role",
+      "family": "refuser",
+      "axis": "missing-note-role",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "refuser__missing-gateway-role",
+      "family": "refuser",
+      "axis": "missing-gateway-role",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "refuser__no-session",
+      "family": "refuser",
+      "axis": "no-session",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "refuser__expired-session",
+      "family": "refuser",
+      "axis": "expired-session",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "refuser__logged-out-session",
+      "family": "refuser",
+      "axis": "logged-out-session",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "refuser__revoked-grants",
+      "family": "refuser",
+      "axis": "revoked-grants",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "refuser__duplicate-or-malformed-cookie",
+      "family": "refuser",
+      "axis": "duplicate-or-malformed-cookie",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "soumettre__owner-positive",
+      "family": "soumettre",
+      "axis": "owner-positive",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "soumettre__same-tenant-other-company",
+      "family": "soumettre",
+      "axis": "same-tenant-other-company",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "soumettre__A-peer-to-owner-and-inverse",
+      "family": "soumettre",
+      "axis": "A-peer-to-owner-and-inverse",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "soumettre__B-peer-to-owner-and-inverse",
+      "family": "soumettre",
+      "axis": "B-peer-to-owner-and-inverse",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "soumettre__cross-tenant-both-directions",
+      "family": "soumettre",
+      "axis": "cross-tenant-both-directions",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "soumettre__forged-context-headers",
+      "family": "soumettre",
+      "axis": "forged-context-headers",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "soumettre__missing-note-role",
+      "family": "soumettre",
+      "axis": "missing-note-role",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "soumettre__missing-gateway-role",
+      "family": "soumettre",
+      "axis": "missing-gateway-role",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "soumettre__no-session",
+      "family": "soumettre",
+      "axis": "no-session",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "soumettre__expired-session",
+      "family": "soumettre",
+      "axis": "expired-session",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "soumettre__logged-out-session",
+      "family": "soumettre",
+      "axis": "logged-out-session",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "soumettre__revoked-grants",
+      "family": "soumettre",
+      "axis": "revoked-grants",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "soumettre__duplicate-or-malformed-cookie",
+      "family": "soumettre",
+      "axis": "duplicate-or-malformed-cookie",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "recalculer__owner-positive",
+      "family": "recalculer",
+      "axis": "owner-positive",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "recalculer__same-tenant-other-company",
+      "family": "recalculer",
+      "axis": "same-tenant-other-company",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "recalculer__A-peer-to-owner-and-inverse",
+      "family": "recalculer",
+      "axis": "A-peer-to-owner-and-inverse",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "recalculer__B-peer-to-owner-and-inverse",
+      "family": "recalculer",
+      "axis": "B-peer-to-owner-and-inverse",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "recalculer__cross-tenant-both-directions",
+      "family": "recalculer",
+      "axis": "cross-tenant-both-directions",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "recalculer__forged-context-headers",
+      "family": "recalculer",
+      "axis": "forged-context-headers",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "recalculer__missing-note-role",
+      "family": "recalculer",
+      "axis": "missing-note-role",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "recalculer__missing-gateway-role",
+      "family": "recalculer",
+      "axis": "missing-gateway-role",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "recalculer__no-session",
+      "family": "recalculer",
+      "axis": "no-session",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "recalculer__expired-session",
+      "family": "recalculer",
+      "axis": "expired-session",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "recalculer__logged-out-session",
+      "family": "recalculer",
+      "axis": "logged-out-session",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "recalculer__revoked-grants",
+      "family": "recalculer",
+      "axis": "revoked-grants",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "recalculer__duplicate-or-malformed-cookie",
+      "family": "recalculer",
+      "axis": "duplicate-or-malformed-cookie",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "annuler__owner-positive",
+      "family": "annuler",
+      "axis": "owner-positive",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "annuler__same-tenant-other-company",
+      "family": "annuler",
+      "axis": "same-tenant-other-company",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "annuler__A-peer-to-owner-and-inverse",
+      "family": "annuler",
+      "axis": "A-peer-to-owner-and-inverse",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "annuler__B-peer-to-owner-and-inverse",
+      "family": "annuler",
+      "axis": "B-peer-to-owner-and-inverse",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "annuler__cross-tenant-both-directions",
+      "family": "annuler",
+      "axis": "cross-tenant-both-directions",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "annuler__forged-context-headers",
+      "family": "annuler",
+      "axis": "forged-context-headers",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "annuler__missing-note-role",
+      "family": "annuler",
+      "axis": "missing-note-role",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "annuler__missing-gateway-role",
+      "family": "annuler",
+      "axis": "missing-gateway-role",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "annuler__no-session",
+      "family": "annuler",
+      "axis": "no-session",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "annuler__expired-session",
+      "family": "annuler",
+      "axis": "expired-session",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "annuler__logged-out-session",
+      "family": "annuler",
+      "axis": "logged-out-session",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "annuler__revoked-grants",
+      "family": "annuler",
+      "axis": "revoked-grants",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "annuler__duplicate-or-malformed-cookie",
+      "family": "annuler",
+      "axis": "duplicate-or-malformed-cookie",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "transformer-factures-achats__owner-positive",
+      "family": "transformer-factures-achats",
+      "axis": "owner-positive",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "transformer-factures-achats__same-tenant-other-company",
+      "family": "transformer-factures-achats",
+      "axis": "same-tenant-other-company",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "transformer-factures-achats__A-peer-to-owner-and-inverse",
+      "family": "transformer-factures-achats",
+      "axis": "A-peer-to-owner-and-inverse",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "transformer-factures-achats__B-peer-to-owner-and-inverse",
+      "family": "transformer-factures-achats",
+      "axis": "B-peer-to-owner-and-inverse",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "transformer-factures-achats__cross-tenant-both-directions",
+      "family": "transformer-factures-achats",
+      "axis": "cross-tenant-both-directions",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "transformer-factures-achats__forged-context-headers",
+      "family": "transformer-factures-achats",
+      "axis": "forged-context-headers",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "transformer-factures-achats__missing-note-role",
+      "family": "transformer-factures-achats",
+      "axis": "missing-note-role",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "transformer-factures-achats__missing-gateway-role",
+      "family": "transformer-factures-achats",
+      "axis": "missing-gateway-role",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "transformer-factures-achats__no-session",
+      "family": "transformer-factures-achats",
+      "axis": "no-session",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "transformer-factures-achats__expired-session",
+      "family": "transformer-factures-achats",
+      "axis": "expired-session",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "transformer-factures-achats__logged-out-session",
+      "family": "transformer-factures-achats",
+      "axis": "logged-out-session",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "transformer-factures-achats__revoked-grants",
+      "family": "transformer-factures-achats",
+      "axis": "revoked-grants",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "transformer-factures-achats__duplicate-or-malformed-cookie",
+      "family": "transformer-factures-achats",
+      "axis": "duplicate-or-malformed-cookie",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "transform-many__owner-positive",
+      "family": "transform-many",
+      "axis": "owner-positive",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "transform-many__same-tenant-other-company",
+      "family": "transform-many",
+      "axis": "same-tenant-other-company",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "transform-many__A-peer-to-owner-and-inverse",
+      "family": "transform-many",
+      "axis": "A-peer-to-owner-and-inverse",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "transform-many__B-peer-to-owner-and-inverse",
+      "family": "transform-many",
+      "axis": "B-peer-to-owner-and-inverse",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "transform-many__cross-tenant-both-directions",
+      "family": "transform-many",
+      "axis": "cross-tenant-both-directions",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "transform-many__forged-context-headers",
+      "family": "transform-many",
+      "axis": "forged-context-headers",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "transform-many__missing-note-role",
+      "family": "transform-many",
+      "axis": "missing-note-role",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "transform-many__missing-gateway-role",
+      "family": "transform-many",
+      "axis": "missing-gateway-role",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "transform-many__no-session",
+      "family": "transform-many",
+      "axis": "no-session",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "transform-many__expired-session",
+      "family": "transform-many",
+      "axis": "expired-session",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "transform-many__logged-out-session",
+      "family": "transform-many",
+      "axis": "logged-out-session",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "transform-many__revoked-grants",
+      "family": "transform-many",
+      "axis": "revoked-grants",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    },
+    {
+      "id": "transform-many__duplicate-or-malformed-cookie",
+      "family": "transform-many",
+      "axis": "duplicate-or-malformed-cookie",
+      "status": "BLOQUE_NON_EXECUTE",
+      "httpStatus": null,
+      "proofSha256": null
+    }
+  ],
+  "preprodAttestations": {
+    "rollback-schema-compatible": false,
+    "session-isolation-plan": false,
+    "isolated-restore-capacity": false
+  },
+  "historicalRecord": true,
+  "supersededBy": "RESULTATS-RECETTE-247.json",
+  "currentStatusNote": "Blocage antérieur conservé, avant activation RECETTE ;247 validations réelles dans le rapport référencé. Aucune case historique transformée en succès."
+}

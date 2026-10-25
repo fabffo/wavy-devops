@@ -1,0 +1,93 @@
+Wavy — Revue finale des candidats et preuves — 25 octobre 2026
+Base master :3da04f4e6f59926d42b939ce0452a63c5bb0c9b8.
+Revue locale uniquement ; aucun test d’isolation relancé, accès PREPROD,
+déploiement, commit ou push. Aucun code candidat changé pendant cette revue.
+
+Décision : GO POUR COMMIT du candidat, pas GO pour déploiement.
+
+Contrôle | Résultat et preuve
+JPA/Flyway | Sources finales et19 journaux concordent par SHA256 avec
+ PREUVES-VALIDATEUR-JPA-LOCAL.json/finalReview :173 réussis,1 ignoré,0 échec
+ lors de la campagne historique. Ancienne API b277edb/nouvelle09fcd98,
+20 migrations/23 entités ; SQL minimal, réseau none, pas de démarrage Spring.
+ Preuves liées au run/plan/lot/projet, archives exactes par SHA avant remplacement,
+ publication globale après nettoyage Docker ET staging ; reprise durable sur échec.
+Abandon | Chemin certain mutationStarted=false, étapes uniquement RO, aucun
+ backup/effet : archive/libération sans probe d’une barrière jamais installée,
+ closureConfirmed=false. Hôte/verrou/réservation/run/plan restent requis.
+ État ambigu, barrière tentée ou mutation : fermeture et rollback/validation requis.
+ Tests dédiés présents dans test-private-orchestrator.py et journaux vérifiés.
+RECETTE |247 IDs uniques,19 familles x13 axes, tous PASSED ;144 validations
+ précédentes +103 reprises réelles, sans doublon.19 refus401 après1811,46 à
+1830,87s d’inactivité réelle. Preuves référencées présentes et hashes conformes.
+ Nettoyage complet,46 tables préexistantes identiques ;39 factures synthétiques
+ supprimées avec notes/tiers/pièces ; images initiales restituées,4 API arrêtées.
+ Les14 skips JPA du rejeu ciblé RECETTE sont distincts des fixtures réelles JPA
+ exécutées dans la campagne historique173/1 ; aucun total additionné artificiellement.
+Git |28 chemins explicites listés ci-dessous, tous autorisés dans FILES.txt.
+ Aucun manifeste actif, script actif hors préparation ou candidat HTTPS public
+ changé. Caches/logs/clefs/dumps/temporaires exclus du staging, conservés localement.
+Secrets | Scan des fichiers de travail et de l’index, motifs clés/jetons et secrets
+ réels du run ; aucun résultat. Scan heuristique, pas de scanner spécialisé installé.
+
+Documentation : README et rapports historiques clarifiés ; les anciens blocages
+ restent conservés comme historique, sans remplacer leurs résultats par des succès.
+ RESULTATS-RECETTE-247.json et RESULTATS-RECETTE-EXECUTION.txt sont les résultats
+ courants ; MATRICE-CORRECTIONS-PREPROD.json conserve les cases PREPROD NON_EXECUTE.
+
+Reprise PREPROD — après autorisation distincte uniquement
+Entrées : ORCHESTRATEUR-PRIVE.txt et PREUVES-MSI-REPRISE.txt ; jamais le runner
+restore directement. Verrou deployments/preprod.lock et réservation persistante,
+V3 et autorisations à usage unique inchangés. status puis abandon si absence
+certaine de mutation, puis reserve/prepare/restore/deploy ; ouverture distincte
+par session, tunnel localhost24443 uniquement, échéance<=900s, fermeture par défaut.
+Un ancien run muté ne peut pas reprendre avec les nouvelles sources/configurationHash :
+conserver sa version approuvée et passer par la procédure propriétaire inspectée ;
+aucune édition des pointeurs, hashes, reçus ou attestations pour forcer une reprise.
+Nouvelle réservation après abandon certain avant mutation utilise les sources finales.
+La paire ancienne API PREPROD attendue b277edb diffère de l’ancienne API RECETTE
+4e5a390 : confirmer le digest VM avant toute préparation ; autre paire refusée.
+Rollback dégradé : liste/détail/synthèse à vérifier avec ancien Front/API ; anciennes
+routes de téléchargement ndf indisponibles, octets conservés, écritures toujours
+bloquées. Acceptation métier/exploitation requise ; aucune compatibilité d’écriture.
+
+Prérequis déploiement encore bloquants : mesures VM/capacité/JDK/outils, image API
+active et schémas/Flyway/profils, preuves de sauvegarde chiffrée et restauration
+isolée du vrai lot cinq DB/documents, cohérence métier et délai ; acceptation du
+rollback dégradé, comptes/droits cibles, tests fonctionnels IA/navigateur/ERP réels,
+fermeture et contrôles d’écriture. Trois attestations PREPROD maintenues false.
+Aucun succès MSI ne remplace ces contrôles ni le prochain GO explicite.
+
+Staging explicite terminé :28 chemins indexés, aucun ajout global :
+preparation/pwa-notes-frais/FILES.txt
+preparation/pwa-notes-frais/README.md
+preparation/pwa-notes-frais/private-shell/ACTIVATION-RECETTE.txt
+preparation/pwa-notes-frais/private-shell/CONTROLES-PREPROD.txt
+preparation/pwa-notes-frais/private-shell/FINALISATION-COMMIT.txt
+preparation/pwa-notes-frais/private-shell/IsolatedSchemaValidator.java
+preparation/pwa-notes-frais/private-shell/MATRICE-CORRECTIONS-PREPROD.json
+preparation/pwa-notes-frais/private-shell/PLAN-CORRECTIONS-PREPROD.txt
+preparation/pwa-notes-frais/private-shell/PLAN-MUTATIONS-RECETTE.json
+preparation/pwa-notes-frais/private-shell/PREUVES-VALIDATEUR-JPA-LOCAL.json
+preparation/pwa-notes-frais/private-shell/PROTOCOLE-JPA-FLYWAY-ISOLE.txt
+preparation/pwa-notes-frais/private-shell/RESULTATS-CORRECTIONS-PREPROD.txt
+preparation/pwa-notes-frais/private-shell/RESULTATS-ISOLATION-247.json
+preparation/pwa-notes-frais/private-shell/RESULTATS-RECETTE-247.json
+preparation/pwa-notes-frais/private-shell/RESULTATS-RECETTE-EXECUTION.txt
+preparation/pwa-notes-frais/private-shell/RESULTATS-VALIDATEUR-JPA.txt
+preparation/pwa-notes-frais/private-shell/REVUE-CONTROLES-PREPROD.txt
+preparation/pwa-notes-frais/private-shell/isolated-validator.py
+preparation/pwa-notes-frais/private-shell/prepare-isolation-cases.py
+preparation/pwa-notes-frais/private-shell/private-backend.py
+preparation/pwa-notes-frais/private-shell/release-private.py
+preparation/pwa-notes-frais/private-shell/restore-private.py
+preparation/pwa-notes-frais/private-shell/test-correction-plan.py
+preparation/pwa-notes-frais/private-shell/test-final-review.py
+preparation/pwa-notes-frais/private-shell/test-isolated-validator.py
+preparation/pwa-notes-frais/private-shell/test-private-backend.py
+preparation/pwa-notes-frais/private-shell/test-private-orchestrator.py
+preparation/pwa-notes-frais/private-shell/test-validator-integration.py
+
+Contrôles finaux réussis : git diff --cached --check ; --stat et --name-status
+relus. Contenu indexé égal au candidat relu, inventaire exact et scan sans détection.
+GO POUR COMMIT

@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 import importlib.util
 import json
 import os
+import re
 from pathlib import Path
 import signal
 import socket
@@ -28,6 +29,9 @@ fingerprint = public.fingerprint
 now = public.now
 ORDER = public.ORDER
 PROFILE = 'private-tunnel-v1'
+SCHEMA = load(P/'isolated-validator.py','private_schema_contract')
+RESTORE_CHECKS = ['five-databases', 'contracts-and-notes', 'hmac', 'catalogues',
+                  'document-hashes', 'notes-permissions', *SCHEMA.CHECKS]
 PREREQUISITES = ['approved-maintenance', 'rollback-schema-compatible', 'synthetic-data-only',
                  'session-isolation-plan', 'backup-key-available', 'isolated-restore-capacity']
 FUNCTIONAL = ['session-isolation', 'company-switch', 'jpeg-png-pdf', 'real-ai-extraction',
@@ -44,6 +48,17 @@ def read_plan():
 class Engine(public.Engine):
     def evidence(self, proof, checks, backup=None):
         self.attest(proof, checks)
+        if checks == RESTORE_CHECKS:
+            validation=proof.get('schemaValidation',{})
+            if validation.get('cleanup') is not True or not re.fullmatch(r'[a-f0-9]{64}',validation.get('reportSha256','')):
+                raise ValueError('Preuve JPA/Flyway complète requise')
+            images=validation.get('images',{})
+            if set(images)!=set(SCHEMA.IMAGES):raise ValueError('Deux API requises pour validation')
+            for key,(reference,jar_hash) in SCHEMA.IMAGES.items():
+                item=images[key]
+                if item.get('reference')!=reference or item.get('jarSha256')!=jar_hash or item.get('passed') is not True:
+                    raise ValueError('Validation API différente ou refusée')
+            self.backend.verify_schema(proof)
         if (proof.get('profile') != PROFILE or proof.get('run') != self.run_id
                 or proof.get('origin') != 'http://localhost:24443'):
             raise ValueError('Preuve privée hors run/origine')
@@ -70,6 +85,8 @@ class Engine(public.Engine):
         self.step('preflight', self.backend.preflight, self.plan)
         self.step('verify-images', self.backend.images, self.plan)
         self.state['previous'] = self.step('snapshot', self.backend.snapshot, self.plan); self.save()
+        if self.state['previous']['images']['factures-api']['reference'] != SCHEMA.IMAGES['old'][0]:
+            raise ValueError('Ancienne API hors paire de validation revue')
         # Barrière d'entrée avant backup/provision/API : image Shell actuelle conservée.
         self.state['mutationStarted'] = True; self.save()
         self.step('install-barrier', self.backend.barrier, self.state['previous'])
@@ -105,16 +122,14 @@ class Engine(public.Engine):
         self.require_phase(('awaiting-restore',))
         self.closed()
         result = self.step('isolated-restore', self.backend.restore, self.state['backup'])
-        self.evidence(result, ['five-databases', 'contracts-and-notes', 'hmac', 'catalogues',
-                               'document-hashes', 'notes-permissions'], self.state['backup'])
+        self.evidence(result, RESTORE_CHECKS, self.state['backup'])
         self.state['restore'] = result
         self.state['phase'] = 'restored'; self.save()
 
     def deploy(self, proof=None):
         self.require_phase(('restored',))
         self.evidence(self.state['prerequisites'], PREREQUISITES)
-        self.evidence(self.state['restore'], ['five-databases', 'contracts-and-notes', 'hmac',
-                                             'catalogues', 'document-hashes', 'notes-permissions'], self.state['backup'])
+        self.evidence(self.state['restore'], RESTORE_CHECKS, self.state['backup'])
         self.closed()
         self.step('preflight', self.backend.preflight, self.plan)
         self.step('verify-images', self.backend.images, self.plan)
@@ -137,13 +152,11 @@ class Engine(public.Engine):
         if proof.get('observed') != self.state['observed'] or proof.get('backup') != self.state['backup']:
             raise ValueError('Autorisation de test hors cohorte')
         self.evidence(self.state['prerequisites'], PREREQUISITES)
-        self.evidence(self.state['restore'], ['five-databases','contracts-and-notes','hmac','catalogues',
-                                             'document-hashes','notes-permissions'], self.state['backup'])
+        self.evidence(self.state['restore'], RESTORE_CHECKS, self.state['backup'])
         self.closed(); self.verify_current()
         self.backend.verify_backup(self.state['backup']); self.backend.storage(); self.backend.checks()
         self.evidence(self.state['prerequisites'], PREREQUISITES)
-        self.evidence(self.state['restore'], ['five-databases','contracts-and-notes','hmac','catalogues',
-                                             'document-hashes','notes-permissions'], self.state['backup'])
+        self.evidence(self.state['restore'], RESTORE_CHECKS, self.state['backup'])
         self.evidence(proof, ['approved-test-session', 'synthetic-data-only'])
         deadlines=[datetime.fromisoformat(item['checkedAt']).timestamp()+86400
                    for item in (proof,self.state['prerequisites'],self.state['restore'])]
@@ -187,8 +200,7 @@ class Engine(public.Engine):
         if not self.state.get('backup'): raise ValueError('Sauvegarde complète requise ; rollback/abandon explicite')
         self.backend.verify_backup(self.state['backup'])
         if target in ('restored','prepared','tested'):
-            self.evidence(self.state.get('restore', {}), ['five-databases','contracts-and-notes','hmac',
-                          'catalogues','document-hashes','notes-permissions'], self.state['backup'])
+            self.evidence(self.state.get('restore', {}), RESTORE_CHECKS, self.state['backup'])
         if target in ('prepared','tested'): self.verify_current(); self.backend.checks()
         self.state.pop('validation', None)
         if target == 'tested':
@@ -226,6 +238,7 @@ class Engine(public.Engine):
             self.state['abandonReason'] = 'no-mutation-barrier-not-required'
         else:
             self.closed()
+            self.backend.isolated_cleanup_guard()
             if self.state['mutationStarted'] and self.state['phase'] not in ('rolled-back','validated'):
                 raise ValueError('Rollback ou validation complète requis')
             self.backend.checks()

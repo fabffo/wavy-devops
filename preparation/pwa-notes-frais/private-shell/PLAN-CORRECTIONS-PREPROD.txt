@@ -1,0 +1,159 @@
+MISE À JOUR IMPLÉMENTATION LOCALE — lire RESULTATS-VALIDATEUR-JPA.txt.
+Le hook candidat et le runner existent désormais ; aucune autorisation PREPROD.
+Les mentions NON IMPLÉMENTÉ du texte de conception ci-dessous sont historiques.
+Runtime JVM : image API épinglée réutilisée ; compilation par JDK17 hôte, pas de nouvelle image outillage.
+
+Wavy — Préparation des corrections PREPROD — 24 octobre 2026
+Référence : REVUE-CONTROLES-PREPROD.txt ; code validé 3da04f4.
+Statut : CONCEPTION uniquement ; aucune anomalie runtime déclarée corrigée par
+un document ou test statique. Aucun accès VM, build, déploiement ou commit.
+Les modèles et facts MSI gardent les trois attestations false.
+
+B1 — Contrat rollback proposé, à accepter explicitement
+Solution minimale : rollback des quatre images snapshot ; PWA fermée, gate de
+mutation Notes conservé ; aucune restauration DB/documents et aucun ancien writer.
+Service accepté PROPOSÉ : collection/détail/synthèse Notes accessibles aux seules
+identités autorisées avec valeurs inchangées ; autres modules ERP préservés.
+Les nouveaux justificatifs restent conservés, intègres et privés mais INDISPONIBLES
+au téléchargement par l'ancienne API. Un 404 des nouveaux endpoints est une
+indisponibilité attendue, jamais un succès de consultation ou d'isolation métier.
+Pas d'URL filesystem, pas de montage statique, pas de proxy vers nouvelle API en
+cachette ; récupération par procédure distincte approuvée ou redéploiement corrigé.
+L'ancien Front peut afficher des actions d'écriture : leurs appels doivent être
+refusés ; ne pas promettre une interface readonly dédiée sans modification applicative.
+Aucune promesse de lien justificatif fonctionnel ; message via consigne opérateur
+et information des testeurs. Si affichage casse aussi liste/détail : NO GO rollback.
+Alternative si téléchargement exigé : une ancienne version compatible stockage ou
+un service de consultation révisé exige code, image, revue sécurité et nouveau GO ;
+ne fait pas partie des quatre images validées ni des corrections autorisées ici.
+Acceptation à obtenir AVANT test : propriétaire métier/exploitation approuve la perte
+temporaire de consultation des pièces et délai de résolution ; sinon NO GO.
+Test sur copies : note historique et note nouvelle avec pièce ndf, ancien couple
+API/Front ; valeurs liste/détail/synthèse, permissions et hash identiques avant/après ;
+mutations 403 gate, originaux conservés. Tester aussi refus inter-user/tenant/société.
+Une simple réponse anonyme 404 sur justificatif ne prouve aucun droit backend.
+
+B2 — Solution retenue pour conception
+Ajouter après autorisation un point de validation DANS l'étape isolated-restore,
+après restauration/contrôles et AVANT down ; sous hôte/FD/verrou/réservation actuels.
+Aucune commande extérieure ne doit démarrer les copies ou remplacer ce point.
+Spécification détaillée : PROTOCOLE-JPA-FLYWAY-ISOLE.txt.
+L'orchestrateur actuel NE SAIT PAS exécuter ce protocole. Aucun nouveau flag,
+commande CLI ou proof true n'est inventé. L'implémentation candidate du hook,
+du validateur et du contrat de preuve nécessite autorisation séparée ; puis tests.
+Ordre non circulaire proposé : avant prepare, compatibilité statique + image active
++ baseline schéma/Flyway + acceptation rollback readonly + capacité et comptes.
+Après prepare, preuve de restauration ET validation réelle de ce lot avant deploy.
+Si la politique exige un exercice réel avant attestation rollback-schema-compatible,
+prévoir un run de répétition isolée dédié, autorisé, avec même gestionnaire d'opération ;
+ne pas cocher true pour amorcer le cycle. Cette décision de politique reste ouverte.
+Faire approuver la séparation et sa correspondance avec les modèles existants ; ne
+changer ni leur sémantique ni leur fraîcheur dans les fichiers actifs à cette étape.
+
+M1 — Intégrité cinq bases/documents
+Au point de quiescence du backup, capturer baseline cohérente (hook futur autorisé) :
+version serveur, schémas/extensions, tables/colonnes, contraintes, index, séquences,
+historiques Flyway et comptages exacts par table ; aucun SELECT métier brut dans logs.
+Sur copies : comparer 100 % inventaire/comptages, contraintes validées, séquences
+et ensemble références ndf tenant/société/note ; resolver autorisé de chemin -> hash,
+taille/MIME selon contrat, chaque référence doit désigner un fichier attendu.
+Contrats ET Notes : tous fichiers hash identiques ; 0 référence manquante, 0 divergence
+inexpliquée, orphelins recensés/acceptés sans suppression. Contraintes préexistantes
+non validées : exception revue explicitement, jamais succès automatique.
+Séquences : comparer last_value/is_called au snapshot cohérent, avec précautions
+sur allocations non transactionnelles ; pas d'égalité naïve à max(id).
+Requêtes génériques pour une copie (via pg exec DU helper uniquement) :
+ SELECT version();
+ SELECT extname,extversion FROM pg_extension ORDER BY extname;
+ SELECT n.nspname,c.relname,c.relkind FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname NOT IN ('pg_catalog','information_schema') AND n.nspname NOT LIKE 'pg_toast%' ORDER BY 1,2;
+ SELECT conrelid::regclass,conname,contype,convalidated FROM pg_constraint WHERE connamespace NOT IN (SELECT oid FROM pg_namespace WHERE nspname IN ('pg_catalog','information_schema')) ORDER BY 1,2;
+Pour comptes exacts, quotes identifiants SQL avec format('%I',...), transaction
+repeatable-read/read-only ; mapper le schéma réel avant génération des requêtes
+Notes/Contrats. Ce mapping est encore à revoir : aucune requête métier improvisée.
+
+M2 — Inventaire Flyway/JPA reproductible
+Lire profils/locations réellement appliqués et ordre de priorité env/propriétés ;
+communs attendus classpath:db/migration/common et vendor PostgreSQL (à confirmer).
+Découvrir l'historique :
+ SELECT table_schema,table_name FROM information_schema.tables WHERE table_name='flyway_schema_history' ORDER BY 1;
+Puis SELECT installé ordonné en qualifiant le schéma validé. Absence/multiplicité
+inexpliquée = NO GO. SHA256 SQL est une identité d'artefact, pas checksum Flyway.
+Utiliser validateWithResult et info du Flyway EMBARQUÉ de chaque image ; zéro failed,
+pending, missing, future, ignored ou mismatch non approuvé, baseline attendue vérifiée.
+No repair/clean/baseline/migrate. JPA ddl-auto=validate et init SQL jamais create/update.
+Comparer pg_dump de même majeure, normalisation owners/ACL maîtrisée, conserver brut
+privé et diff ; ne pas masquer les changements de colonne/type/contrainte/index.
+Front/PWA/Shell : contrôler versions, contrat HTTP, base /pwa/, manifeste/SW/assets,
+absence de cache sensible ; ils ne constituent pas des preuves JPA.
+
+M3 — Matrice sessions
+Voir MATRICE-CORRECTIONS-PREPROD.json : dimensions/familles et statuts explicites.
+Comptes A-owner A1/A2, A-peer A1, B-owner B1/B2, B-peer B1 ; deux tenants synthétiques.
+NOTE_DE_FRAIS + GESTIONNAIRE sans supervision ; profils navigateur séparés, secrets
+hors Git. Deux comptes négatifs supplémentaires synthétiques distincts : un sans
+NOTE_DE_FRAIS avec accès Gateway, un avec NOTE_DE_FRAIS sans accès Gateway.
+Un alias réservé n'est pas un compte provisionné. Mapping IDs et droits réels privés.
+Pour chaque couple famille/dimension applicable : positif même méthode/statut,
+puis cible existante interdite ; sessions mutantes autorisées par le gate ; vérifier
+état/hash après refus. Inclure B-peer vers B-owner et inverse, synthèses/filtres,
+JSON/multipart, contenu/apercu et transformations. N/A justifié par contrat métier,
+jamais pour cacher un 500 ou l'absence de fixture valide ; 100 % cases applicables.
+Rôles, logout/expiration/révocation testés avec requêtes capturées et état serveur,
+401/403/404 contractuel, 0 contenu hors périmètre et 0 mutation interdite.
+
+M4 — Seuils proposés, à approuver/mesurer avant mutation
+Champs obligatoires par filesystem physique : availableBytes, budgetBytes,
+marginBytes, growthBytes ; disponible >= budget + marge + croissance ; aucun double
+comptage repo/Docker/backups. Budget compose les postes de CONTROLES §3.
+RAM : memAvailable >= peakRestoreBytes + erpReserveBytes + ramMarginBytes,
+pics observés sous charge comparable ; CPU et latence ERP <= plafonds approuvés.
+Helper entier : durée projetée puis observée <= maxHelperSeconds, valeur approuvée
+strictement <900 ; sinon NO GO. Ne pas inventer les octets, durées ou plafonds VM.
+ERP : code/content-type/marqueur applicatif par route identiques au baseline attendu,
+session authentifiée positive ; seuils p95 et charge/temps d'observation consignés.
+IA : valeurs attendues annotées par fixture, montants corrigés/stockés égaux au jeu
+attendu à la précision devise ; extraction imprécise signalée sans automatisation.
+Expiration : deadline=min(t0+900, limites fraîches de preuves) ; probes horodatés
+autour de l'échéance ; 0 autorisation pour requêtes admises après deadline. Enregistrer
+intervalle probes et erreur horloge ; ne pas conclure une précision supérieure aux
+mesures. Requêtes déjà en vol suivies jusqu'à terminaison/état final.
+
+M5 — IA/fermeture
+Lecture locale du manifeste : défaut env auto-création false ; propriété API défaut
+true. Avant IA réelle, relever uniquement la valeur effective approuvée, sans exposer
+toutes les variables du conteneur ; false obligatoire, aucune facture créée inattendue.
+Distinguer configuration effective d'une simple valeur par défaut dans un fichier.
+Requêtes synthétiques valides, cookie valide, corps identique avant/après fermeture ;
+POST/PUT/PATCH/DELETE/OPTIONS et alias routés vérifiés, code403 ET marqueur closed,
+écriture/hash inchangés ; cas workflow valider/refuser séparés des refus d'accès.
+Fermeture PWA404, Notes403, GET/HEAD selon backend ; autres modules ERP baseline.
+Fixtures : socket absent/inaccessible, PWA indisponible, interruption/SIGKILL,
+rollback incomplet, TTL raccourci et 900s maximum ; aucune panne VM autorisée ici.
+Purge profil client/SW/IndexedDB/cache, logout serveur, tentative hors ligne ;
+0 document ou donnée sensible récupérable par les interfaces du profil purgé.
+Aucune affirmation d'effacement physique de fichiers précédemment téléchargés.
+
+R1 — Structure Compose
+Nouveau test local rend le YAML actuel (config seulement) et exige bijection six
+services->six volumes/destinations, secrets RO/create_host_path:false, absence
+external/ports/réseau privilégié, rootfs RO/security/tmpfs et digest fixe. Mutations
+alias, mount ou secret inattendus doivent être rejetées par ce test de contrat.
+Il ne renforce PAS validate_rendered en production : ce durcissement candidat reste
+à autoriser. YAML actuel conforme ne signifie pas fail-closed de tout futur YAML.
+
+R2 — Registre exploitable
+JSON associé : neuf anomalies + grille sessions avec statut NON_EXECUTE et champs
+preuve/run/planHash/reviewer/dates/code-retour/hash vides ; aucun succès présumé.
+Copier hors Git en 0700/0600 avant usage ; une ligne par commande et sous-cas,
+N/A motivé et accepté. Inclure sortie assainie, code retour, début/fin UTC, hash
+artefacts, décision corrective/retest. Ne jamais y mettre cookie, mot de passe ou PII.
+Accès exploitation/reviewer seulement, durée de conservation approuvée, purge des
+secrets éphémères après nettoyage prouvé ; conserver diagnostics d'échec nécessaires.
+
+Étapes suivantes
+1. Revue/acceptation contrat B1 et politique de prérequis B2.
+2. Autorisation de développement candidate B2 et durcissement R1/M1 si retenus.
+3. Implémentation/tests fixtures, puis revue indépendante ; aucun contournement.
+4. GO séparé accès VM pour relever capacités, comptes, baselines et configurations.
+5. GO distinct pour répétition/restauration/déploiement/ouverture, preuves réelles.
+Aucune des étapes 2–5 n'est autorisée par ce dossier documentaire.

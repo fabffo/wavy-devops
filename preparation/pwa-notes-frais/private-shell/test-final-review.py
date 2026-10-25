@@ -136,6 +136,7 @@ def restore_fixture(invalid_fd=False,down_fails=False,down_error=None):
             if invalid_fd:env['DOCKER_HOST']='tcp://forbidden.invalid:2375'
             with patch.object(restore,'ROOT',root),patch.object(restore.base,'dotenv',return_value={
                  'WAVY_BACKUP_ENCRYPTION_PASSPHRASE':'fixture-only-crypto-material'}),\
+                 patch.object(restore.base,'render',return_value={'services':{'wavy-factures-api-preprod':{'environment':{}}}}),\
                  patch.object(restore.manifest,'run'),patch.object(restore,'command',command),\
                  patch.object(restore.socket,'gethostname',return_value='wavy-preprod'),\
                  patch.object(restore,'load',return_value=SimpleNamespace(validate=lambda *args:None)),\

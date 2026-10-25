@@ -1,0 +1,171 @@
+{
+  "kind": "RECETTE_MUTATION_PLAN_REQUIRES_EXPLICIT_APPROVAL",
+  "approved": false,
+  "project": "wavy-recette",
+  "existingDatabasesReused": 5,
+  "newDatabases": 0,
+  "newVolumes": 0,
+  "activeManifestChanges": 0,
+  "readOnlyCompatibility": {
+    "old": {
+      "passed": true,
+      "migrations": 20,
+      "entities": 23,
+      "databaseConnectionsReadOnly": true
+    },
+    "new": {
+      "passed": true,
+      "migrations": 20,
+      "entities": 23,
+      "databaseConnectionsReadOnly": true
+    }
+  },
+  "services": {
+    "gateway": "start existing immutable container, later stop",
+    "socle": "same pinned image, temporary session timeout 60s and bootstrap false; recreate only API",
+    "factures": "new API pinned digest; recreate only API",
+    "otherApplications": "remain stopped",
+    "postgres": "remain existing/running"
+  },
+  "overlayFile": "/tmp/wavy-recette-activation-ttnyorry/factures-override.proposed.json",
+  "actors": [
+    {
+      "alias": "A-owner",
+      "tenant": "A",
+      "companies": [
+        "A1",
+        "A2"
+      ],
+      "roles": [
+        "NOTE_DE_FRAIS",
+        "GESTIONNAIRE"
+      ]
+    },
+    {
+      "alias": "A-peer",
+      "tenant": "A",
+      "companies": [
+        "A1"
+      ],
+      "roles": [
+        "NOTE_DE_FRAIS",
+        "GESTIONNAIRE"
+      ]
+    },
+    {
+      "alias": "B-owner",
+      "tenant": "B",
+      "companies": [
+        "B1",
+        "B2"
+      ],
+      "roles": [
+        "NOTE_DE_FRAIS",
+        "GESTIONNAIRE"
+      ]
+    },
+    {
+      "alias": "B-peer",
+      "tenant": "B",
+      "companies": [
+        "B1"
+      ],
+      "roles": [
+        "NOTE_DE_FRAIS",
+        "GESTIONNAIRE"
+      ]
+    },
+    {
+      "alias": "no-note-role",
+      "tenant": "A",
+      "companies": [
+        "A1"
+      ],
+      "roles": [
+        "GESTIONNAIRE"
+      ]
+    },
+    {
+      "alias": "no-gateway-role",
+      "tenant": "B",
+      "companies": [
+        "B1"
+      ],
+      "roles": [
+        "NOTE_DE_FRAIS"
+      ]
+    },
+    {
+      "alias": "A-reviewer",
+      "tenant": "A",
+      "companies": [
+        "A1",
+        "A2"
+      ],
+      "roles": [
+        "NOTE_DE_FRAIS",
+        "GESTIONNAIRE",
+        "SUPER_NOTE_DE_FRAIS"
+      ]
+    },
+    {
+      "alias": "B-reviewer",
+      "tenant": "B",
+      "companies": [
+        "B1",
+        "B2"
+      ],
+      "roles": [
+        "NOTE_DE_FRAIS",
+        "GESTIONNAIRE",
+        "SUPER_NOTE_DE_FRAIS"
+      ]
+    }
+  ],
+  "newSocleRows": {
+    "tenant": 2,
+    "societe_interne": 4,
+    "utilisateur": 8,
+    "utilisateur_role": 16,
+    "utilisateur_societe": 12,
+    "compteur": 12,
+    "total": 54
+  },
+  "newTenantDataPolicy": "additive only, no reuse of unqualified existing accounts, no upsert-update, no sequence reset; returning IDs private",
+  "storage": {
+    "existingVolumeKey": "contrats-pieces-jointes-recette",
+    "dedicatedSubpath": "notes-frais-isolation-104f58d0009cfb12",
+    "owner": "100:101",
+    "mode": "0700",
+    "rootDirectoryMayRemainEmptyAfterControlledDataCleanup": true
+  },
+  "limits": {
+    "notes": 741,
+    "expenseLines": 741,
+    "storedFileVersions": 988,
+    "explicitSyntheticPurchaseInvoices": 52,
+    "httpRequests": 5000,
+    "logins": 2048,
+    "syntheticRoleRevokeRestoreChanges": 64
+  },
+  "backups": "encrypted private backups of Socle and Factures before mutation; other three DBs not written; no automatic global restore",
+  "cleanup": "only IDs returned by this run and run storage files, checked tenant/company ownership and FK graph; never global DELETE/TRUNCATE/CASCADE; do not reset sequences",
+  "rollback": "after cleanup restore original pinned images/configs as stopped containers with compose up --no-start --no-deps --no-build --pull never; Gateway stopped, 5 DBs remain running",
+  "scenarios": {
+    "total": 247,
+    "applicable": 247,
+    "qualifiedPermissionChecks": 8,
+    "contract": "/tmp/wavy-recette-activation-ttnyorry/scenario-contract.proposed.json",
+    "executed": 0,
+    "qualification": "8 peer-versus-owner cases for supervisor-only actions prove missing-supervisor denial, not owner filtering; ordinary endpoint cases retain owner-isolation assertions"
+  },
+  "externalAI": "disabled; no paid provider requests",
+  "secrets": "generate only for new fixture accounts; private 0700/0600; no console, Git or raw HAR",
+  "approvalCovers": "only described RECETTE mutations under limits; abort on drift, collision, dependency not covered, or unexpected existing data change",
+  "readOnlyPreconditions": {
+    "identitySequencesBeyondExistingRows": true,
+    "existingCompaniesMissingStartupCounters": 0,
+    "oldNewMigrationsIdentical": true,
+    "JPAandFlywayBothImagesValidatedReadOnly": true
+  }
+}

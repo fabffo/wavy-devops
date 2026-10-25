@@ -1,0 +1,189 @@
+MISE À JOUR — 25 octobre 2026 : le rapport ci-dessous est historique.
+La revue finale courante est FINALISATION-COMMIT.txt ; les247 cas RECETTE sont
+désormais validés dans RESULTATS-RECETTE-247.json. Les anciens NO-GO de sessions
+ne sont plus l’état courant. Les limites et attestations PREPROD restent inchangées.
+
+Wavy — Validateur JPA/Flyway isolé : implémentation candidate locale
+24 octobre 2026 — code non commité ; aucun accès VM/PREPROD ni push.
+Aucun code métier, manifeste actif ou script de production modifié.
+Ce rapport complète les documents de conception et distingue les preuves locales
+synthétiques des attestations PREPROD, toutes conservées à false.
+
+Architecture effectivement implémentée
+- IsolatedSchemaValidator.java : outil autonome, pas un démarrage Spring Boot.
+  Charge les classes et bibliothèques du JAR de CHAQUE image Factures API revue.
+  Flyway 11.14.1, Hibernate 7.2.7.Final, driver PostgreSQL 42.7.10 ; 20 migrations,
+  23 entités. Ancienne et nouvelle version en processus/classpaths séparés.
+- isolated-validator.py : bibliothèque sans entrée CLI d'exécution ; elle est appelée
+  par restore-private.py APRÈS restauration cinq DB/documents et AVANT leur down.
+- Le runtime JVM réutilise l'image API exacte PAR DIGEST ; aucun nouvel outillage
+  Docker flottant, pull ou build. Compilation host javac --release17, heap256m,
+  source et classe SHA256 dans la preuve. JDK compatible requis sur future VM.
+- Deux JAR SHA256 vérifiés contre la paire locale revue ; référence de l'ancienne
+  API du snapshot exigée avant mutation. Autre ancienne API = refus, comparaison
+  complémentaire obligatoire ; aucune substitution du digest attendu.
+- JPA standalone applique les conventions Boot revues (SpringImplicitNamingStrategy,
+  snake_case, schéma public, timezone UTC), hbm2ddl=validate. Overrides/profils/sources
+  de configuration non revus provoquent un refus. Ce n'est PAS une preuve de santé
+  Spring, Gateway, dépendances HTTP ou démarrage de toute l'application.
+
+Isolation et autorisations
+Les PG du Compose restent network_mode:none. Le validateur partage le namespace
+réseau DU PG Factures isolé après contrôle image/labels/service/projet/mounts/état.
+Il n'a aucun réseau PREPROD, socket Docker, port publié ou document actif monté.
+User1000:1000, rootfs/artifacts RO, cap-drop ALL, no-new-privileges, RAM512m,
+CPU1, pids128, tmpfs64m ; secret transmis seulement par stdin, jamais argv/log.
+Le namespace none n'a pas de route externe ; pas de tentative vers une adresse VM.
+Sur COPIE seulement : rôle aléatoire sans superuser/CREATEDB/CREATEROLE/BYPASSRLS,
+CONNECT cible + USAGE public + SELECT du seul historique Flyway. TEMP/CREATE et privilèges PUBLIC
+révoqués ; aucun DML/DDL. HBA TCP n'accepte que ce rôle/cette DB via SCRAM ; tous
+les autres accès TCP sont rejetés. Unix local reste réservé au helper propriétaire ;
+son socket n'est pas monté dans le validateur. Auth erronée et droits interdits testés.
+Le runner désactive volontairement son défaut read_only pour éprouver les véritables
+permissions CREATE/TEMP/DELETE et lecture des lignes Notes (interdite au rôle
+de contrôle), puis rétablit read_only. Tout succès inattendu refuse
+la validation ; jamais un mode readonly seul présenté comme barrière d'autorisation.
+
+Intégration, preuves et fermeture
+Le verrou, FD hérité, hôte, run/planHash/réservation et gardes V3 existants restent
+obligatoires. Aucun nouveau chemin de restauration directe ni commande hors owner.
+RESTORE_CHECKS exige JPA/Flyway/invariance Factures/nettoyage validateur dans
+restore/deploy/open-test/resume. Backend relit le rapport, vérifie SHA256, source,
+run/plan/lot/images et état avant consommation ; anciennes preuves insuffisantes.
+Le source Java entre dans configurationHash : changer le validateur invalide la
+reprise mutée non revue, comme les autres composants du candidat.
+Rapport schema-validation.json privé, lié au run/plan/manifest backup, images/JAR,
+source/classes et empreinte du dump Factures avant/après CHAQUE version. Dump SQL
+hashé par flux dans un fichier temporaire privé non conservé (staging du run),
+sans contenu métier en rapport ; checksums Flyway natifs, SHA SQL non substitués.
+Rapport préservé AVANT destruction des copies, y compris échec ; seul stage/kind
+assaini est publié, pas les messages d'erreur DB/JVM, secrets ou données brutes.
+restore-proof.json n'est publié qu'après succès et nettoyage complet des copies.
+
+Nettoyage et limites physiques
+Les noms de conteneurs intentionnels sont inscrits avant create, y compris
+l'extraction de JAR (conteneur jamais démarré). finally supprime les validateurs
+puis le seul projet de restauration contrôlé ; aucun prune ou volume actif.
+SIGTERM/interruption normale passe par finally. Parent death provoque SIGTERM du
+helper Linux. Validation bornée à240s et au budget restant ; restore réserve une
+fin de nettoyage avant timeout externe900s. Timeout ne doit pas produire de preuve.
+Si suppression d'un validateur échoue, down PG est différé, reprise/staging/IDs
+durables conservés. Si down échoue, aucune preuve globale ; réservation conservée.
+Après resume inspecté vers awaiting-restore, restore reprend le nettoyage du
+précédent attempt sous le même owner/FD, vérifie projet/lot/images/labels et chemins
+privés, puis seulement peut créer de nouvelles copies. Ressource étrangère : refus.
+Un journal docker-cleaned permet de reprendre aussi la suppression du staging sans
+relancer Docker ; aucune édition manuelle des pointeurs n’est nécessaire. Abandon
+après mutation refuse de libérer la réservation tant que le nettoyage reste incomplet.
+SIGKILL direct du helper, panne daemon ou machine empêchent toute garantie physique
+de nettoyage immédiat : état durable et refus de progression sont la garantie
+possible. Une inspection/nettoyage propriétaire approuvés restent alors nécessaires ;
+ne pas effacer les pointeurs pour forcer une reprise ou attester une fermeture.
+
+Automatisation sessions
+prepare-isolation-cases.py génère exclusivement une worklist hors ligne JSONL, 247
+cases uniques, méthode/URL modèle/fixtures/étapes/case résultat vide. Aucun client HTTP,
+mode exécution, cookie, compte réel ou résultat interprété comme succès. Création
+exclusive d'un nouveau fichier0600 ; ne remplace/écrase aucune preuve existante.
+MATRICE-CORRECTIONS-PREPROD.json garde les247 cases NON_EXECUTE et les trois
+attestations false ; état d'implémentation locale séparé du statut PREPROD.
+
+Risques/prérequis restant avant toute nouvelle autorisation
+- Acceptation du rollback dégradé B1 (pièces indisponibles avec ancienne API), tests
+  réel ancien Front/API et droits ; aucune compatibilité documentaire inventée.
+- Décision sur la politique des attestations avant prepare et preuve du lot ensuite,
+  pour éviter le cycle logique identifié dans B2 ; les faits MSI ne deviennent pas true.
+- JPA prouve les mappings, pas tout Spring/JPA applicatif ni les dépendances sécurisées.
+  En cas de configuration effective non reconnue : refus et revue, pas assouplissement.
+- M1 reste partiel : dump Factures invariant, cinq restaurations et hashes documents
+  existants ; inventaires métier et correspondances DB/documents sur lot réel manquent.
+- Les tests locaux cinq DB utilisent une instance PG sans réseau, cinq paires de DB
+  synthétiques ; ils ne prouvent ni restauration opérationnelle du lot réel, ni capacité
+  PREPROD avec cinq PG parallèles, ni cohérence interbases du métier.
+- Capacité disque/RAM/CPU, délai total, espace temporaire dump, JDK et utilitaires
+  réellement présents sur VM inconnus ; respecter limite existante900s et marges.
+- Les 247 cas restent à qualifier (droits/statuts/fixtures) puis exécuter après GO.
+- R1 : contrat Compose testé ; le validateur rendu historique reste moins strict pour
+  les autres services. Ne pas assimiler la garde du PG Factures à un durcissement global.
+Aucun de ces manques n'est une attestation validée par les tests synthétiques.
+
+Résultats définitifs de la campagne : tableau ajouté après exécution ci-dessous.
+
+Campagne locale terminée : 19 suites, 164 réussis, 1 ignoré, 0 échec.
+Suites privées : 105 réussis ; orchestrateur public/stockage : 59 réussis, 1 ignoré.
+Le test ignoré est le test stockage Docker à volume jetable non activé par son
+opt-in propre ; il ne concerne pas les vrais tests PostgreSQL/JVM, tous exécutés.
+Suite | Réussis | Ignorés | Échoués
+test-assets.py | 1 | 0 | 0
+test-backup-private.py | 2 | 0 | 0
+test-compose.py | 3 | 0 | 0
+test-correction-plan.py | 6 | 0 | 0
+test-final-review.py | 9 | 0 | 0
+test-isolated-restore.py | 1 | 0 | 0
+test-isolated-validator.py | 20 | 0 | 0
+test-private-backend.py | 13 | 0 | 0
+test-private-orchestrator.py | 16 | 0 | 0
+test-private-runtime.py | 3 | 0 | 0
+test-private.py | 4 | 0 | 0
+test-restore-private.py | 4 | 0 | 0
+test-review-regressions.py | 6 | 0 | 0
+test-session-gate.py | 7 | 0 | 0
+test-validator-integration.py | 10 | 0 | 0
+test-orchestrator.py | 25 | 0 | 0
+test-storage-authorization-concurrency.py | 12 | 0 | 0
+test-storage-security.py | 17 | 1 | 0
+test-storage-runtime.py | 5 | 0 | 0
+
+Après ajustement du hash SQL en flux et de la persistance fsync : confirmation
+ciblée 11 réussis, puis 7 gardes réussies dont un nouveau cas de budget insuffisant.
+Ces confirmations recouvrent des cas de la campagne ; ne pas les additionner comme
+autant de cas uniques. Java compilé et exécuté pour les deux versions sur PG16.
+La suite principale du validateur comporte 20 tests (6 gardes et 14 fixtures réelles) ;
+la dernière garde ajoutée de budget porte désormais cette suite à21 tests.
+Les fixtures réelles couvrent : validation deux images, invariance du dump,
+colonne/type incompatibles, checksum/pending/future/historique absent, rôle élevé,
+grant écriture, mauvais mot de passe/autre DB, absence route externe, preuve/cleanup
+du cycle réel, terminaison réelle du processus validateur et cinq dumps/restores
+synthétiques avec comparaison de contenu et détection de mutation.
+Test intégration propriétaire simulé : hook avant down, échec/interruption/cleanup,
+aucune publication preuve globale sur échec ; deploy/resume/open-test refusent
+preuves anciennes/incomplètes ; ancienne API inattendue refusée avant barrière.
+Compose/Nginx/assets/gate et autorisations V3/concurrence réexécutés sans échec.
+Faits structurés et hashes des logs/sources : PREUVES-VALIDATEUR-JPA-LOCAL.json.
+Aucun succès de ces tests ne vaut attestation PREPROD.
+
+Confirmation du moindre privilège : 4 tests PostgreSQL/JVM réussis avec SELECT sur
+le seul historique Flyway, accès aux lignes Notes explicitement refusé.
+Après ajout de la reprise propriétaire : 15 tests intégration/reprise et 9 anciennes
+régressions réussis. Vérification finale : 8 gardes/cycle réel, 13 backend et 16
+orchestrateur privé réussis. Ces séries sont des confirmations ciblées qui recouvrent
+les tests précédents, pas des scénarios PREPROD ni un nouveau total de cas uniques.
+La reprise couvre refus owner/lot/conteneur étranger, ordre suppression validateur
+avant copies, nouvel échec down, échec staging après Docker et réessai sans Docker.
+Preuve globale publiée après nettoyage Docker ET staging. Aucun conteneur de test
+wavy-validator ou wavy-pwa-restore-local ne subsiste aux contrôles finaux.
+Contrôles finaux : inventaire explicite conforme, syntaxe Python et compilation Java
+réelle conformes, diff check conforme, scan heuristique54 fichiers sans détection.
+Index vide ; commit3da04f4 inchangé ; caches préexistants conservés.
+
+Fichiers de cette étape (tous sous preparation/pwa-notes-frais)
+Candidat runtime : private-shell/IsolatedSchemaValidator.java (nouveau),
+private-shell/isolated-validator.py (nouveau), private-shell/restore-private.py,
+private-shell/release-private.py, private-shell/private-backend.py.
+Préparation hors ligne : private-shell/prepare-isolation-cases.py (nouveau).
+Tests : private-shell/test-isolated-validator.py et test-validator-integration.py
+(nouveaux) ; private-shell/test-private-backend.py, test-private-orchestrator.py,
+test-final-review.py (fixtures et assertions adaptées).
+Documents : FILES.txt, README.md, private-shell/MATRICE-CORRECTIONS-PREPROD.json,
+PLAN-CORRECTIONS-PREPROD.txt, PROTOCOLE-JPA-FLYWAY-ISOLE.txt,
+RESULTATS-VALIDATEUR-JPA.txt et PREUVES-VALIDATEUR-JPA-LOCAL.json (deux nouveaux).
+Les autres documents/caches non suivis préexistants sont conservés sans être indexés.
+
+GO POUR REVUE DU VALIDATEUR LOCAL UNIQUEMENT.
+Aucune autorisation VM, commit, push ou déploiement. Trois attestations false.
+
+Revue finale complémentaire : lire FINALISATION-COMMIT.txt.
+Liaison preuve/tentative nettoyée renforcée ; archives JPA par SHA256 avant remplacement ;
+ancien rapport nettoyé ne bloque plus le nettoyage de la tentative suivante.
+Campagne finale : 173 réussis, 1 ignoré, aucun échec ;
+247 cas sessions non exécutés faute de backend/fixtures effectifs. NO-GO commit.
