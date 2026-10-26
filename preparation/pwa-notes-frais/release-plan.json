@@ -20,35 +20,35 @@
       "platform": "linux/amd64"
     },
     "pwa": {
-      "version": "0.1.0-6944c31",
-      "digest": "sha256:95c0cbb999708b40cd20ddc66a719e796d38d8d90c97835410a74f3d432f751b",
-      "reference": "ghcr.io/fabffo/wavy-pwa@sha256:95c0cbb999708b40cd20ddc66a719e796d38d8d90c97835410a74f3d432f751b",
+      "version": "0.2.0-9bfd217",
+      "digest": "sha256:9f10a7e8716b1fe4a09a91653e7591a00f8f5c64b1b1dc667cae685f5a375938",
+      "reference": "ghcr.io/fabffo/wavy-pwa@sha256:9f10a7e8716b1fe4a09a91653e7591a00f8f5c64b1b1dc667cae685f5a375938",
       "ociLabels": {
-        "org.opencontainers.image.revision": "6944c31",
+        "org.opencontainers.image.revision": "9bfd217",
         "org.opencontainers.image.source": "https://github.com/fabffo/wavy-pwa",
-        "org.opencontainers.image.version": "0.1.0"
+        "org.opencontainers.image.version": "0.2.0"
       },
       "platform": "linux/amd64"
     },
     "factures-front": {
-      "version": "0.1.0-a201858",
-      "digest": "sha256:92afeb07b95e08fcd3379d70c4b02bb984fb0dd2afba9f0aa1bd74c262448470",
-      "reference": "ghcr.io/fabffo/wavy-factures-front@sha256:92afeb07b95e08fcd3379d70c4b02bb984fb0dd2afba9f0aa1bd74c262448470",
+      "version": "0.2.0-0663a99",
+      "digest": "sha256:e116a8eaf8141684b9ce27e056c8e21eadd30e42c2215c67a0c678ee4dca3726",
+      "reference": "ghcr.io/fabffo/wavy-factures-front@sha256:e116a8eaf8141684b9ce27e056c8e21eadd30e42c2215c67a0c678ee4dca3726",
       "ociLabels": {
-        "org.opencontainers.image.revision": "a201858",
+        "org.opencontainers.image.revision": "0663a99",
         "org.opencontainers.image.source": "https://github.com/fabffo/wavy-factures-front",
-        "org.opencontainers.image.version": "0.1.0"
+        "org.opencontainers.image.version": "0.2.0"
       },
       "platform": "linux/amd64"
     },
     "erp-shell": {
-      "version": "0.1.0-0cfb699",
-      "digest": "sha256:0182ea7a16a1c0d665e98df0b2bc4e318d96534ea11b4c9de0aee825f9ad8022",
-      "reference": "ghcr.io/fabffo/wavy-erp-shell@sha256:0182ea7a16a1c0d665e98df0b2bc4e318d96534ea11b4c9de0aee825f9ad8022",
+      "version": "0.2.0-f6ee944",
+      "digest": "sha256:450328d7bea84b1c9e11616daa03067f6fe6da8dcc2d5bf929a46c909940ae96",
+      "reference": "ghcr.io/fabffo/wavy-erp-shell@sha256:450328d7bea84b1c9e11616daa03067f6fe6da8dcc2d5bf929a46c909940ae96",
       "ociLabels": {
-        "org.opencontainers.image.revision": "0cfb699",
+        "org.opencontainers.image.revision": "f6ee944",
         "org.opencontainers.image.source": "https://github.com/fabffo/wavy-erp-shell",
-        "org.opencontainers.image.version": "0.1.0"
+        "org.opencontainers.image.version": "0.2.0"
       },
       "platform": "linux/amd64"
     }
