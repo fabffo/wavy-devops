@@ -202,7 +202,7 @@
     "socle-front"
   ],
   "privateEvidenceExcluded": true,
-  "userGitIndexesUnchanged": true,
+  "userGitIndexesUnchanged": false,
   "outsideRelease": [
     {
       "repository": "wavy-contrats-front-build",
@@ -268,5 +268,116 @@
       ],
       "includedInErpRelease": false
     }
-  ]
+  ],
+  "publicationCompleted": true,
+  "sourceCommits": [
+    {
+      "repository": "wavy-devops",
+      "branch": "master",
+      "commit": "c73a0afb260d6ea87c0d005a65d45676bf3fde7d",
+      "remoteCommit": "c73a0afb260d6ea87c0d005a65d45676bf3fde7d",
+      "files": 37
+    },
+    {
+      "repository": "wavy-erp-shell",
+      "branch": "master",
+      "commit": "f6ee944b538be66fb60346e3f51fbbe5454cef53",
+      "remoteCommit": "f6ee944b538be66fb60346e3f51fbbe5454cef53",
+      "files": 8
+    },
+    {
+      "repository": "wavy-pwa",
+      "branch": "main",
+      "commit": "9bfd21779135aa04030bb0ab83bf922fd015f506",
+      "remoteCommit": "9bfd21779135aa04030bb0ab83bf922fd015f506",
+      "files": 6
+    },
+    {
+      "repository": "wavy-tiers-front",
+      "branch": "master",
+      "commit": "05594f9f6df9842aba8c73f63fa2b7c93bb2601c",
+      "remoteCommit": "05594f9f6df9842aba8c73f63fa2b7c93bb2601c",
+      "files": 2
+    },
+    {
+      "repository": "wavy-contrats-front",
+      "branch": "master",
+      "commit": "e05aabcf81fa408cb4cf9f067b7add1474582b07",
+      "remoteCommit": "e05aabcf81fa408cb4cf9f067b7add1474582b07",
+      "files": 3
+    },
+    {
+      "repository": "wavy-factures-front",
+      "branch": "master",
+      "commit": "0663a9986675a5f83418973e895e2c20dd65406b",
+      "remoteCommit": "0663a9986675a5f83418973e895e2c20dd65406b",
+      "files": 3
+    },
+    {
+      "repository": "wavy-tresorerie-front",
+      "branch": "master",
+      "commit": "9c2bea6b2db19c6ab0c05e0479dc61aeccb1e6a4",
+      "remoteCommit": "9c2bea6b2db19c6ab0c05e0479dc61aeccb1e6a4",
+      "files": 3
+    },
+    {
+      "repository": "wavy-gateway",
+      "branch": "master",
+      "commit": "2ac68294620facf7703a880cf6c3d37a28586c51",
+      "remoteCommit": "2ac68294620facf7703a880cf6c3d37a28586c51",
+      "files": 2
+    }
+  ],
+  "publishedImages": [
+    {
+      "component": "erp-shell",
+      "tag": "ghcr.io/fabffo/wavy-erp-shell:0.2.0-f6ee944",
+      "digest": "sha256:450328d7bea84b1c9e11616daa03067f6fe6da8dcc2d5bf929a46c909940ae96",
+      "reference": "ghcr.io/fabffo/wavy-erp-shell@sha256:450328d7bea84b1c9e11616daa03067f6fe6da8dcc2d5bf929a46c909940ae96",
+      "commit": "f6ee944b538be66fb60346e3f51fbbe5454cef53",
+      "verified": true
+    },
+    {
+      "component": "pwa",
+      "tag": "ghcr.io/fabffo/wavy-pwa:0.2.0-9bfd217",
+      "digest": "sha256:9f10a7e8716b1fe4a09a91653e7591a00f8f5c64b1b1dc667cae685f5a375938",
+      "reference": "ghcr.io/fabffo/wavy-pwa@sha256:9f10a7e8716b1fe4a09a91653e7591a00f8f5c64b1b1dc667cae685f5a375938",
+      "commit": "9bfd21779135aa04030bb0ab83bf922fd015f506",
+      "verified": true
+    },
+    {
+      "component": "tiers-front",
+      "tag": "ghcr.io/fabffo/wavy-tiers-front:0.2.0-05594f9",
+      "digest": "sha256:45cd1ad15e450946e360347ae76738b28f20e69517e82313c5061f15dbc457ef",
+      "reference": "ghcr.io/fabffo/wavy-tiers-front@sha256:45cd1ad15e450946e360347ae76738b28f20e69517e82313c5061f15dbc457ef",
+      "commit": "05594f9f6df9842aba8c73f63fa2b7c93bb2601c",
+      "verified": true
+    },
+    {
+      "component": "contrats-front",
+      "tag": "ghcr.io/fabffo/wavy-contrats-front:0.2.0-e05aabc",
+      "digest": "sha256:5562ba2cf480630aa66cc1ced8484f61b24c1dbf619966464f27a9df0d7484a6",
+      "reference": "ghcr.io/fabffo/wavy-contrats-front@sha256:5562ba2cf480630aa66cc1ced8484f61b24c1dbf619966464f27a9df0d7484a6",
+      "commit": "e05aabcf81fa408cb4cf9f067b7add1474582b07",
+      "verified": true
+    },
+    {
+      "component": "factures-front",
+      "tag": "ghcr.io/fabffo/wavy-factures-front:0.2.0-0663a99",
+      "digest": "sha256:e116a8eaf8141684b9ce27e056c8e21eadd30e42c2215c67a0c678ee4dca3726",
+      "reference": "ghcr.io/fabffo/wavy-factures-front@sha256:e116a8eaf8141684b9ce27e056c8e21eadd30e42c2215c67a0c678ee4dca3726",
+      "commit": "0663a9986675a5f83418973e895e2c20dd65406b",
+      "verified": true
+    },
+    {
+      "component": "tresorerie-front",
+      "tag": "ghcr.io/fabffo/wavy-tresorerie-front:0.2.0-9c2bea6",
+      "digest": "sha256:061a1b61488313f07c5f57b84b53f20b83f6ccdd4da03f484bacaf69fa76c7b6",
+      "reference": "ghcr.io/fabffo/wavy-tresorerie-front@sha256:061a1b61488313f07c5f57b84b53f20b83f6ccdd4da03f484bacaf69fa76c7b6",
+      "commit": "9c2bea6b2db19c6ab0c05e0479dc61aeccb1e6a4",
+      "verified": true
+    }
+  ],
+  "gitIndexPolicy": "Only explicitly approved files staged and committed after authorization",
+  "deploymentExecuted": false
 }

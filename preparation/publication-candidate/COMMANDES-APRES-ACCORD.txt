@@ -1,3 +1,6 @@
+PROCÉDURE SOURCE ET SIX PUBLICATIONS EXÉCUTÉES APRÈS ACCORD — ne pas relancer les builds immuables.
+Manifeste final : cohort-candidate.json ; les versions actives et les VMs restent inchangées.
+
 COMMANDES À EXÉCUTER UNIQUEMENT APRÈS ACCORD EXPLICITE
 Depuis le répertoire wavy-devops. Vérifier les fichiers exacts et les index avant chaque commit.
 

@@ -1,5 +1,5 @@
 {
-  "state": "PENDING_APPROVED_COMMITS_AND_GHCR_PUBLICATION",
+  "state": "PUBLISHED_VERIFIED_NO_DEPLOYMENT",
   "functionalVersionForRebuiltFronts": "0.2.0",
   "singleCohortFor": [
     "recette",
@@ -13,7 +13,8 @@
       "reference": "ghcr.io/fabffo/wavy-socle-api@sha256:640253c045feabd0be90a81e29b46af28b2c3c5e19d0fb81c0e89b7da45bdf31",
       "testedRevision": "8b7a3f0",
       "repositoryHead": "a9352ecd638338703725d100227c3622803742c0",
-      "headDiffersFromTestedImage": true
+      "headDiffersFromTestedImage": true,
+      "registryDigestVerified": true
     },
     "tiers-api": {
       "mode": "REUSE_TESTED_DIGEST",
@@ -22,7 +23,8 @@
       "reference": "ghcr.io/fabffo/wavy-tiers-api@sha256:6c91e16bd3f5211c892273031f5ab1f1d56d6007e4003e0dd382fef845f2400e",
       "testedRevision": "7642a09",
       "repositoryHead": "7642a09d47ecbcb2e5962ddde958c50180e97c61",
-      "headDiffersFromTestedImage": false
+      "headDiffersFromTestedImage": false,
+      "registryDigestVerified": true
     },
     "contrats-api": {
       "mode": "REUSE_TESTED_DIGEST",
@@ -31,7 +33,8 @@
       "reference": "ghcr.io/fabffo/wavy-contrats-api@sha256:f60edb42690fa005748cdf6bbf9f2b9fdeb956ce3001c1e3ae0655dc2ad72ff0",
       "testedRevision": "527874b",
       "repositoryHead": "1cc65d11d0686bccb78d4bb5b29da2cca4965bbe",
-      "headDiffersFromTestedImage": true
+      "headDiffersFromTestedImage": true,
+      "registryDigestVerified": true
     },
     "factures-api": {
       "mode": "REUSE_TESTED_DIGEST",
@@ -40,7 +43,8 @@
       "reference": "ghcr.io/fabffo/wavy-factures-api@sha256:a414a866c910bd20a4c8af4018fc0e31db513ffff1cca76b15c913807f75d0e5",
       "testedRevision": "09fcd98",
       "repositoryHead": "09fcd9895e2077da2481b040b088f2accd953e4a",
-      "headDiffersFromTestedImage": false
+      "headDiffersFromTestedImage": false,
+      "registryDigestVerified": true
     },
     "tresorerie-api": {
       "mode": "REUSE_TESTED_DIGEST",
@@ -49,7 +53,8 @@
       "reference": "ghcr.io/fabffo/wavy-tresorerie-api@sha256:e45d7063a3715d8dc370458960d6dcda7fa731582ceb902ea42e2f8b3dd33f56",
       "testedRevision": "45fd268",
       "repositoryHead": "45fd26820fb954c644ca151381b0c4b97361545f",
-      "headDiffersFromTestedImage": false
+      "headDiffersFromTestedImage": false,
+      "registryDigestVerified": true
     },
     "gateway": {
       "mode": "REUSE_TESTED_DIGEST",
@@ -58,7 +63,8 @@
       "reference": "ghcr.io/fabffo/wavy-gateway@sha256:25279339824458d3247f05764fe48a8af3f892da4627fccac8dff58380d6c547",
       "testedRevision": "98e2ced",
       "repositoryHead": "98e2ced416d33009c7d92f4c9fa3aa5838c62760",
-      "headDiffersFromTestedImage": false
+      "headDiffersFromTestedImage": false,
+      "registryDigestVerified": true
     },
     "socle-front": {
       "mode": "REUSE_TESTED_DIGEST",
@@ -67,13 +73,12 @@
       "reference": "ghcr.io/fabffo/wavy-socle-front@sha256:1d32cb2cc8cbb5c334800d6fa13df2dff9e1293988179f0df8138b77958fbdaa",
       "testedRevision": "d4c76c5",
       "repositoryHead": "d4c76c571fc574921211b782fc157d8035121e5f",
-      "headDiffersFromTestedImage": false
+      "headDiffersFromTestedImage": false,
+      "registryDigestVerified": true
     },
     "tiers-front": {
-      "mode": "REBUILD_AFTER_APPROVED_COMMIT",
-      "versionTemplate": "0.2.0-${TIERS_FRONT_COMMIT}",
-      "digest": null,
-      "digestTemplate": "PENDING_TIERS_FRONT_DIGEST",
+      "mode": "PUBLISHED_VERIFIED",
+      "digest": "sha256:45cd1ad15e450946e360347ae76738b28f20e69517e82313c5061f15dbc457ef",
       "sourceHeadBeforeCommit": "527527b96522153f0da74de4d8b1b5d0f0da9032",
       "sourceTree": "11e3e9953ec8163c253c9a538bdc8bab009cdbee",
       "validation": {
@@ -85,13 +90,18 @@
         "sizeBytes": 62864314,
         "platform": "linux/amd64",
         "smokePassed": true
-      }
+      },
+      "version": "0.2.0-05594f9",
+      "tag": "ghcr.io/fabffo/wavy-tiers-front:0.2.0-05594f9",
+      "reference": "ghcr.io/fabffo/wavy-tiers-front@sha256:45cd1ad15e450946e360347ae76738b28f20e69517e82313c5061f15dbc457ef",
+      "sourceCommit": "05594f9f6df9842aba8c73f63fa2b7c93bb2601c",
+      "platform": "linux/amd64",
+      "registryDigestVerified": true,
+      "releaseImageId": "sha256:19ec871a740054fb824f874f5e0ab1f7402267acc602bc91382871fa3f870700"
     },
     "contrats-front": {
-      "mode": "REBUILD_AFTER_APPROVED_COMMIT",
-      "versionTemplate": "0.2.0-${CONTRATS_FRONT_COMMIT}",
-      "digest": null,
-      "digestTemplate": "PENDING_CONTRATS_FRONT_DIGEST",
+      "mode": "PUBLISHED_VERIFIED",
+      "digest": "sha256:5562ba2cf480630aa66cc1ced8484f61b24c1dbf619966464f27a9df0d7484a6",
       "sourceHeadBeforeCommit": "9af670cd01a017a43dbd8a221638799feaaf537d",
       "sourceTree": "12298dc9c37706b19b542aa9a1cf5e9da16c304b",
       "validation": {
@@ -103,13 +113,18 @@
         "sizeBytes": 62805412,
         "platform": "linux/amd64",
         "smokePassed": true
-      }
+      },
+      "version": "0.2.0-e05aabc",
+      "tag": "ghcr.io/fabffo/wavy-contrats-front:0.2.0-e05aabc",
+      "reference": "ghcr.io/fabffo/wavy-contrats-front@sha256:5562ba2cf480630aa66cc1ced8484f61b24c1dbf619966464f27a9df0d7484a6",
+      "sourceCommit": "e05aabcf81fa408cb4cf9f067b7add1474582b07",
+      "platform": "linux/amd64",
+      "registryDigestVerified": true,
+      "releaseImageId": "sha256:5a1836067f3c2ebd6716a4486a02ce134e0609a71647ac329cc1ba5b0e4282f9"
     },
     "factures-front": {
-      "mode": "REBUILD_AFTER_APPROVED_COMMIT",
-      "versionTemplate": "0.2.0-${FACTURES_FRONT_COMMIT}",
-      "digest": null,
-      "digestTemplate": "PENDING_FACTURES_FRONT_DIGEST",
+      "mode": "PUBLISHED_VERIFIED",
+      "digest": "sha256:e116a8eaf8141684b9ce27e056c8e21eadd30e42c2215c67a0c678ee4dca3726",
       "sourceHeadBeforeCommit": "a201858b251f271c2294b83ee1e953cecdf1acfd",
       "sourceTree": "bbe061f2252c5413dbe7138579322bdb6a32ff30",
       "validation": {
@@ -121,13 +136,18 @@
         "sizeBytes": 64923848,
         "platform": "linux/amd64",
         "smokePassed": true
-      }
+      },
+      "version": "0.2.0-0663a99",
+      "tag": "ghcr.io/fabffo/wavy-factures-front:0.2.0-0663a99",
+      "reference": "ghcr.io/fabffo/wavy-factures-front@sha256:e116a8eaf8141684b9ce27e056c8e21eadd30e42c2215c67a0c678ee4dca3726",
+      "sourceCommit": "0663a9986675a5f83418973e895e2c20dd65406b",
+      "platform": "linux/amd64",
+      "registryDigestVerified": true,
+      "releaseImageId": "sha256:90068a3c88d938f098624bbc3f26ad508a21b436cad6093a708f05ecdf05d0c2"
     },
     "tresorerie-front": {
-      "mode": "REBUILD_AFTER_APPROVED_COMMIT",
-      "versionTemplate": "0.2.0-${TRESORERIE_FRONT_COMMIT}",
-      "digest": null,
-      "digestTemplate": "PENDING_TRESORERIE_FRONT_DIGEST",
+      "mode": "PUBLISHED_VERIFIED",
+      "digest": "sha256:061a1b61488313f07c5f57b84b53f20b83f6ccdd4da03f484bacaf69fa76c7b6",
       "sourceHeadBeforeCommit": "4bda80b8eaa464fd369cef14372abe288f2e6a0a",
       "sourceTree": "860e2efe22925c119d3ca18c2373be3716c83971",
       "validation": {
@@ -139,13 +159,18 @@
         "sizeBytes": 62816366,
         "platform": "linux/amd64",
         "smokePassed": true
-      }
+      },
+      "version": "0.2.0-9c2bea6",
+      "tag": "ghcr.io/fabffo/wavy-tresorerie-front:0.2.0-9c2bea6",
+      "reference": "ghcr.io/fabffo/wavy-tresorerie-front@sha256:061a1b61488313f07c5f57b84b53f20b83f6ccdd4da03f484bacaf69fa76c7b6",
+      "sourceCommit": "9c2bea6b2db19c6ab0c05e0479dc61aeccb1e6a4",
+      "platform": "linux/amd64",
+      "registryDigestVerified": true,
+      "releaseImageId": "sha256:a1d0e659a8f4daabc2f3969fa156b4336a0cc1c3d457cf3b6dbe297ddc43cc5b"
     },
     "pwa": {
-      "mode": "REBUILD_AFTER_APPROVED_COMMIT",
-      "versionTemplate": "0.2.0-${PWA_COMMIT}",
-      "digest": null,
-      "digestTemplate": "PENDING_PWA_DIGEST",
+      "mode": "PUBLISHED_VERIFIED",
+      "digest": "sha256:9f10a7e8716b1fe4a09a91653e7591a00f8f5c64b1b1dc667cae685f5a375938",
       "sourceHeadBeforeCommit": "6944c31eaa1b970a73092e885bd5280f88efead3",
       "sourceTree": "ee32c89027b4278e8431e311e9f4d66fb7731f60",
       "validation": {
@@ -157,13 +182,18 @@
         "sizeBytes": 62707484,
         "platform": "linux/amd64",
         "smokePassed": true
-      }
+      },
+      "version": "0.2.0-9bfd217",
+      "tag": "ghcr.io/fabffo/wavy-pwa:0.2.0-9bfd217",
+      "reference": "ghcr.io/fabffo/wavy-pwa@sha256:9f10a7e8716b1fe4a09a91653e7591a00f8f5c64b1b1dc667cae685f5a375938",
+      "sourceCommit": "9bfd21779135aa04030bb0ab83bf922fd015f506",
+      "platform": "linux/amd64",
+      "registryDigestVerified": true,
+      "releaseImageId": "sha256:8d026c30a4c121e09d8d09c5ebdce4e8ddd454a82661e0ed48c9054bd8935d02"
     },
     "erp-shell": {
-      "mode": "REBUILD_AFTER_APPROVED_COMMIT",
-      "versionTemplate": "0.2.0-${ERP_SHELL_COMMIT}",
-      "digest": null,
-      "digestTemplate": "PENDING_ERP_SHELL_DIGEST",
+      "mode": "PUBLISHED_VERIFIED",
+      "digest": "sha256:450328d7bea84b1c9e11616daa03067f6fe6da8dcc2d5bf929a46c909940ae96",
       "sourceHeadBeforeCommit": "0cfb699d6c6b2f81e70af938ecabb93bcc696068",
       "sourceTree": "79fb4c17fe887313cee60b574be68982d5a8b7ab",
       "validation": {
@@ -175,10 +205,79 @@
         "sizeBytes": 48574392,
         "platform": "linux/amd64",
         "smokePassed": true
-      }
+      },
+      "version": "0.2.0-f6ee944",
+      "tag": "ghcr.io/fabffo/wavy-erp-shell:0.2.0-f6ee944",
+      "reference": "ghcr.io/fabffo/wavy-erp-shell@sha256:450328d7bea84b1c9e11616daa03067f6fe6da8dcc2d5bf929a46c909940ae96",
+      "sourceCommit": "f6ee944b538be66fb60346e3f51fbbe5454cef53",
+      "platform": "linux/amd64",
+      "registryDigestVerified": true,
+      "releaseImageId": "sha256:9ff1a8ba48db06da212593e2ce1fc385f9e004e85ca84494aa95688cf4505f6b"
     }
   },
-  "templatesDeployable": false,
-  "finalGhcrDigestsKnown": false,
-  "vmAccess": false
+  "templatesDeployable": true,
+  "finalGhcrDigestsKnown": true,
+  "vmAccess": false,
+  "sourceCommits": [
+    {
+      "repository": "wavy-devops",
+      "branch": "master",
+      "commit": "c73a0afb260d6ea87c0d005a65d45676bf3fde7d",
+      "remoteCommit": "c73a0afb260d6ea87c0d005a65d45676bf3fde7d",
+      "files": 37
+    },
+    {
+      "repository": "wavy-erp-shell",
+      "branch": "master",
+      "commit": "f6ee944b538be66fb60346e3f51fbbe5454cef53",
+      "remoteCommit": "f6ee944b538be66fb60346e3f51fbbe5454cef53",
+      "files": 8
+    },
+    {
+      "repository": "wavy-pwa",
+      "branch": "main",
+      "commit": "9bfd21779135aa04030bb0ab83bf922fd015f506",
+      "remoteCommit": "9bfd21779135aa04030bb0ab83bf922fd015f506",
+      "files": 6
+    },
+    {
+      "repository": "wavy-tiers-front",
+      "branch": "master",
+      "commit": "05594f9f6df9842aba8c73f63fa2b7c93bb2601c",
+      "remoteCommit": "05594f9f6df9842aba8c73f63fa2b7c93bb2601c",
+      "files": 2
+    },
+    {
+      "repository": "wavy-contrats-front",
+      "branch": "master",
+      "commit": "e05aabcf81fa408cb4cf9f067b7add1474582b07",
+      "remoteCommit": "e05aabcf81fa408cb4cf9f067b7add1474582b07",
+      "files": 3
+    },
+    {
+      "repository": "wavy-factures-front",
+      "branch": "master",
+      "commit": "0663a9986675a5f83418973e895e2c20dd65406b",
+      "remoteCommit": "0663a9986675a5f83418973e895e2c20dd65406b",
+      "files": 3
+    },
+    {
+      "repository": "wavy-tresorerie-front",
+      "branch": "master",
+      "commit": "9c2bea6b2db19c6ab0c05e0479dc61aeccb1e6a4",
+      "remoteCommit": "9c2bea6b2db19c6ab0c05e0479dc61aeccb1e6a4",
+      "files": 3
+    },
+    {
+      "repository": "wavy-gateway",
+      "branch": "master",
+      "commit": "2ac68294620facf7703a880cf6c3d37a28586c51",
+      "remoteCommit": "2ac68294620facf7703a880cf6c3d37a28586c51",
+      "files": 2
+    }
+  ],
+  "deploymentExecuted": false,
+  "cohortSha256": "56d43b10fa99dfd17edc072fefadaca6d9221984d0aad82ec209df2f552cd646",
+  "activeEnvironmentManifestsUpdated": false,
+  "applicationPolicy": "Materialize on target only through an explicitly authorized installation; preserve target data/configuration; validate schema compatibility first."
 }
