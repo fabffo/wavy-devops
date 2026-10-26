@@ -1,0 +1,272 @@
+{
+  "reposExamined": [
+    {
+      "repository": "wavy-devops",
+      "head": "e965e1d0ff01fab4f3e797dac349e4e9f2ba0c9d",
+      "branch": "master",
+      "selected": [
+        ".gitignore",
+        "docs/wavy-local.md",
+        "docs/wavy-menu.md",
+        "preparation/https-msi/Caddyfile.candidate",
+        "preparation/https-msi/Caddyfile.local-only.candidate",
+        "preparation/https-msi/INSTALLATION.txt",
+        "preparation/https-msi/WAVY-LOCAL-CYCLE.txt",
+        "preparation/https-msi/check_caddy_adapter.py",
+        "preparation/https-msi/chrome-bundle-diagnostic.cjs",
+        "preparation/https-msi/chrome-diagnostics.cjs",
+        "preparation/https-msi/chrome-navigation.cjs",
+        "preparation/https-msi/chrome-notes.cjs",
+        "preparation/https-msi/chrome-probe.cjs",
+        "preparation/https-msi/functional_preflight.py",
+        "preparation/https-msi/local_auth.py",
+        "preparation/https-msi/local_functional.py",
+        "preparation/https-msi/prepare-functional-fixtures.cjs",
+        "preparation/https-msi/test-chrome-diagnostics.cjs",
+        "preparation/https-msi/test_https_msi.py",
+        "preparation/https-msi/test_local_auth.py",
+        "preparation/https-msi/test_manual_session.py",
+        "preparation/https-msi/test_nginx_runtime.py",
+        "preparation/https-msi/test_session_challenge_runtime.py",
+        "preparation/https-msi/wavy_deploy.py",
+        "preparation/publication-candidate/COMMANDES-APRES-ACCORD.txt",
+        "preparation/publication-candidate/RAPPORT.md",
+        "preparation/publication-candidate/cohort-candidate.json",
+        "preparation/publication-candidate/inventaire.json",
+        "preparation/publication-candidate/release-plan.json.template",
+        "preparation/publication-candidate/versions/preprod.digests.template",
+        "preparation/publication-candidate/versions/preprod.env.template",
+        "preparation/publication-candidate/versions/recette.digests.template",
+        "preparation/publication-candidate/versions/recette.env.template",
+        "scripts/test-wavy-local.py",
+        "scripts/test-wavy-menu.py",
+        "scripts/wavy-deploy.sh",
+        "wavy"
+      ],
+      "excludedUntracked": []
+    },
+    {
+      "repository": "wavy-erp-shell",
+      "head": "0cfb699d6c6b2f81e70af938ecabb93bcc696068",
+      "branch": "master",
+      "selected": [
+        "e2e/pwa-notes-frais.local.spec.ts",
+        "src/app/app.html",
+        "src/app/app.scss",
+        "src/app/app.ts",
+        "src/app/core/pwa-integration.service.ts",
+        "src/app/core/wavy-context.service.ts",
+        "src/app/navigation.spec.ts",
+        "src/styles.scss"
+      ],
+      "excludedUntracked": [],
+      "candidateSourceTree": "79fb4c17fe887313cee60b574be68982d5a8b7ab"
+    },
+    {
+      "repository": "wavy-pwa",
+      "head": "6944c31eaa1b970a73092e885bd5280f88efead3",
+      "branch": "main",
+      "selected": [
+        "ngsw-config.json",
+        "src/app/app.config.ts",
+        "src/app/app.css",
+        "src/app/app.html",
+        "src/app/app.ts",
+        "src/styles.css"
+      ],
+      "excludedUntracked": [],
+      "candidateSourceTree": "ee32c89027b4278e8431e311e9f4d66fb7731f60"
+    },
+    {
+      "repository": "wavy-tiers-front",
+      "head": "527527b96522153f0da74de4d8b1b5d0f0da9032",
+      "branch": "master",
+      "selected": [
+        "src/app/app.scss",
+        "src/styles.scss"
+      ],
+      "excludedUntracked": [],
+      "candidateSourceTree": "11e3e9953ec8163c253c9a538bdc8bab009cdbee"
+    },
+    {
+      "repository": "wavy-contrats-front",
+      "head": "9af670cd01a017a43dbd8a221638799feaaf537d",
+      "branch": "master",
+      "selected": [
+        "src/app/app.scss",
+        "src/environments/environment.preprod.ts",
+        "src/styles.scss"
+      ],
+      "excludedUntracked": [],
+      "candidateSourceTree": "12298dc9c37706b19b542aa9a1cf5e9da16c304b"
+    },
+    {
+      "repository": "wavy-factures-front",
+      "head": "a201858b251f271c2294b83ee1e953cecdf1acfd",
+      "branch": "master",
+      "selected": [
+        "src/app/app.css",
+        "src/environments/environment.preprod.ts",
+        "src/styles.css"
+      ],
+      "excludedUntracked": [],
+      "candidateSourceTree": "bbe061f2252c5413dbe7138579322bdb6a32ff30"
+    },
+    {
+      "repository": "wavy-tresorerie-front",
+      "head": "4bda80b8eaa464fd369cef14372abe288f2e6a0a",
+      "branch": "master",
+      "selected": [
+        "src/app/app.scss",
+        "src/app/features/tresorerie/pages/tresorerie.page.css",
+        "src/styles.scss"
+      ],
+      "excludedUntracked": [],
+      "candidateSourceTree": "860e2efe22925c119d3ca18c2373be3716c83971"
+    },
+    {
+      "repository": "wavy-gateway",
+      "head": "98e2ced416d33009c7d92f4c9fa3aa5838c62760",
+      "branch": "master",
+      "selected": [
+        "src/test/java/fr/wavy/gateway/ActuatorRecetteTest.java",
+        "src/test/java/fr/wavy/gateway/HttpsProxyRecetteTest.java"
+      ],
+      "excludedUntracked": [],
+      "candidateSourceTree": "6cc2a3db631a7faa7e6670b31caab49985280cfe"
+    },
+    {
+      "repository": "wavy-socle-api",
+      "head": "a9352ecd638338703725d100227c3622803742c0",
+      "branch": "master",
+      "selected": [],
+      "excludedUntracked": [],
+      "candidateSourceTree": "5f0bdbcfeb60df7bb7e570901f6b67a55e6c307f"
+    },
+    {
+      "repository": "wavy-tiers-api",
+      "head": "7642a09d47ecbcb2e5962ddde958c50180e97c61",
+      "branch": "master",
+      "selected": [],
+      "excludedUntracked": [],
+      "candidateSourceTree": "3a8ef9c179c1f75b7adb56e5b444842895862061"
+    },
+    {
+      "repository": "wavy-contrats-api",
+      "head": "1cc65d11d0686bccb78d4bb5b29da2cca4965bbe",
+      "branch": "master",
+      "selected": [],
+      "excludedUntracked": [],
+      "candidateSourceTree": "773cfa1ba205909bdb79eef79bda93238b4bb30f"
+    },
+    {
+      "repository": "wavy-factures-api",
+      "head": "09fcd9895e2077da2481b040b088f2accd953e4a",
+      "branch": "master",
+      "selected": [],
+      "excludedUntracked": [],
+      "candidateSourceTree": "8979baf12b1e62960d337af8366c1e5d4253df75"
+    },
+    {
+      "repository": "wavy-tresorerie-api",
+      "head": "45fd26820fb954c644ca151381b0c4b97361545f",
+      "branch": "master",
+      "selected": [],
+      "excludedUntracked": [],
+      "candidateSourceTree": "0eeb0593579f2266850c85d5fffa106cd7c817e2"
+    },
+    {
+      "repository": "wavy-socle-front",
+      "head": "d4c76c571fc574921211b782fc157d8035121e5f",
+      "branch": "master",
+      "selected": [],
+      "excludedUntracked": [],
+      "candidateSourceTree": "111cc1cc424de972866de59d02efbf7d596385a0"
+    }
+  ],
+  "imagesToRebuild": [
+    "erp-shell",
+    "pwa",
+    "tiers-front",
+    "contrats-front",
+    "factures-front",
+    "tresorerie-front"
+  ],
+  "imagesToReuse": [
+    "socle-api",
+    "tiers-api",
+    "contrats-api",
+    "factures-api",
+    "tresorerie-api",
+    "gateway",
+    "socle-front"
+  ],
+  "privateEvidenceExcluded": true,
+  "userGitIndexesUnchanged": true,
+  "outsideRelease": [
+    {
+      "repository": "wavy-contrats-front-build",
+      "head": "dae25927a1f60fe64c33a507195703be57c9b1d0",
+      "changes": [],
+      "includedInErpRelease": false
+    },
+    {
+      "repository": "wavy-contrats-front-build-navigation",
+      "head": "9af670cd01a017a43dbd8a221638799feaaf537d",
+      "changes": [],
+      "includedInErpRelease": false
+    },
+    {
+      "repository": "wavy-factures-front-build",
+      "head": "9f324b84effad97eb2b815a4593cf4e52a5ced79",
+      "changes": [],
+      "includedInErpRelease": false
+    },
+    {
+      "repository": "wavy-factures-front-build-navigation",
+      "head": "eac0a367f1ed7e511c43d8c95c872acd3cac4966",
+      "changes": [],
+      "includedInErpRelease": false
+    },
+    {
+      "repository": "wavy-factures-front-build-pwa",
+      "head": "a201858b251f271c2294b83ee1e953cecdf1acfd",
+      "changes": [],
+      "includedInErpRelease": false
+    },
+    {
+      "repository": "wavy-factures-front-build-ventes",
+      "head": "bd0ba92c32ac64a817639033e7c91c9e0c7fddb2",
+      "changes": [],
+      "includedInErpRelease": false
+    },
+    {
+      "repository": "wavy-launchpad",
+      "head": "85a4a1d9a29d56c7c5fc60292b7f339d0e14342b",
+      "changes": [
+        " M .env",
+        " M .gitignore",
+        " M README.md",
+        " M package-lock.json",
+        "?? .env.staging",
+        "?? docker/",
+        "?? supabase/.branches/",
+        "?? supabase/.temp/",
+        "?? supabase/migrations/20260212180134_fix_invitation_accept_policy.sql",
+        "?? supabase/migrations/20260212181000_fix_profiles_admin_policy.sql",
+        "?? supabase/seed.sql"
+      ],
+      "includedInErpRelease": false
+    },
+    {
+      "repository": "wavy-services-fr",
+      "head": "f93db62df3183223a386e30cfed835fbb52dfc2c",
+      "changes": [
+        " M docker/docker-compose.yml",
+        "?? ARCHITECTURE.md",
+        "?? CLAUDE.md"
+      ],
+      "includedInErpRelease": false
+    }
+  ]
+}

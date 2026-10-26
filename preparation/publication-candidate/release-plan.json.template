@@ -1,0 +1,102 @@
+{
+  "state": "CANDIDATE_PENDING_COMMITS_AND_PUBLICATION",
+  "components": [
+    "factures-api",
+    "pwa",
+    "factures-front",
+    "erp-shell"
+  ],
+  "activation": "erp-shell-last-after-all-runtime-checks",
+  "images": {
+    "factures-api": {
+      "version": "0.1.0-09fcd98",
+      "digest": "sha256:a414a866c910bd20a4c8af4018fc0e31db513ffff1cca76b15c913807f75d0e5",
+      "reference": "ghcr.io/fabffo/wavy-factures-api@sha256:a414a866c910bd20a4c8af4018fc0e31db513ffff1cca76b15c913807f75d0e5",
+      "ociLabels": {
+        "org.opencontainers.image.revision": "09fcd98",
+        "org.opencontainers.image.source": "https://github.com/fabffo/wavy-factures-api",
+        "org.opencontainers.image.version": "0.1.0"
+      },
+      "platform": "linux/amd64"
+    },
+    "pwa": {
+      "version": "0.2.0-${PWA_COMMIT}",
+      "digest": "PENDING_PWA_DIGEST",
+      "reference": "ghcr.io/fabffo/wavy-pwa@PENDING_PWA_DIGEST",
+      "ociLabels": {
+        "org.opencontainers.image.revision": "PENDING_APPROVED_COMMIT",
+        "org.opencontainers.image.source": "https://github.com/fabffo/wavy-pwa",
+        "org.opencontainers.image.version": "0.2.0"
+      },
+      "platform": "linux/amd64"
+    },
+    "factures-front": {
+      "version": "0.2.0-${FACTURES_FRONT_COMMIT}",
+      "digest": "PENDING_FACTURES_FRONT_DIGEST",
+      "reference": "ghcr.io/fabffo/wavy-factures-front@PENDING_FACTURES_FRONT_DIGEST",
+      "ociLabels": {
+        "org.opencontainers.image.revision": "PENDING_APPROVED_COMMIT",
+        "org.opencontainers.image.source": "https://github.com/fabffo/wavy-factures-front",
+        "org.opencontainers.image.version": "0.2.0"
+      },
+      "platform": "linux/amd64"
+    },
+    "erp-shell": {
+      "version": "0.2.0-${ERP_SHELL_COMMIT}",
+      "digest": "PENDING_ERP_SHELL_DIGEST",
+      "reference": "ghcr.io/fabffo/wavy-erp-shell@PENDING_ERP_SHELL_DIGEST",
+      "ociLabels": {
+        "org.opencontainers.image.revision": "PENDING_APPROVED_COMMIT",
+        "org.opencontainers.image.source": "https://github.com/fabffo/wavy-erp-shell",
+        "org.opencontainers.image.version": "0.2.0"
+      },
+      "platform": "linux/amd64"
+    }
+  },
+  "requiredChecks": [
+    "https",
+    "secure-cookie",
+    "volume-uid-gid",
+    "backup-restore",
+    "session-isolation",
+    "browser",
+    "android",
+    "ios"
+  ],
+  "deploymentOrder": [
+    "factures-api",
+    "factures-front",
+    "pwa",
+    "erp-shell"
+  ],
+  "pwaEnabledByDefault": false,
+  "imageEvidence": {
+    "source": "local-docker-image-inspect",
+    "date": "2026-10-20",
+    "registryRechecked": false,
+    "facturesApiDigestRecoveredLocally": true
+  },
+  "coordination": {
+    "status": "CORRECTED_CANDIDATE_REVIEW_ONLY",
+    "entrypoint": "scripts/release-pwa-preprod.sh",
+    "lock": "deployments/preprod.lock",
+    "actions": [
+      "prepare",
+      "validate",
+      "activate",
+      "resume",
+      "rollback",
+      "abandon"
+    ],
+    "defaultAccess": "closed",
+    "failureClosure": "native-https-edge-auth-request-independent-of-docker-and-erp-shell",
+    "rollback": "all-four-images-from-durable-snapshot-shell-recreated-stopped-no-database-restore",
+    "evidenceMaxAgeSeconds": 86400,
+    "runtimeChecks": "NOT_EXECUTED",
+    "reservation": "deployments/preprod-reservation.json",
+    "reservationRelease": "explicit-abandon-after-confirmed-edge-closure-and-rollback-if-mutated",
+    "leaseExpiry": "functional-proof.checkedAt plus 24 hours, enforced per request",
+    "edgeChecks": "LOCAL_FIXTURES_ONLY"
+  },
+  "runtimeChecksStatus": "NOT_EXECUTED"
+}

@@ -1,0 +1,184 @@
+{
+  "state": "PENDING_APPROVED_COMMITS_AND_GHCR_PUBLICATION",
+  "functionalVersionForRebuiltFronts": "0.2.0",
+  "singleCohortFor": [
+    "recette",
+    "preprod"
+  ],
+  "images": {
+    "socle-api": {
+      "mode": "REUSE_TESTED_DIGEST",
+      "version": "0.1.0-8b7a3f0",
+      "digest": "sha256:640253c045feabd0be90a81e29b46af28b2c3c5e19d0fb81c0e89b7da45bdf31",
+      "reference": "ghcr.io/fabffo/wavy-socle-api@sha256:640253c045feabd0be90a81e29b46af28b2c3c5e19d0fb81c0e89b7da45bdf31",
+      "testedRevision": "8b7a3f0",
+      "repositoryHead": "a9352ecd638338703725d100227c3622803742c0",
+      "headDiffersFromTestedImage": true
+    },
+    "tiers-api": {
+      "mode": "REUSE_TESTED_DIGEST",
+      "version": "0.1.0-7642a09",
+      "digest": "sha256:6c91e16bd3f5211c892273031f5ab1f1d56d6007e4003e0dd382fef845f2400e",
+      "reference": "ghcr.io/fabffo/wavy-tiers-api@sha256:6c91e16bd3f5211c892273031f5ab1f1d56d6007e4003e0dd382fef845f2400e",
+      "testedRevision": "7642a09",
+      "repositoryHead": "7642a09d47ecbcb2e5962ddde958c50180e97c61",
+      "headDiffersFromTestedImage": false
+    },
+    "contrats-api": {
+      "mode": "REUSE_TESTED_DIGEST",
+      "version": "0.1.0-527874b",
+      "digest": "sha256:f60edb42690fa005748cdf6bbf9f2b9fdeb956ce3001c1e3ae0655dc2ad72ff0",
+      "reference": "ghcr.io/fabffo/wavy-contrats-api@sha256:f60edb42690fa005748cdf6bbf9f2b9fdeb956ce3001c1e3ae0655dc2ad72ff0",
+      "testedRevision": "527874b",
+      "repositoryHead": "1cc65d11d0686bccb78d4bb5b29da2cca4965bbe",
+      "headDiffersFromTestedImage": true
+    },
+    "factures-api": {
+      "mode": "REUSE_TESTED_DIGEST",
+      "version": "0.1.0-09fcd98",
+      "digest": "sha256:a414a866c910bd20a4c8af4018fc0e31db513ffff1cca76b15c913807f75d0e5",
+      "reference": "ghcr.io/fabffo/wavy-factures-api@sha256:a414a866c910bd20a4c8af4018fc0e31db513ffff1cca76b15c913807f75d0e5",
+      "testedRevision": "09fcd98",
+      "repositoryHead": "09fcd9895e2077da2481b040b088f2accd953e4a",
+      "headDiffersFromTestedImage": false
+    },
+    "tresorerie-api": {
+      "mode": "REUSE_TESTED_DIGEST",
+      "version": "0.1.0-45fd268",
+      "digest": "sha256:e45d7063a3715d8dc370458960d6dcda7fa731582ceb902ea42e2f8b3dd33f56",
+      "reference": "ghcr.io/fabffo/wavy-tresorerie-api@sha256:e45d7063a3715d8dc370458960d6dcda7fa731582ceb902ea42e2f8b3dd33f56",
+      "testedRevision": "45fd268",
+      "repositoryHead": "45fd26820fb954c644ca151381b0c4b97361545f",
+      "headDiffersFromTestedImage": false
+    },
+    "gateway": {
+      "mode": "REUSE_TESTED_DIGEST",
+      "version": "0.1.0-98e2ced",
+      "digest": "sha256:25279339824458d3247f05764fe48a8af3f892da4627fccac8dff58380d6c547",
+      "reference": "ghcr.io/fabffo/wavy-gateway@sha256:25279339824458d3247f05764fe48a8af3f892da4627fccac8dff58380d6c547",
+      "testedRevision": "98e2ced",
+      "repositoryHead": "98e2ced416d33009c7d92f4c9fa3aa5838c62760",
+      "headDiffersFromTestedImage": false
+    },
+    "socle-front": {
+      "mode": "REUSE_TESTED_DIGEST",
+      "version": "0.1.0-d4c76c5",
+      "digest": "sha256:1d32cb2cc8cbb5c334800d6fa13df2dff9e1293988179f0df8138b77958fbdaa",
+      "reference": "ghcr.io/fabffo/wavy-socle-front@sha256:1d32cb2cc8cbb5c334800d6fa13df2dff9e1293988179f0df8138b77958fbdaa",
+      "testedRevision": "d4c76c5",
+      "repositoryHead": "d4c76c571fc574921211b782fc157d8035121e5f",
+      "headDiffersFromTestedImage": false
+    },
+    "tiers-front": {
+      "mode": "REBUILD_AFTER_APPROVED_COMMIT",
+      "versionTemplate": "0.2.0-${TIERS_FRONT_COMMIT}",
+      "digest": null,
+      "digestTemplate": "PENDING_TIERS_FRONT_DIGEST",
+      "sourceHeadBeforeCommit": "527527b96522153f0da74de4d8b1b5d0f0da9032",
+      "sourceTree": "11e3e9953ec8163c253c9a538bdc8bab009cdbee",
+      "validation": {
+        "component": "tiers-front",
+        "exitCode": 0,
+        "validationTag": "wavy-validation/tiers-front:tree-11e3e9953ec8",
+        "sourceTree": "11e3e9953ec8163c253c9a538bdc8bab009cdbee",
+        "imageId": "sha256:d4ce5240aa3e3a44958233c8a06a0666aea85f980cc3d4b53494eb11d2324298",
+        "sizeBytes": 62864314,
+        "platform": "linux/amd64",
+        "smokePassed": true
+      }
+    },
+    "contrats-front": {
+      "mode": "REBUILD_AFTER_APPROVED_COMMIT",
+      "versionTemplate": "0.2.0-${CONTRATS_FRONT_COMMIT}",
+      "digest": null,
+      "digestTemplate": "PENDING_CONTRATS_FRONT_DIGEST",
+      "sourceHeadBeforeCommit": "9af670cd01a017a43dbd8a221638799feaaf537d",
+      "sourceTree": "12298dc9c37706b19b542aa9a1cf5e9da16c304b",
+      "validation": {
+        "component": "contrats-front",
+        "exitCode": 0,
+        "validationTag": "wavy-validation/contrats-front:tree-12298dc9c377",
+        "sourceTree": "12298dc9c37706b19b542aa9a1cf5e9da16c304b",
+        "imageId": "sha256:512787171cb9ccc09ba4e4026864d945c0667c6ae102bf520c1e7dca97176397",
+        "sizeBytes": 62805412,
+        "platform": "linux/amd64",
+        "smokePassed": true
+      }
+    },
+    "factures-front": {
+      "mode": "REBUILD_AFTER_APPROVED_COMMIT",
+      "versionTemplate": "0.2.0-${FACTURES_FRONT_COMMIT}",
+      "digest": null,
+      "digestTemplate": "PENDING_FACTURES_FRONT_DIGEST",
+      "sourceHeadBeforeCommit": "a201858b251f271c2294b83ee1e953cecdf1acfd",
+      "sourceTree": "bbe061f2252c5413dbe7138579322bdb6a32ff30",
+      "validation": {
+        "component": "factures-front",
+        "exitCode": 0,
+        "validationTag": "wavy-validation/factures-front:tree-bbe061f2252c",
+        "sourceTree": "bbe061f2252c5413dbe7138579322bdb6a32ff30",
+        "imageId": "sha256:b326ab936ebd2bf500dd2d534473ac5973367cc98ff93a4106ea650c1a226680",
+        "sizeBytes": 64923848,
+        "platform": "linux/amd64",
+        "smokePassed": true
+      }
+    },
+    "tresorerie-front": {
+      "mode": "REBUILD_AFTER_APPROVED_COMMIT",
+      "versionTemplate": "0.2.0-${TRESORERIE_FRONT_COMMIT}",
+      "digest": null,
+      "digestTemplate": "PENDING_TRESORERIE_FRONT_DIGEST",
+      "sourceHeadBeforeCommit": "4bda80b8eaa464fd369cef14372abe288f2e6a0a",
+      "sourceTree": "860e2efe22925c119d3ca18c2373be3716c83971",
+      "validation": {
+        "component": "tresorerie-front",
+        "exitCode": 0,
+        "validationTag": "wavy-validation/tresorerie-front:tree-860e2efe2292",
+        "sourceTree": "860e2efe22925c119d3ca18c2373be3716c83971",
+        "imageId": "sha256:a7c9f0834d3f8c3325f7edc4a85b1486783ce44e2931ef1c786ff7bcfb7734d3",
+        "sizeBytes": 62816366,
+        "platform": "linux/amd64",
+        "smokePassed": true
+      }
+    },
+    "pwa": {
+      "mode": "REBUILD_AFTER_APPROVED_COMMIT",
+      "versionTemplate": "0.2.0-${PWA_COMMIT}",
+      "digest": null,
+      "digestTemplate": "PENDING_PWA_DIGEST",
+      "sourceHeadBeforeCommit": "6944c31eaa1b970a73092e885bd5280f88efead3",
+      "sourceTree": "ee32c89027b4278e8431e311e9f4d66fb7731f60",
+      "validation": {
+        "component": "pwa",
+        "exitCode": 0,
+        "validationTag": "wavy-validation/pwa:tree-ee32c89027b4",
+        "sourceTree": "ee32c89027b4278e8431e311e9f4d66fb7731f60",
+        "imageId": "sha256:ab1aa0bbd30932c0b0bfb0c6e428ae25ae36a056f7a7cdea750782a10db1714c",
+        "sizeBytes": 62707484,
+        "platform": "linux/amd64",
+        "smokePassed": true
+      }
+    },
+    "erp-shell": {
+      "mode": "REBUILD_AFTER_APPROVED_COMMIT",
+      "versionTemplate": "0.2.0-${ERP_SHELL_COMMIT}",
+      "digest": null,
+      "digestTemplate": "PENDING_ERP_SHELL_DIGEST",
+      "sourceHeadBeforeCommit": "0cfb699d6c6b2f81e70af938ecabb93bcc696068",
+      "sourceTree": "79fb4c17fe887313cee60b574be68982d5a8b7ab",
+      "validation": {
+        "component": "erp-shell",
+        "exitCode": 0,
+        "validationTag": "wavy-validation/erp-shell:tree-79fb4c17fe88",
+        "sourceTree": "79fb4c17fe887313cee60b574be68982d5a8b7ab",
+        "imageId": "sha256:4dbf68528f5b643723c3834a1e48a38cc5463f164fdb7545c14c334cf7befc4d",
+        "sizeBytes": 48574392,
+        "platform": "linux/amd64",
+        "smokePassed": true
+      }
+    }
+  },
+  "templatesDeployable": false,
+  "finalGhcrDigestsKnown": false,
+  "vmAccess": false
+}

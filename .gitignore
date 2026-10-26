@@ -18,3 +18,17 @@ deployments/preprod.lock
 # Réservation et état privés du candidat PWA (jamais des secrets dans Git).
 deployments/preprod-reservation.json
 deployments/pwa-release/
+
+# Caches, secrets et preuves locales de qualification (jamais publiés).
+__pycache__/
+*.py[cod]
+*.private.*
+preparation/https-msi/*.json
+preparation/https-msi/AUTORISATION*.txt
+preparation/https-msi/VALIDATION*.txt
+preparation/https-msi/DIAGNOSTIC*.txt
+preparation/https-msi/SESSION-MANUELLE*.txt
+preparation/https-msi/PWA-SESSION*.txt
+preparation/https-msi/QUALIFICATION-FONCTIONNELLE.txt
+preparation/https-msi/RAPPORT.txt
+preparation/https-msi/FILES.txt

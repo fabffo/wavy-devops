@@ -1,0 +1,183 @@
+MISE À JOUR — phase locale autorisée exécutée puis entièrement restituée.
+Lire RAPPORT.txt et RESULTATS-AUTH-LOCALE.json :140 contrôles réels réussis.
+La section ci-dessous conserve la conception initiale ; ses mentions d’attente
+d’autorisation/prototype non exécuté sont historiques. Les actions de release
+complète et les tests Notes/IA restent non autorisés/non implémentés pour ce profil.
+La commande commune dispose désormais de auth-test/auth-recover locaux seulement.
+Exécution bornée (répertoire privé et preuve de consentement existants requis) :
+  ./scripts/wavy-deploy.sh recettelocal auth-test --run-dir "$EVIDENCE" \
+    --authorization "$EVIDENCE/authorization.json"
+Reprise d’un nettoyage interrompu uniquement, même propriétaire/réservation :
+  ./scripts/wavy-deploy.sh recettelocal auth-recover --run-dir "$EVIDENCE" \
+    --authorization "$EVIDENCE/authorization.json"
+Ne pas rejouer un run terminé : il est clos et ses données nettoyées. Ne pas
+fabriquer une autorisation supplémentaire pour ouvrir Notes ou une promotion.
+
+Wavy — HTTPS central MSI : conception et qualification locale
+25 octobre2026. État : PRÉPARATION, PAS UNE AUTORISATION DE DÉPLOIEMENT.
+
+Architecture retenue (composants existants, aucun DNS public)
+Navigateur Windows -> Caddy Windows127.0.0.1:443/tls internal -> Shell Nginx Docker
+-> Gateway -> Socle et APIs. ERP/modules et /api même origine ; PWA sous /pwa/.
+recettelocal.wavyservices.fr -> Windows127.0.0.1:24207 -> transfert localhost WSL2
+-> Shell RECETTE existant127.0.0.1:24207. À éprouver après autorisation locale.
+recette.wavyservices.fr -> Windows127.0.0.1:34443 -> tunnel SSH -> VM RECETTE.
+preprod.wavyservices.fr -> Windows127.0.0.1:24443 -> tunnel SSH actuel -> VM PREPROD.
+VirtualBox reste NAT : réutiliser les accès SSH déjà configurés. Une redirection
+NAT HTTP vers l’interface invitée NE joint PAS un listener127.0.0.1 de la VM.
+Ne pas modifier le bind Shell PREPROD pour contourner ce point.
+Les trois noms doivent résoudre127.0.0.1 dans hosts Windows. Aucun DNS public
+modifié ici. WSL curl ne partage pas automatiquement hosts/confiance CA Windows.
+
+Fichiers et commande commune
+scripts/wavy-deploy.sh <recettelocal|recette|preprod> [plan|check|render|probe|deploy|resume|rollback]
+Sans action : plan READ ONLY. check :13 images déjà locales, digests/OCI/plateforme,
+aucun build/pull. Même cohorte13 images dans chaque cible ;4 images PWA/Notes
+issues du release-plan existant,9 du jeu RECETTE validé. Aucun tag flottant promu.
+render : overlay LOCAL candidat uniquement, ne remplace aucun manifeste actif.
+probe : seulement Caddy local Windows en loopback, GET/OPTIONS sans identifiants,
+chaîne TLS vérifiée ; aucune sonde VM, aucun POST applicatif.
+ATTENTION : deploy/resume/rollback sont actuellement BLOQUÉS, pas implémentés
+comme adaptateur exécutable de cette nouvelle chaîne HTTPS. Cette façade prépare
+la standardisation ; elle ne remplace pas les moteurs de déploiement existants.
+Ne pas utiliser deploy.sh classique pour contourner le refus (tags/manifeste actifs).
+
+Préparation MSI exécutée sans mutation des données
+  ./scripts/wavy-deploy.sh recettelocal plan
+  ./scripts/wavy-deploy.sh recettelocal check
+  # Sous-réseau réel obtenu en lecture seule :
+  docker network inspect wavy-recette --format '{{json .IPAM.Config}}'
+  # Sortie NEUVE, parent existant, aucun écrasement. Adapter le réseau observé :
+  ./scripts/wavy-deploy.sh recettelocal render \
+    --output /tmp/wavy-https-msi-candidate --docker-subnet 172.21.0.0/16
+  python3 -B preparation/https-msi/test_https_msi.py
+  ./scripts/wavy-deploy.sh recettelocal probe
+Ne pas lancer compose up : la phase AUTORISATION-LOCALE.txt attend validation.
+La sonde actuelle échoue intentionnellement : le site est une page diagnostic,
+GET auth ne répond pas401, PWA n’est pas404 et les headers CORS manquent.
+
+Proxy/CORS/cookies — correctifs candidats et bornes de confiance
+Caddyfile.local-only.candidate ne remplace que le répondant LOCAL ; les blocs
+RECETTE distante/PREPROD restent identiques. Caddyfile.candidate est la cible finale
+TROIS domaines ; ne pas l’activer tant que les promotions ne sont pas approuvées.
+Caddy réécrit Host et X-Forwarded-{Proto,Host,Port,For}, retire Forwarded client,
+et refuse les mutations API sans Origin exacte. POST/auth/session n’est pas
+intercepté pour fabriquer un succès ; OPTIONS est traité par le vrai CORS Gateway.
+Shell ne publie que127.0.0.1:24207 ; les12 autres applications n’exposent aucun port
+hôte dans l’overlay. Leurs réseaux existants restent inchangés. Les5 DB ne sont
+ni recréées ni reconfigurées ; leurs publications antérieures sont inchangées.
+Supabase et tous les autres projets sont hors périmètre.
+Shell fixe le contexte externe canonique HTTPS pour /api et lectures Notes ;
+aucune confiance aveugle dans le proto client ni append d’une seconde valeur http.
+Gateway : une seule origine exacte, credentials conservés, pas de wildcard ;
+forwarded/x-forwarded générateurs désactivés, PreserveHostHeader, déduplication
+CORS conservée. Les valeurs produites par le Shell restent uniques jusqu’au Socle.
+Socle : RemoteIpValve natif, regex du seul subnet Docker constaté, protocole/host/
+port des headers normalisés. Refus d’un subnet public, /0, /8 ou confiance.*.
+Le réseau Docker applicatif est une zone de confiance : vérifier qu’aucun conteneur
+étranger n’y est attaché, ni autre port API publié ; les opérateurs locaux/root
+restent de confiance. L’IP client ne fonde aucun droit tenant/société/utilisateur.
+Cookies login : Secure=true, HttpOnly=true, SameSite=strict, Path=/, aucun Domain
+partagé entre environnements. Contrôler login/logout/changement société en réel.
+Socle émet actuellement un cookie d’expiration logout SameSite=Lax codé en dur ;
+ce tombstone ne modifie pas les attributs de la session vivante. Vérifier sa
+suppression effective ; ne pas présenter cela comme une session lax autorisée.
+La durée Socle reste1800s d’inactivité, sans réglage artificiel ni horloge simulée.
+Aucun Location/proxy_redirect ajouté aveuglément : tester les URLs absolues et
+les ressources Angular/module/base href/manifeste/service worker sur l’origine.
+
+CSRF : état existant et décision à prendre
+SecuriteConfiguration Socle contient déjà csrf(disable), y compris secure.
+Aucun code de désactivation n’est ajouté. La vérification Origin au bord ET au
+Shell protège les écritures navigateur, en plus de SameSite strict et CORS.
+Ce n’est PAS une preuve que CSRF Spring est activé. Choisir explicitement soit
+un vrai contrat token client/serveur (hors correction proxy minimale), soit revoir
+et accepter formellement la protection Origin stricte. Ne pas autoriser un
+contournement Origin absent, les clients API doivent envoyer l’origine approuvée.
+Ne pas déclarer la sécurité de la cible conforme sans cette décision et ses tests.
+
+PWA/Notes de frais
+PWA et /api/pwa fermées404 indépendamment du conteneur ; Notes/justificatifs
+refusent toutes mutations403 (TRACE405 natif Nginx), lectures soumises au backend.
+Aucun marqueur ou socket d’ouverture livré. Le candidat fermé ne permet PAS de
+faire les essais d’écriture demandés. Réutiliser le gate de session<=900s sous
+orchestrateur après adaptation contrôlée du profil HTTPS, pas une dérogation.
+Stockage Notes100:101:0700, subpath dédié, protections V3 et autorisations à usage
+unique conservés. render ne crée aucun volume/répertoire documentaire ni montage
+Factures supplémentaire : la configuration stockage complète manque à ce stade.
+Les tests Notes/IA seront autorisés séparément avec sauvegardes chiffrées, fixtures
+et nettoyage. Auto-création facture IA=false. Aucune clé IA dans le candidat.
+Les247 cas précédents restent des preuves réelles de l’ancien parcours RECETTE,
+pas de la nouvelle chaîne HTTPS. Ne pas les relancer sans impact : ciblés session/
+cookies/contexte en premier, puis familles touchées ; toute différence d’isolation
+impose la campagne nécessaire. Les tests Gateway nouveaux ont un backend synthétique.
+
+Moteurs existants et reprise/rollback
+PREPROD : conserver private-shell/release-private.py, preprod.lock, réservation,
+JPA/Flyway sur copies avant nettoyage, sauvegardes chiffrées5 DB+documents,
+V3, snapshots/rollback4 images, fermeture sur erreur/expiration, ERP préservé.
+Ce moteur exige origin http://localhost:24443 et refuse SPRING_APPLICATION_JSON.
+Le candidat utilise une origine HTTPS et JSON Gateway : INCOMPATIBILITÉ DÉTECTÉE.
+Ne pas réécrire l’origine de preuve, attester un faux HTTPS ou retirer la garde
+pour le faire accepter. L’intégration du profil HTTPS externe reste À IMPLÉMENTER
+et tester sous les mêmes gardes avant les commandes de déploiement effectives.
+Réservation ancienne avant mutation certaine : status/abandon sous gardes, archive,
+puis reserve sources approuvées ; jamais effacer un pointeur. Mutation/échec ambigu :
+version/snapshot conservés, fermeture, inspection, reprise propriétaire.
+Rollback Notes dégradé : ancienne API lit liste/détail/synthèse à valider ; pièces
+ndf peuvent être indisponibles, octets conservés et ancien writer jamais réactivé.
+Aucun restore DB actif improvisé ; ressources isolées nettoyées sous propriétaire.
+
+Promotions futures — commandes exactes de PRÉPARATION, ne pas exécuter sur VM ici
+Sur MSI, conserver la cohorte et l’empreinte du plan local réellement validé :
+  ./scripts/wavy-deploy.sh recette plan
+  ./scripts/wavy-deploy.sh preprod plan
+  ./scripts/wavy-deploy.sh recette check
+  ./scripts/wavy-deploy.sh preprod check
+Ces check lisent uniquement le cache MSI, pas les VMs. La promotion exigera un reçu
+local réel lié aux images/configurations/tests et un GO distinct. AUCUN reçu inventé.
+Sur Windows, après autorisation VM et vérification des alias SSH/NAT existants :
+  ssh -N -L 127.0.0.1:34443:127.0.0.1:24207 wavy-recette
+  ssh -N -L 127.0.0.1:24443:127.0.0.1:24443 wavy-preprod
+Ne pas doubler le tunnel PREPROD s’il existe déjà. Les13 références immuables sont
+fournies par plan ; acquérir les mêmes digests après autorisation, jamais rebuild VM.
+Les commandes deploy/resume/rollback ne sont pas encore opérationnelles pour HTTPS ;
+leur implémentation et preuve locale sont des prérequis, pas une étape à contourner.
+
+Installation courte après préparation complète et accord
+1. Valider AUTORISATION-LOCALE.txt, capacité/outils/migrations sans pending,
+sauvegarde chiffrée, état/empreintes/13 historiques ; vérifier binaire Caddy2.11.7.
+2. Implémenter/revoir l’adaptateur commun sous verrou, journal, snapshot et fermeture
+sur erreur ; commencer par la phase auth bornée sans Notes, puis nettoyer/restaurer.
+3. Après validation HTTPS/session réelle, décider CSRF et intégrer le gate temporaire
+et stockage Notes au profil HTTPS ; soumettre le plan d’écritures Notes/IA.
+4. Tester en RECETTE locale, préserver les preuves et états des originaux, puis
+GO distinct pour RECETTE distante ; PREPROD seulement après cette promotion validée.
+État actuel : NO-GO POUR RECETTE LOCALE FONCTIONNELLE ; configurations candidates
+et tests préparatoires seulement. Aucune VM, donnée ou configuration active changée.
+
+Reprise : phase auth locale désormais codée, pas encore exécutée
+Le script expose aussi les commandes suivantes, exclusivement après accord
+explicite sur AUTORISATION-LOCALE.txt et préparation d'un dossier privé hors Git :
+  ./scripts/wavy-deploy.sh recettelocal auth-test \
+    --run-dir "$RUN_DIR" --authorization "$RUN_DIR/authorization.json"
+En cas d'interruption, reprendre le même dossier sous la réservation conservée :
+  ./scripts/wavy-deploy.sh recettelocal auth-recover \
+    --run-dir "$RUN_DIR" --authorization "$RUN_DIR/authorization.json"
+RUN_DIR doit désigner un dossier réel, appartenant à l'utilisateur, mode0700,
+hors dépôt ; authorization.json doit être un fichier mode0600 contenant :
+scope=HTTPS_AUTH_ONLY_54_SOCLE_ROWS_8_EXISTING_SERVICES, approved=true (booléen),
+runDirectory=chemin absolu du dossier, authorizationDocumentSha256=SHA256 réel
+du document approuvé, planSha256=empreinte réelle du plan local, fixtureMarker=
+12 caractères hexadécimaux aléatoires, caddyBinary=chemin du binaire Windows
+Caddy2.11.7. Il s'agit d'un objet JSON, pas d'un fichier de variables shell.
+Créer ce reçu uniquement après l'accord humain ; il ne constitue pas cet accord.
+La récupération restaure/nettoie ; elle ne reprend pas les tests métier.
+Ni création du reçu, ni exécution de ces commandes durant la préparation.
+Cette phase ne qualifie pas encore expiration naturelle1800s, Notes/IA,
+justificatifs, navigateur ou promotions. Aucun GO global ne doit en découler.
+
+Sources primaires consultées
+https://caddyserver.com/docs/caddyfile/directives/reverse_proxy
+https://caddyserver.com/docs/api (POST/adapt sans chargement)
+https://docs.spring.io/spring-cloud-gateway/reference/spring-cloud-gateway-server-webflux/httpheadersfilters.html

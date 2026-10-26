@@ -1,0 +1,70 @@
+COMMANDES À EXÉCUTER UNIQUEMENT APRÈS ACCORD EXPLICITE
+Depuis le répertoire wavy-devops. Vérifier les fichiers exacts et les index avant chaque commit.
+
+# wavy-devops
+git -C . diff --check
+git -C . add -- .gitignore docs/wavy-local.md docs/wavy-menu.md preparation/https-msi/Caddyfile.candidate preparation/https-msi/Caddyfile.local-only.candidate preparation/https-msi/INSTALLATION.txt preparation/https-msi/WAVY-LOCAL-CYCLE.txt preparation/https-msi/check_caddy_adapter.py preparation/https-msi/chrome-bundle-diagnostic.cjs preparation/https-msi/chrome-diagnostics.cjs preparation/https-msi/chrome-navigation.cjs preparation/https-msi/chrome-notes.cjs preparation/https-msi/chrome-probe.cjs preparation/https-msi/functional_preflight.py preparation/https-msi/local_auth.py preparation/https-msi/local_functional.py preparation/https-msi/prepare-functional-fixtures.cjs preparation/https-msi/test-chrome-diagnostics.cjs preparation/https-msi/test_https_msi.py preparation/https-msi/test_local_auth.py preparation/https-msi/test_manual_session.py preparation/https-msi/test_nginx_runtime.py preparation/https-msi/test_session_challenge_runtime.py preparation/https-msi/wavy_deploy.py preparation/publication-candidate/COMMANDES-APRES-ACCORD.txt preparation/publication-candidate/RAPPORT.md preparation/publication-candidate/cohort-candidate.json preparation/publication-candidate/inventaire.json preparation/publication-candidate/release-plan.json.template preparation/publication-candidate/versions/preprod.digests.template preparation/publication-candidate/versions/preprod.env.template preparation/publication-candidate/versions/recette.digests.template preparation/publication-candidate/versions/recette.env.template scripts/test-wavy-local.py scripts/test-wavy-menu.py scripts/wavy-deploy.sh wavy
+git -C . diff --cached --stat
+git -C . commit -m 'feat(devops): unifie le cycle HTTPS local et le menu interactif'
+git -C . push origin HEAD:master
+
+# wavy-erp-shell
+git -C ../wavy-erp-shell diff --check
+git -C ../wavy-erp-shell add -- e2e/pwa-notes-frais.local.spec.ts src/app/app.html src/app/app.scss src/app/app.ts src/app/core/pwa-integration.service.ts src/app/core/wavy-context.service.ts src/app/navigation.spec.ts src/styles.scss
+git -C ../wavy-erp-shell diff --cached --stat
+git -C ../wavy-erp-shell commit -m 'feat(shell): integre Mobile PWA et remplit la zone de travail'
+git -C ../wavy-erp-shell push origin HEAD:master
+
+# wavy-pwa
+git -C ../wavy-pwa diff --check
+git -C ../wavy-pwa add -- ngsw-config.json src/app/app.config.ts src/app/app.css src/app/app.html src/app/app.ts src/styles.css
+git -C ../wavy-pwa diff --cached --stat
+git -C ../wavy-pwa commit -m 'fix(pwa): adapte le layout integre et isole le service worker'
+git -C ../wavy-pwa push origin HEAD:main
+
+# wavy-tiers-front
+git -C ../wavy-tiers-front diff --check
+git -C ../wavy-tiers-front add -- src/app/app.scss src/styles.scss
+git -C ../wavy-tiers-front diff --cached --stat
+git -C ../wavy-tiers-front commit -m 'fix(layout): transmet la surface disponible au module tiers'
+git -C ../wavy-tiers-front push origin HEAD:master
+
+# wavy-contrats-front
+git -C ../wavy-contrats-front diff --check
+git -C ../wavy-contrats-front add -- src/app/app.scss src/environments/environment.preprod.ts src/styles.scss
+git -C ../wavy-contrats-front diff --cached --stat
+git -C ../wavy-contrats-front commit -m 'fix(layout): transmet la surface disponible au module contrats'
+git -C ../wavy-contrats-front push origin HEAD:master
+
+# wavy-factures-front
+git -C ../wavy-factures-front diff --check
+git -C ../wavy-factures-front add -- src/app/app.css src/environments/environment.preprod.ts src/styles.css
+git -C ../wavy-factures-front diff --cached --stat
+git -C ../wavy-factures-front commit -m 'fix(layout): remplit la zone de travail factures'
+git -C ../wavy-factures-front push origin HEAD:master
+
+# wavy-tresorerie-front
+git -C ../wavy-tresorerie-front diff --check
+git -C ../wavy-tresorerie-front add -- src/app/app.scss src/app/features/tresorerie/pages/tresorerie.page.css src/styles.scss
+git -C ../wavy-tresorerie-front diff --cached --stat
+git -C ../wavy-tresorerie-front commit -m 'fix(layout): remplit la surface du module tresorerie'
+git -C ../wavy-tresorerie-front push origin HEAD:master
+
+# wavy-gateway
+git -C ../wavy-gateway diff --check
+git -C ../wavy-gateway add -- src/test/java/fr/wavy/gateway/ActuatorRecetteTest.java src/test/java/fr/wavy/gateway/HttpsProxyRecetteTest.java
+git -C ../wavy-gateway diff --cached --stat
+git -C ../wavy-gateway commit -m 'test(gateway): verifie CORS HTTPS et les entetes du proxy'
+git -C ../wavy-gateway push origin HEAD:master
+
+# GHCR : fournir GHCR_USERNAME / GHCR_TOKEN par le canal sécurisé, jamais dans le texte.
+# Réexécute tests et build propre avec vrai SHA ; garde inchangée.
+./scripts/build-image.sh erp-shell 0.2.0 --push
+./scripts/build-image.sh pwa 0.2.0 --push
+./scripts/build-image.sh tiers-front 0.2.0 --push
+./scripts/build-image.sh contrats-front 0.2.0 --push
+./scripts/build-image.sh factures-front 0.2.0 --push
+./scripts/build-image.sh tresorerie-front 0.2.0 --push
+
+# Après obtention des vrais digests : matérialiser les candidats de versions et release-plan, comparer les 13 pins, puis commit DevOps séparé.
+# Ne pas exécuter de commande sur les VMs.

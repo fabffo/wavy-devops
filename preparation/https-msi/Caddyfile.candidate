@@ -1,0 +1,40 @@
+# Windows MSI uniquement. Fichier candidat ; ne remplace pas le Caddyfile actif.
+# Ports NAT à confirmer avant toute promotion. Aucune modification DNS public.
+{
+    admin 127.0.0.1:2019
+}
+
+(wavy_private_https) {
+    bind 127.0.0.1
+    tls internal
+    @cross_origin_write {
+        path /api /api/*
+        not method GET HEAD OPTIONS
+        not header Origin https://{args[0]}
+    }
+    respond @cross_origin_write 403
+    reverse_proxy 127.0.0.1:{args[1]} {
+        header_up Host {args[0]}
+        header_up X-Forwarded-Host {args[0]}
+        header_up X-Forwarded-Proto https
+        header_up X-Forwarded-Port 443
+        header_up X-Forwarded-For {http.request.remote.host}
+        header_up -Forwarded
+        header_up -X-Tenant-Id
+        header_up -X-Utilisateur-Id
+        header_up -X-Societe-Courante-Id
+        header_up -X-Wavy-Roles
+        header_up -X-Roles
+        header_up -X-Wavy-Email
+    }
+}
+
+recettelocal.wavyservices.fr {
+    import wavy_private_https recettelocal.wavyservices.fr 24207
+}
+recette.wavyservices.fr {
+    import wavy_private_https recette.wavyservices.fr 34443
+}
+preprod.wavyservices.fr {
+    import wavy_private_https preprod.wavyservices.fr 24443
+}

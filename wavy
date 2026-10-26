@@ -61,6 +61,14 @@ Usage :
   ./wavy stop local|recette|preprod
   ./wavy clean
   ./wavy ai recette
+  ./wavy local up|down|restart|status|logs|test [modules...] [--dry-run]
+  ./wavy local up pwa --build-frontends
+  ./wavy local test pwa --chrome
+  ./wavy promotion-plan recette|preprod
+
+Modules locaux HTTPS : socle tiers contrats factures tresorerie pwa
+Sans module : mode complet. Pas de rebuild ni suppression de volume implicite.
+La syntaxe historique (par exemple ./wavy start local) reste inchangée.
 
 Services logiques :
   socle-api tiers-api contrats-api factures-api tresorerie-api gateway
@@ -82,6 +90,11 @@ validate_env_arg() {
     local|recette|preprod) ;;
     *) die "Environnement invalide : $env. Valeurs attendues : local, recette, preprod." ;;
   esac
+}
+
+guard_active_https_session() {
+  [[ "$1" != recette || ( ! -f "$ROOT_DIR/deployments/recette-https-reservation.json" && ! -f "$HOME/.local/state/wavy/recettelocal/runtime-info.json" ) ]] \
+    || die "RECETTE MSI HTTPS réservée : utiliser ./wavy local (ou fermer/restaurer explicitement la session avant une commande historique mutante)."
 }
 
 is_known_service() {
@@ -146,6 +159,7 @@ build_cmd() {
   local env="$1"
   local target="${2:-all}"
   validate_env_arg "$env"
+  guard_active_https_session "$env"
   [[ "$env" != preprod ]] || die "PREPROD est IMAGE uniquement. Utiliser deploy.sh preprod <composant>."
   require_docker
 
@@ -166,6 +180,7 @@ build_cmd() {
 restart_all_cmd() {
   local env="$1"
   validate_env_arg "$env"
+  guard_active_https_session "$env"
   require_docker
 
   if [[ "$env" == "recette" ]]; then
@@ -188,6 +203,7 @@ restart_all_cmd() {
 start_cmd() {
   local env="$1"
   validate_env_arg "$env"
+  guard_active_https_session "$env"
   require_docker
   if [[ "$env" == "preprod" ]]; then
     die "Provisionnement initial séparé requis : voir README_PREPROD.md. Pour une mise à jour : deploy.sh preprod <composant>."
@@ -218,6 +234,7 @@ restart_cmd() {
   local env="$1"
   local target="${2:-}"
   validate_env_arg "$env"
+  guard_active_https_session "$env"
   [[ -n "$target" ]] || die "Service manquant. Exemple : ./wavy restart recette factures-api"
 
   if [[ "$target" == "all" ]]; then
@@ -256,6 +273,7 @@ backup_cmd() {
 
 restore_cmd() {
   local env="$1"
+  guard_active_https_session "$env"
   local backup="${2:-}"
   if [[ "$env" == "preprod" ]]; then
     [[ -n "$backup" ]] || die "Usage : ./wavy restore preprod backups/preprod/<horodatage>"
@@ -267,6 +285,7 @@ restore_cmd() {
 
 stop_cmd() {
   local env="$1"
+  guard_active_https_session "$env"
   run_with_env "$env" "$SCRIPT_DIR/stop-all.sh"
 }
 
@@ -299,140 +318,282 @@ ai_cmd() {
   done
 }
 
+# The interactive UI delegates to the existing CLI; it never selects a Docker
+# project from a VM label. Historical verb-first commands below stay unchanged.
+MENU_INPUT="" MENU_NAV="" MENU_QUIT=0
+MENU_MODULES=()
+
+menu_read() {
+  MENU_INPUT=""
+  read -r -p "$1" MENU_INPUT || MENU_INPUT=q
+}
+
+menu_control() {
+  MENU_NAV=""
+  case "${MENU_INPUT,,}" in
+    b|r|retour|0) MENU_NAV=back ;;
+    m|principal) MENU_NAV=main ;;
+    q|quitter) MENU_NAV=quit; MENU_QUIT=1 ;;
+  esac
+}
+
 pause_menu() {
-  printf "\n"
-  read -r -p "Appuyer sur Entrée pour continuer..." _
+  menu_read $'\nEntrée : actions · m : menu principal · q : quitter > '
+  menu_control
+}
+
+menu_heading() {
+  printf '\n────────────────────────────────────────────────────────────\n'
+  printf ' WAVY  |  %s\n' "$1"
+  printf '────────────────────────────────────────────────────────────\n'
+}
+
+menu_command() {
+  printf '\nCommande : ./wavy'
+  printf ' %q' "$@"
+  printf '\n'
+}
+
+menu_run() {
+  menu_command "$@"
+  local code
+  if "$ROOT_DIR/wavy" "$@" </dev/null; then
+    printf '\nOpération terminée.\n'
+  else
+    code=$?
+    printf '\nOpération en échec (code %s). Le menu reste disponible.\n' "$code"
+  fi
+}
+
+menu_confirm() {
+  menu_read "$1 Saisir oui pour confirmer [annuler] : "
+  menu_control
+  [[ -z "$MENU_NAV" && "${MENU_INPUT,,}" == oui ]]
+}
+
+menu_select_modules() {
+  local token module invalid found
+  local -a tokens
+  while true; do
+    printf '\nModules : 1 Socle · 2 Tiers · 3 Contrats · 4 Factures · 5 Trésorerie · 6 PWA\n'
+    printf 'Tous : Entrée ou tous. Sélection multiple : 2 4 ou tiers,pwa.\n'
+    menu_read 'Modules [tous] · b retour · m principal · q quitter > '
+    # 0 means all here, rather than back; b is always available.
+    if [[ "$MENU_INPUT" != 0 ]]; then
+      menu_control
+      [[ -z "$MENU_NAV" ]] || return 1
+    fi
+    MENU_MODULES=(); invalid=false
+    read -r -a tokens <<< "${MENU_INPUT//,/ }"
+    if [[ ${#tokens[@]} == 0 ]]; then MENU_NAV=""; return 0; fi
+    if [[ ${#tokens[@]} == 1 ]]; then
+      case "${tokens[0],,}" in tous|all|0) MENU_NAV=""; return 0;; esac
+    fi
+    for token in "${tokens[@]}"; do
+      case "${token,,}" in
+        1|socle) module=socle;; 2|tiers) module=tiers;;
+        3|contrats) module=contrats;; 4|factures) module=factures;;
+        5|tresorerie|trésorerie) module=tresorerie;; 6|pwa) module=pwa;;
+        *) invalid=true; break;;
+      esac
+      found=false
+      for token in "${MENU_MODULES[@]}"; do [[ "$token" != "$module" ]] || found=true; done
+      [[ "$found" == true ]] || MENU_MODULES+=("$module")
+    done
+    if [[ "$invalid" == false ]]; then MENU_NAV=""; return 0; fi
+    printf 'Sélection invalide : utiliser les numéros/noms ci-dessus, ou tous seul.\n'
+  done
+}
+
+menu_format_local() {
+  python3 -c '
+import json,sys
+r=json.load(sys.stdin)
+if sys.argv[1]=="status":
+ print("\n{:<24} {:<14} {}".format("Service", "État Docker", "Santé Docker"))
+ for name,row in sorted(r["services"].items()):
+  print("{:<24} {:<14} {}".format(name,row.get("state","inconnu"),row.get("health") or "non définie"))
+ print("\nOrigine : "+r["origin"])
+else:
+ for key,label in (("required","Ensemble requis (modules + dépendances)"),("wouldStop","Arrêts prévus"),("retainedShared","Dépendances partagées conservées")):
+  print("\n"+label+" : "+(", ".join(r.get(key,[])) or "aucun"))
+ print("\nBases : conservées actives par défaut. Volumes et documents : conservés.")
+ print("Le moteur réévalue ce plan à l’exécution ; les services déjà actifs sont réutilisés.")
+' "$1"
+}
+
+menu_preview() {
+  local plan
+  menu_command "$@" --dry-run
+  if plan=$("$ROOT_DIR/wavy" "$@" --dry-run </dev/null); then
+    if printf '%s\n' "$plan" | menu_format_local plan; then return 0; fi
+  fi
+  printf '\nAperçu indisponible ou invalide : aucune mutation exécutée.\n'
+  return 1
 }
 
 run_menu_action() {
-  local env="$1"
-  local choice="$2"
-
+  local env="$1" choice="$2" verb="" mode="" tail=50 output
+  MENU_NAV=""
+  if [[ "$env" != msi ]]; then
+    if [[ "$choice" == 11 ]]; then
+      case "$env" in
+        recette-vm) menu_run promotion-plan recette;;
+        preprod-vm) menu_run promotion-plan preprod;;
+      esac
+    else
+      printf '\nIndisponible depuis MSI : aucun transport VM implémenté.\n'
+      printf 'Aucun statut distant consulté et aucune commande Docker locale exécutée à sa place.\n'
+      printf 'Les scripts de déploiement/sauvegarde existants doivent être utilisés sur leur hôte cible avec leurs gardes.\n'
+    fi
+    return 0
+  fi
   case "$choice" in
-    1) run_with_env "$env" "$SCRIPT_DIR/doctor.sh" ;;
-    2) show_status "$env" ;;
-    3) build_cmd "$env" all ;;
-    4) restart_cmd "$env" all ;;
-    5) restart_cmd "$env" socle-api ;;
-    6) restart_cmd "$env" tiers-api ;;
-    7) restart_cmd "$env" contrats-api ;;
-    8) restart_cmd "$env" factures-api ;;
-    9) restart_cmd "$env" tresorerie-api ;;
-    10) restart_cmd "$env" gateway ;;
-    11) restart_cmd "$env" socle-front ;;
-    12) restart_cmd "$env" tiers-front ;;
-    13) restart_cmd "$env" contrats-front ;;
-    14) restart_cmd "$env" factures-front ;;
-    15) restart_cmd "$env" tresorerie-front ;;
-    16) restart_cmd "$env" pwa ;;
-    17) restart_cmd "$env" erp-shell ;;
-    18) run_with_env "$env" "$SCRIPT_DIR/logs.sh" ;;
-    19) backup_cmd "$env" ;;
-    20) restore_cmd "$env" ;;
-    21) stop_cmd "$env" ;;
-    22) "$SCRIPT_DIR/clean.sh" ;;
-    23)
-      [[ "$env" == "recette" ]] || die "Option réservée à l'environnement recette."
-      ai_cmd recette
-      ;;
-    24)
-      [[ "$env" == "recette" ]] || die "Option réservée à l'environnement recette."
-      restart_cmd recette factures-api
-      ;;
-    25)
-      [[ "$env" == "recette" ]] || die "Option réservée à l'environnement recette."
-      logs_cmd recette factures-api
-      ;;
-    *) warn "Choix inconnu : $choice" ;;
+    1) verb=up;; 2) verb=down;; 3) verb=restart;;
+    4) verb=status;; 5) verb=test;; 6) verb=logs;; 7) verb=test;; 8) verb=up;;
+    9)
+      printf '\nSauvegarde existante : CINQ BASES locales, sans les documents.\n'
+      printf 'Pas de snapshot distribué cohérent garanti pendant les écritures. Aucun arrêt automatique.\n'
+      menu_command backup recette
+      if menu_confirm 'Créer cette sauvegarde BDD partielle ?'; then
+        # Validate the local-only host/context before the legacy read-only backup.
+        if "$ROOT_DIR/wavy" local status </dev/null >/dev/null; then menu_run backup recette
+        else printf 'Garde locale en échec ; sauvegarde non lancée.\n'; fi
+      else printf 'Sauvegarde annulée.\n'; fi
+      return 0;;
+    10)
+      printf '\nRestauration non proposée dans le cycle local permanent :\n'
+      printf 'la commande historique est protégée et ne restaure pas les justificatifs.\n'
+      printf 'Aucune base ni aucun volume modifié. La syntaxe historique reste disponible dans ./wavy help.\n'
+      return 0;;
+    *) printf 'Choix inconnu.\n'; return 0;;
+  esac
+  menu_select_modules || return 0
+  if [[ "$choice" == 6 ]]; then
+    while true; do
+      menu_read 'Lignes de logs par service [50, max 1000] · b/m/q > '
+      menu_control; [[ -z "$MENU_NAV" ]] || return 0
+      tail=${MENU_INPUT:-50}
+      if [[ "$tail" =~ ^[0-9]{1,4}$ ]] && ((10#$tail<=1000)); then tail=$((10#$tail)); break; fi
+      printf 'Nombre attendu entre 0 et 1000.\n'
+    done
+  fi
+  if [[ "$choice" == 7 ]]; then
+    printf '\nTests : 1 Santé + HTTPS (sans connexion) · 2 Chrome ERP/PWA · 3 Captures responsive\n'
+    menu_read 'Test [1] · b/m/q > '
+    menu_control; [[ -z "$MENU_NAV" ]] || return 0
+    case "${MENU_INPUT:-1}" in
+      1) ;;
+      2|3)
+        if [[ ${#MENU_MODULES[@]} != 0 && " ${MENU_MODULES[*]} " != *' pwa '* ]]; then
+          printf 'Le parcours ERP/PWA nécessite PWA sélectionné (ou tous), déjà démarré.\n'; return 0
+        fi
+        if [[ "$MENU_INPUT" == 2 ]]; then mode=chrome; else mode=layout; fi;;
+      *) printf 'Test inconnu.\n'; return 0;;
+    esac
+  fi
+  local -a command=(local "$verb" "${MENU_MODULES[@]}")
+  case "$choice" in
+    1|2|3|8)
+      if [[ "$choice" == 8 ]]; then
+        printf '\nBuild : reconstruction des SIX fronts locaux puis démarrage/application sur la sélection.\n'
+        printf 'Images API réutilisées ; aucun build API/push.\n'
+        command+=(--build-frontends)
+      fi
+      menu_preview "${command[@]}" || return 0
+      menu_command "${command[@]}"
+      if menu_confirm 'Appliquer cette action locale ?'; then menu_run "${command[@]}"
+      else printf 'Action annulée.\n'; fi;;
+    4)
+      menu_command "${command[@]}"
+      if output=$("$ROOT_DIR/wavy" "${command[@]}" </dev/null); then
+        printf '%s\n' "$output" | menu_format_local status || printf 'Statut illisible.\n'
+      else printf 'Lecture des statuts en échec.\n'; fi;;
+    6) menu_run "${command[@]}" --tail "$tail";;
+    *)
+      case "$mode" in
+        chrome) command+=(--chrome);;
+        layout) command+=(--layout after);;
+      esac
+      if [[ -n "$mode" ]]; then
+        printf '\nParcours Chrome réel avec le compte de test configuré ; aucune écriture métier automatique.\n'
+        if ! menu_confirm 'Ouvrir ce parcours navigateur ?'; then printf 'Test annulé.\n'; return 0; fi
+      fi
+      menu_run "${command[@]}";;
   esac
 }
 
 environment_menu() {
-  local env="$1"
-  local title choice
-  validate_env_arg "$env"
-
-  if [[ "$env" == "local" ]]; then
-    title="WAVY CLI - LOCAL"
-  else
-    title="WAVY CLI - ${env^^}"
-  fi
-
-  while true; do
-    clear || true
-    printf "${BLUE}==============================${NC}\n"
-    printf "${BLUE}%22s${NC}\n" "$title"
-    printf "${BLUE}==============================${NC}\n\n"
-    cat <<EOF
-1  - Doctor
-2  - Statut Docker
-3  - Build all $env
-4  - Rebuild image + restart all $env
-
-5  - Rebuild image + restart Socle API
-6  - Rebuild image + restart Tiers API
-7  - Rebuild image + restart Contrats API
-8  - Rebuild image + restart Factures API
-9  - Rebuild image + restart Trésorerie API
-10 - Rebuild image + restart Gateway
-
-11 - Rebuild bundle/image + restart Socle Front
-12 - Rebuild bundle/image + restart Tiers Front
-13 - Rebuild bundle/image + restart Contrats Front
-14 - Rebuild bundle/image + restart Factures Front
-15 - Rebuild bundle/image + restart Trésorerie Front
-16 - Rebuild bundle/image + restart PWA
-17 - Rebuild bundle/image + restart Wavy ERP Shell ($env)
-
-18 - Logs
-19 - Backup DB $env
-20 - Restore DB $env
-21 - Stop $env
-22 - Clean Docker
+  local env="$1" title url choice
+  case "$env" in
+    msi) title='RECETTE locale MSI'; url='https://recettelocal.wavyservices.fr';;
+    recette-vm) title='RECETTE distante VM'; url='https://recette.wavyservices.fr';;
+    preprod-vm) title='PREPROD VM'; url='https://preprod.wavyservices.fr';;
+    *) return 1;;
+  esac
+  while [[ "$MENU_QUIT" != 1 ]]; do
+    menu_heading "$title"
+    printf 'URL configurée : %s\n' "$url"
+    if [[ "$env" == msi ]]; then
+      printf 'Projet : wavy-recette sur MSI · cycle permanent · aucun nettoyage automatique\n\n'
+      cat <<'EOF'
+  1  Démarrer                         6  Logs bornés
+  2  Arrêter                         7  Tests
+  3  Redémarrer                      8  Build des fronts + démarrer
+  4  Statuts Docker réels            9  Sauvegarde BDD (documents exclus)
+  5  Santé conteneurs + HTTPS        10 Restauration [indisponible]
 EOF
-    if [[ "$env" == "recette" ]]; then
-      cat <<EOF
-
-23 - Vérifier variables IA
-24 - Rebuild image + restart Factures API avec .env.recette
-25 - Logs Factures API
+    else
+      cat <<'EOF'
+État distant : non interrogé. URL configurée, accessibilité non vérifiée.
+Transport VM absent : les actions suivantes ne sont pas exécutables depuis MSI :
+  démarrer / arrêter / redémarrer / statuts / santé / logs / tests / build /
+  sauvegarde / restauration.
+  1 Démarrer [—]             6 Logs [—]
+  2 Arrêter [—]              7 Tests [—]
+  3 Redémarrer [—]           8 Build [—]
+  4 Statuts [—]              9 Sauvegarde [—]
+  5 Santé [—]                10 Restauration [—]
+  11 Préparer le plan de promotion par digest [LOCAL, sans accès VM]
 EOF
     fi
-    cat <<EOF
-
-0  - Retour
-
-EOF
-    read -r -p "Choix : " choice
-    [[ "$choice" == "0" ]] && return
+    printf '\n  b / 0 Retour aux environnements · m Menu principal · q Quitter\n'
+    menu_read 'Action > '
+    menu_control
+    case "$MENU_NAV" in back|main) return 0;; quit) return 0;; esac
+    choice="$MENU_INPUT"
+    if [[ "$env" == msi && ! "$choice" =~ ^([1-9]|10)$ ]] ||
+       [[ "$env" != msi && ! "$choice" =~ ^([1-9]|10|11)$ ]]; then
+      printf 'Choix inconnu.\n'; continue
+    fi
     run_menu_action "$env" "$choice"
+    case "$MENU_NAV" in main|quit) return 0;; back) continue;; esac
     pause_menu
+    case "$MENU_NAV" in main|quit) return 0;; esac
   done
 }
 
 interactive_menu() {
   local choice
-  while true; do
-    clear || true
-    printf "${BLUE}==============================${NC}\n"
-    printf "${BLUE}          WAVY CLI${NC}\n"
-    printf "${BLUE}==============================${NC}\n\n"
-    cat <<EOF
-Choisir un environnement :
-
-1 - Local
-2 - Recette
-3 - Préproduction
-0 - Quitter
-
+  MENU_QUIT=0
+  while [[ "$MENU_QUIT" != 1 ]]; do
+    menu_heading 'Menu principal'
+    cat <<'EOF'
+  1  RECETTE locale MSI  — exploitation quotidienne HTTPS
+  2  RECETTE distante VM — capacités et préparation locale
+  3  PREPROD VM          — capacités et préparation locale
+  4  Aide / commandes historiques (syntaxes conservées)
+  0 / q Quitter
 EOF
-    read -r -p "Choix : " choice
-    case "$choice" in
-      1) environment_menu local ;;
-      2) environment_menu recette ;;
-      3) environment_menu preprod ;;
-      0) exit 0 ;;
-      *) warn "Choix inconnu : $choice"; pause_menu ;;
+    menu_read 'Environnement > '
+    choice="$MENU_INPUT"
+    case "${choice,,}" in
+      1) environment_menu msi;;
+      2) environment_menu recette-vm;;
+      3) environment_menu preprod-vm;;
+      4) usage; pause_menu;;
+      0|q|quitter) return 0;;
+      *) printf 'Choix inconnu.\n';;
     esac
   done
 }
@@ -446,6 +607,10 @@ main() {
   shift || true
 
   case "$command" in
+    local) exec python3 -B "$ROOT_DIR/preparation/https-msi/wavy_deploy.py" --local-cli "$@" ;;
+    promotion-plan)
+      [[ "$#" -eq 1 && ( "$1" == recette || "$1" == preprod ) ]] || die "Usage : ./wavy promotion-plan recette|preprod"
+      exec python3 -B "$ROOT_DIR/preparation/https-msi/wavy_deploy.py" "$1" plan ;;
     help|-h|--help) usage ;;
     doctor) "$SCRIPT_DIR/doctor.sh" ;;
     start) start_cmd "${1:-}" ;;

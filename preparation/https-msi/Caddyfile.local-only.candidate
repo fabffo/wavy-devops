@@ -1,0 +1,30 @@
+recettelocal.wavyservices.fr {
+    bind 127.0.0.1
+    tls internal
+    @cross_origin_write {
+        path /api /api/*
+        not method GET HEAD OPTIONS
+        not header Origin https://recettelocal.wavyservices.fr
+    }
+    respond @cross_origin_write 403
+    reverse_proxy 127.0.0.1:24207 {
+        header_up Host recettelocal.wavyservices.fr
+        header_up X-Forwarded-Host recettelocal.wavyservices.fr
+        header_up X-Forwarded-Proto https
+        header_up X-Forwarded-Port 443
+        header_up X-Forwarded-For {http.request.remote.host}
+        header_up -Forwarded
+    }
+}
+
+recette.wavyservices.fr {
+    bind 127.0.0.1
+    tls internal
+    respond "Wavy RECETTE VM - HTTPS OK" 200
+}
+
+preprod.wavyservices.fr {
+    bind 127.0.0.1
+    tls internal
+    reverse_proxy 127.0.0.1:24443
+}

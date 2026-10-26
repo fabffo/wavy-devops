@@ -1,0 +1,40 @@
+Contrat d'exécution de ./wavy local — MSI uniquement
+Invocation explicite de up/down/restart : accord sur le cycle technique demandé,
+jamais sur des données métier,fixtures,migrations nouvelles ou ouverture PWA.
+Compose RECETTE existant,projet wavy-recette,images par digest de la cohorte revue.
+L'ancienne syntaxe ./wavy start local conserve son projet source historique.
+
+Socle et Tiers sont interdépendants en exécution ; leur fermeture est résolue
+sans récursion infinie. Contrats utilise Socle/Tiers ; Factures utilise aussi
+Contrats ; Trésorerie utilise Factures/Tiers/Socle ; PWA utilise Factures et Gateway.
+Chaque module ERP ajoute son front ; tous utilisent Gateway et ERP Shell.
+Gateway ne force pas le démarrage des API de routes optionnelles. Shell résout
+ses fronts optionnels à la requête pour permettre les vrais démarrages partiels.
+
+Pas d'argument module : ensemble des six modules. up démarre les dépendances
+nécessaires manquantes,ne recrée pas une application déjà active. restart ne coupe
+pas un service utilisé par un autre module actif ; il signale les services retenus.
+down stoppe les applications sélectionnées devenues inutilisées,sans suppression.
+Bases laissées démarrées par défaut ; down --databases stoppe seulement les bases
+inutilisées,avec leurs conteneurs/volumes conservés. Jamais compose down,down-v,
+rm de volume,build,pull,reset ou migration volontaire dans ce cycle.
+
+La session HTTPS manuelle courante est réutilisée,sans nouveau compte/login ni
+perte volontaire de session Socle. Réservation,verrou et journal existants partagés.
+Pas de nettoyage ou rollback automatique,les services restent après les tests.
+Une fermeture/restauration de session reste une action explicite --confirm-close.
+Les commandes historiques mutantes RECETTE sont bloquées pendant cette réservation
+pour éviter qu'un rebuild ancien écrase la chaîne HTTPS ; les autres usages restent.
+
+PWA : démarrer son conteneur ne lève PAS le gate. Image privée,sans port publié,
+PWA/interface et écritures Notes fermées par défaut. Origines,auth,cookies,isolation,
+protection des justificatifs et correctif Basic de /api/auth/session conservés.
+Le profil reste en lecture seule métier,hors connexion/changement société/logout.
+test = santé + sondes HTTPS anonymes,sans données métier ni247 tests rejoués.
+Logs expurgés des secrets connus,des cookies et des autorisations Basic/Bearer.
+
+Le premier démarrage à froid exige les conteneurs et volumes PostgreSQL existants
+et des preuves Flyway/JPA compatibles ; ce n'est pas un installateur de base vide.
+Chaque arrêt est calculé sur les modules déclarés ET les consommateurs réellement
+actifs. Les commandes locales n'accèdent jamais aux VMs ni aux manifestes distants.
+promotion-plan prépare seulement la cohorte immuable,aucun déploiement distant.
