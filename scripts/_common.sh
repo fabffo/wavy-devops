@@ -78,6 +78,22 @@ component_key() {
   printf '%s' "$1" | tr '[:lower:]-' '[:upper:]_'
 }
 
+# Verrou RECETTE déjà utilisé par le cycle MSI : pas de backup et recréation concurrents.
+recette_operation_lock() {
+  local lock="$ROOT_DIR/deployments/recette.lock" current_umask fd
+  mkdir -p "$ROOT_DIR/deployments"
+  [[ ! -L "$lock" ]] || die 'Verrou RECETTE symbolique refusé.'
+  if [[ "${WAVY_RECETTE_LOCK_FD:-}" =~ ^[0-9]+$ && -e "/proc/$$/fd/$WAVY_RECETTE_LOCK_FD" && "$lock" -ef "/proc/$$/fd/$WAVY_RECETTE_LOCK_FD" ]]; then
+    fd="$WAVY_RECETTE_LOCK_FD"
+  else
+    current_umask="$(umask)"; umask 077
+    exec {fd}>>"$lock"
+    umask "$current_umask"
+    export WAVY_RECETTE_LOCK_FD="$fd"
+  fi
+  flock -n "$fd" || die 'Une opération RECETTE est déjà en cours.'
+}
+
 deployment_mode() {
   local env="$1" component="$2"
   case "$env/$component" in

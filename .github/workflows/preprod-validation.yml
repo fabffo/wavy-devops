@@ -5,6 +5,8 @@ on:
     paths:
       - docker-compose.preprod*.yml
       - docker-compose.recette.yml
+      - docker/recette-pwa/**
+      - docs/pwa-recette-*.md
       - versions/recette.*
       - .env.preprod.example
       - .env.recette.example
@@ -35,6 +37,8 @@ jobs:
         run: |
           python3 scripts/test-release-images.py
           python3 scripts/test-gateway-cors.py
+          python3 scripts/test-recette-pwa.py
+          python3 scripts/test-recette-documents.py
           python3 scripts/test-preprod-config.py
           python3 scripts/test-preprod-guards.py
           python3 scripts/test-preprod-nginx.py

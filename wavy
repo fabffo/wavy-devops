@@ -64,6 +64,7 @@ Usage :
   ./wavy local up|down|restart|status|logs|test [modules...] [--dry-run]
   ./wavy local up pwa --build-frontends
   ./wavy local test pwa --chrome
+  ./wavy pwa recette check [--runtime] [--backup-dir <lot>] [--plan]
   ./wavy promotion-plan recette|preprod
 
 Modules locaux HTTPS : socle tiers contrats factures tresorerie pwa
@@ -608,6 +609,7 @@ main() {
 
   case "$command" in
     local) exec python3 -B "$ROOT_DIR/preparation/https-msi/wavy_deploy.py" --local-cli "$@" ;;
+    pwa) exec python3 -B "$SCRIPT_DIR/recette_pwa.py" "$@" ;;
     promotion-plan)
       [[ "$#" -eq 1 && ( "$1" == recette || "$1" == preprod ) ]] || die "Usage : ./wavy promotion-plan recette|preprod"
       exec python3 -B "$ROOT_DIR/preparation/https-msi/wavy_deploy.py" "$1" plan ;;

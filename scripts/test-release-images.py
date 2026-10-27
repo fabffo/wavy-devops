@@ -20,6 +20,7 @@ class ReleaseImages(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory()
         self.root = Path(self.tmp.name)
         shutil.copytree(ROOT/'versions', self.root/'versions')
+        shutil.copytree(ROOT/'docker/recette-pwa', self.root/'docker/recette-pwa')
         for env in ('recette', 'preprod'):
             shutil.copy(ROOT/f'docker-compose.{env}.yml', self.root)
             text = (ROOT/f'.env.{env}.example').read_text().replace('CHANGE_ME', 'fictional-test-only')
@@ -67,6 +68,8 @@ class ReleaseImages(unittest.TestCase):
         calls = []
         def docker(cmd, **kwargs):
             calls.append(cmd)
+            if cmd[:2] == ['docker', 'inspect']:
+                return subprocess.CompletedProcess(cmd, 1, '', 'No such container')
             if cmd[:3] == ['docker', 'image', 'inspect']:
                 pinned = next(i for i in images.values() if i.startswith(cmd[3]+'@'))
                 repo = cmd[3].rsplit(':', 1)[0]
@@ -90,6 +93,8 @@ class ReleaseImages(unittest.TestCase):
         calls = []
         def docker(cmd, **kwargs):
             calls.append(cmd)
+            if cmd[:2] == ['docker', 'inspect']:
+                return subprocess.CompletedProcess(cmd, 1, '', 'No such container')
             if cmd[:3] == ['docker', 'image', 'inspect']:
                 repo = cmd[3].rsplit(':', 1)[0]
                 pinned = next(i for i in images.values() if i.startswith(cmd[3]+'@'))

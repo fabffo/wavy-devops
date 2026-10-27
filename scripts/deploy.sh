@@ -21,6 +21,8 @@ if [[ "${1:-}" == preprod ]]; then
   exec "$SCRIPT_DIR/release-preprod.sh" DEPLOY "$@"
 fi
 
+[[ "${1:-}" != recette ]] || recette_operation_lock
+
 started_at="$(date -Is)"
 result=KO
 env="${1:-inconnu}"

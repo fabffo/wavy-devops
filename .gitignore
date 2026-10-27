@@ -32,3 +32,6 @@ preparation/https-msi/PWA-SESSION*.txt
 preparation/https-msi/QUALIFICATION-FONCTIONNELLE.txt
 preparation/https-msi/RAPPORT.txt
 preparation/https-msi/FILES.txt
+
+# Verrou RECETTE partagé avec le cycle local permanent et les backups.
+deployments/recette.lock

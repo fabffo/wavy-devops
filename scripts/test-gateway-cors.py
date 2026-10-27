@@ -24,6 +24,7 @@ class GatewayCors(unittest.TestCase):
                 with self.subTest(env=env, custom=custom), tempfile.TemporaryDirectory() as tmp:
                     root = Path(tmp)
                     shutil.copytree(ROOT/'versions', root/'versions')
+                    shutil.copytree(ROOT/'docker/recette-pwa', root/'docker/recette-pwa')
                     shutil.copy(ROOT/f'docker-compose.{env}.yml', root)
                     text = (ROOT/f'.env.{env}.example').read_text().replace('CHANGE_ME', 'fictional')
                     if custom or custom is None:

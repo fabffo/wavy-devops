@@ -5,7 +5,7 @@ services:
     container_name: wavy-erp-shell-recette
     image: ${WAVY_IMAGE_REGISTRY}/wavy-erp-shell:${ERP_SHELL_VERSION}@${ERP_SHELL_DIGEST:?Digest de release requis}
     ports:
-      - "${WAVY_ERP_SHELL_HOST_PORT:-24207}:80"
+      - "${WAVY_RECETTE_PRIVATE_BIND_ADDRESS:-0.0.0.0}:${WAVY_ERP_SHELL_HOST_PORT:-24207}:80"
     environment:
       NGINX_ENVSUBST_FILTER: _UPSTREAM$
       API_UPSTREAM: http://wavy-gateway-recette:8088
@@ -38,7 +38,7 @@ services:
       POSTGRES_USER: ${WAVY_SOCLE_DB_USERNAME:-socle_user}
       POSTGRES_PASSWORD: ${WAVY_SOCLE_DB_PASSWORD:-motdepasse_recette}
     ports:
-      - "${WAVY_SOCLE_DB_HOST_PORT:-25432}:5432"
+      - "${WAVY_RECETTE_PRIVATE_BIND_ADDRESS:-0.0.0.0}:${WAVY_SOCLE_DB_HOST_PORT:-25432}:5432"
     volumes:
       - socle-postgres-recette-data:/var/lib/postgresql/data
     healthcheck:
@@ -57,7 +57,7 @@ services:
       POSTGRES_USER: ${WAVY_TIERS_DB_USER:-tiers_user}
       POSTGRES_PASSWORD: ${WAVY_TIERS_DB_PASSWORD:-motdepasse_recette}
     ports:
-      - "${WAVY_TIERS_DB_HOST_PORT:-25433}:5432"
+      - "${WAVY_RECETTE_PRIVATE_BIND_ADDRESS:-0.0.0.0}:${WAVY_TIERS_DB_HOST_PORT:-25433}:5432"
     volumes:
       - tiers-postgres-recette-data:/var/lib/postgresql/data
     healthcheck:
@@ -76,7 +76,7 @@ services:
       POSTGRES_USER: ${WAVY_CONTRATS_DB_USER:-contrats_user}
       POSTGRES_PASSWORD: ${WAVY_CONTRATS_DB_PASSWORD:-motdepasse_recette}
     ports:
-      - "${WAVY_CONTRATS_DB_HOST_PORT:-25434}:5432"
+      - "${WAVY_RECETTE_PRIVATE_BIND_ADDRESS:-0.0.0.0}:${WAVY_CONTRATS_DB_HOST_PORT:-25434}:5432"
     volumes:
       - contrats-postgres-recette-data:/var/lib/postgresql/data
     healthcheck:
@@ -95,7 +95,7 @@ services:
       POSTGRES_USER: ${WAVY_FACTURES_DB_USER:-factures_user}
       POSTGRES_PASSWORD: ${WAVY_FACTURES_DB_PASSWORD:-motdepasse_recette}
     ports:
-      - "${WAVY_FACTURES_DB_HOST_PORT:-25435}:5432"
+      - "${WAVY_RECETTE_PRIVATE_BIND_ADDRESS:-0.0.0.0}:${WAVY_FACTURES_DB_HOST_PORT:-25435}:5432"
     volumes:
       - factures-postgres-recette-data:/var/lib/postgresql/data
     healthcheck:
@@ -114,7 +114,7 @@ services:
       POSTGRES_USER: ${WAVY_TRESORERIE_DB_USER:-tresorerie_user}
       POSTGRES_PASSWORD: ${WAVY_TRESORERIE_DB_PASSWORD:-motdepasse_recette}
     ports:
-      - "${WAVY_TRESORERIE_DB_HOST_PORT:-25436}:5432"
+      - "${WAVY_RECETTE_PRIVATE_BIND_ADDRESS:-0.0.0.0}:${WAVY_TRESORERIE_DB_HOST_PORT:-25436}:5432"
     volumes:
       - tresorerie-postgres-recette-data:/var/lib/postgresql/data
     healthcheck:
@@ -147,7 +147,7 @@ services:
       SPRING_DATASOURCE_PASSWORD: ${WAVY_SOCLE_DB_PASSWORD:-motdepasse_recette}
       SPRING_DATASOURCE_DRIVER_CLASS_NAME: org.postgresql.Driver
     ports:
-      - "${WAVY_SOCLE_API_HOST_PORT:-28080}:8080"
+      - "${WAVY_RECETTE_PRIVATE_BIND_ADDRESS:-0.0.0.0}:${WAVY_SOCLE_API_HOST_PORT:-28080}:8080"
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://localhost:8080/actuator/health"]
       interval: 10s
@@ -178,7 +178,7 @@ services:
       WAVY_TIERS_SERVICE_PASSWORD: ${WAVY_TIERS_SERVICE_PASSWORD}
       WAVY_CORS_ALLOWED_ORIGIN_PATTERNS: ${WAVY_CORS_ALLOWED_ORIGIN_PATTERNS:-https://recette.wavyservices.fr,http://localhost:24200,http://localhost:24201,http://localhost:24202,http://localhost:24203,http://localhost:24204,http://localhost:24206,http://localhost:24207}
     ports:
-      - "${WAVY_TIERS_API_HOST_PORT:-28081}:8081"
+      - "${WAVY_RECETTE_PRIVATE_BIND_ADDRESS:-0.0.0.0}:${WAVY_TIERS_API_HOST_PORT:-28081}:8081"
     depends_on:
       tiers-postgres:
         condition: service_healthy
@@ -206,7 +206,7 @@ services:
       WAVY_CONTRATS_API_PORT: 8082
       WAVY_CONTRATS_STOCKAGE_PIECES_JOINTES: /app/data/contrats/pieces-jointes
     ports:
-      - "${WAVY_CONTRATS_API_HOST_PORT:-28082}:8082"
+      - "${WAVY_RECETTE_PRIVATE_BIND_ADDRESS:-0.0.0.0}:${WAVY_CONTRATS_API_HOST_PORT:-28082}:8082"
     volumes:
       - contrats-pieces-jointes-recette:/app/data/contrats/pieces-jointes
     healthcheck:
@@ -250,7 +250,7 @@ services:
       WAVY_AI_ACHAT_MINIMUM_CONFIDENCE: ${WAVY_AI_ACHAT_MINIMUM_CONFIDENCE:-0.90}
       WAVY_CORS_ALLOWED_ORIGIN_PATTERNS: ${WAVY_CORS_ALLOWED_ORIGIN_PATTERNS:-https://recette.wavyservices.fr,http://localhost:24200,http://localhost:24201,http://localhost:24202,http://localhost:24203,http://localhost:24204,http://localhost:24206,http://localhost:24207}
     ports:
-      - "${WAVY_FACTURES_API_HOST_PORT:-28083}:8083"
+      - "${WAVY_RECETTE_PRIVATE_BIND_ADDRESS:-0.0.0.0}:${WAVY_FACTURES_API_HOST_PORT:-28083}:8083"
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:8083/actuator/health"]
       interval: 10s
@@ -280,7 +280,7 @@ services:
       WAVY_TIERS_API_URL: http://wavy-tiers-api-recette:8081
       WAVY_CORS_ALLOWED_ORIGIN_PATTERNS: ${WAVY_CORS_ALLOWED_ORIGIN_PATTERNS:-https://recette.wavyservices.fr,http://localhost:24200,http://localhost:24201,http://localhost:24202,http://localhost:24203,http://localhost:24204,http://localhost:24206,http://localhost:24207}
     ports:
-      - "${WAVY_TRESORERIE_API_HOST_PORT:-28086}:8086"
+      - "${WAVY_RECETTE_PRIVATE_BIND_ADDRESS:-0.0.0.0}:${WAVY_TRESORERIE_API_HOST_PORT:-28086}:8086"
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:8086/actuator/health"]
       interval: 10s
@@ -310,7 +310,7 @@ services:
       WAVY_TRESORERIE_API_URL: http://wavy-tresorerie-api-recette:8086
       WAVY_CORS_ALLOWED_ORIGIN_PATTERNS: ${WAVY_CORS_ALLOWED_ORIGIN_PATTERNS:-https://recette.wavyservices.fr,http://localhost:24200,http://localhost:24201,http://localhost:24202,http://localhost:24203,http://localhost:24204,http://localhost:24206,http://localhost:24207}
     ports:
-      - "${WAVY_GATEWAY_HOST_PORT:-28088}:8088"
+      - "${WAVY_RECETTE_PRIVATE_BIND_ADDRESS:-0.0.0.0}:${WAVY_GATEWAY_HOST_PORT:-28088}:8088"
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:8088/actuator/health"]
       interval: 10s
@@ -339,7 +339,7 @@ services:
       API_UPSTREAM: http://wavy-gateway-recette:8088
       SOCLE_API_UPSTREAM: http://wavy-socle-api-recette:8080
     ports:
-      - "${WAVY_SOCLE_FRONT_HOST_PORT:-24200}:80"
+      - "${WAVY_RECETTE_PRIVATE_BIND_ADDRESS:-0.0.0.0}:${WAVY_SOCLE_FRONT_HOST_PORT:-24200}:80"
     depends_on:
       wavy-gateway-recette:
         condition: service_started
@@ -351,7 +351,7 @@ services:
     container_name: wavy-tiers-front-recette
     image: ${WAVY_IMAGE_REGISTRY}/wavy-tiers-front:${TIERS_FRONT_VERSION}@${TIERS_FRONT_DIGEST:?Digest de release requis}
     ports:
-      - "${WAVY_TIERS_FRONT_HOST_PORT:-24201}:80"
+      - "${WAVY_RECETTE_PRIVATE_BIND_ADDRESS:-0.0.0.0}:${WAVY_TIERS_FRONT_HOST_PORT:-24201}:80"
     depends_on:
       wavy-gateway-recette:
         condition: service_started
@@ -363,7 +363,7 @@ services:
     container_name: wavy-contrats-front-recette
     image: ${WAVY_IMAGE_REGISTRY}/wavy-contrats-front:${CONTRATS_FRONT_VERSION}@${CONTRATS_FRONT_DIGEST:?Digest de release requis}
     ports:
-      - "${WAVY_CONTRATS_FRONT_HOST_PORT:-24202}:80"
+      - "${WAVY_RECETTE_PRIVATE_BIND_ADDRESS:-0.0.0.0}:${WAVY_CONTRATS_FRONT_HOST_PORT:-24202}:80"
     depends_on:
       wavy-gateway-recette:
         condition: service_started
@@ -375,7 +375,7 @@ services:
     container_name: wavy-factures-front-recette
     image: ${WAVY_IMAGE_REGISTRY}/wavy-factures-front:${FACTURES_FRONT_VERSION}@${FACTURES_FRONT_DIGEST:?Digest de release requis}
     ports:
-      - "${WAVY_FACTURES_FRONT_HOST_PORT:-24203}:80"
+      - "${WAVY_RECETTE_PRIVATE_BIND_ADDRESS:-0.0.0.0}:${WAVY_FACTURES_FRONT_HOST_PORT:-24203}:80"
     depends_on:
       wavy-gateway-recette:
         condition: service_started
@@ -387,7 +387,7 @@ services:
     container_name: wavy-tresorerie-front-recette
     image: ${WAVY_IMAGE_REGISTRY}/wavy-tresorerie-front:${TRESORERIE_FRONT_VERSION}@${TRESORERIE_FRONT_DIGEST:?Digest de release requis}
     ports:
-      - "${WAVY_TRESORERIE_FRONT_HOST_PORT:-24206}:80"
+      - "${WAVY_RECETTE_PRIVATE_BIND_ADDRESS:-0.0.0.0}:${WAVY_TRESORERIE_FRONT_HOST_PORT:-24206}:80"
     depends_on:
       wavy-gateway-recette:
         condition: service_started
@@ -399,7 +399,7 @@ services:
     container_name: wavy-pwa-recette
     image: ${WAVY_IMAGE_REGISTRY}/wavy-pwa:${PWA_VERSION}@${PWA_DIGEST:?Digest de release requis}
     ports:
-      - "${WAVY_PWA_HOST_PORT:-24204}:80"
+      - "${WAVY_RECETTE_PRIVATE_BIND_ADDRESS:-0.0.0.0}:${WAVY_PWA_HOST_PORT:-24204}:80"
     depends_on:
       wavy-gateway-recette:
         condition: service_started

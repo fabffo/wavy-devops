@@ -1,0 +1,40 @@
+{
+  "environment": "recette",
+  "origin": "https://recette.wavyservices.fr",
+  "approved": false,
+  "reviewer": null,
+  "storageVolume": "REPLACE_WITH_QUALIFIED_EXISTING_VOLUME",
+  "images": {
+    "socle-api": "ghcr.io/fabffo/wavy-socle-api:0.1.0-8b7a3f0@sha256:640253c045feabd0be90a81e29b46af28b2c3c5e19d0fb81c0e89b7da45bdf31",
+    "tiers-api": "ghcr.io/fabffo/wavy-tiers-api:0.1.0-7642a09@sha256:6c91e16bd3f5211c892273031f5ab1f1d56d6007e4003e0dd382fef845f2400e",
+    "gateway": "ghcr.io/fabffo/wavy-gateway:0.1.0-38330ce@sha256:68d421619b1020d45e7195b38e9aa4ad94bcfffbddd424b66eda7d182d39c217",
+    "factures-api": "ghcr.io/fabffo/wavy-factures-api:0.1.0-09fcd98@sha256:a414a866c910bd20a4c8af4018fc0e31db513ffff1cca76b15c913807f75d0e5",
+    "factures-front": "ghcr.io/fabffo/wavy-factures-front:0.2.0-0663a99@sha256:e116a8eaf8141684b9ce27e056c8e21eadd30e42c2215c67a0c678ee4dca3726",
+    "pwa": "ghcr.io/fabffo/wavy-pwa:0.2.0-9bfd217@sha256:9f10a7e8716b1fe4a09a91653e7591a00f8f5c64b1b1dc667cae685f5a375938",
+    "erp-shell": "ghcr.io/fabffo/wavy-erp-shell:0.2.0-f6ee944@sha256:450328d7bea84b1c9e11616daa03067f6fe6da8dcc2d5bf929a46c909940ae96"
+  },
+  "checks": {
+    "https-session": false,
+    "pwa-routing": false,
+    "erp-iframe": false,
+    "mobile-login": false,
+    "roles-denied": false,
+    "session-isolation": false,
+    "company-switch": false,
+    "private-storage": false,
+    "backup-restore": false,
+    "note-role-allowed": false,
+    "tiers-me-allowed": false,
+    "merchant-read-allowed": false,
+    "direct-api-ports-private": false,
+    "notes-create-update": false,
+    "attachment-reload": false,
+    "cross-tenant-write-denied": false,
+    "cross-company-write-denied": false,
+    "concurrent-attachment-isolation": false
+  },
+  "backup": {
+    "manifestSha256": null,
+    "restoredManifestSha256": null
+  }
+}

@@ -18,6 +18,8 @@ if [[ "${1:-}" == preprod ]]; then
   exec "$SCRIPT_DIR/release-preprod.sh" ROLLBACK "$@"
 fi
 
+[[ "${1:-}" != recette ]] || recette_operation_lock
+
 started_at="$(date -Is)"
 result=KO
 env="${1:-inconnu}"
@@ -166,6 +168,10 @@ docker image tag "$current_image_id" "$cached_image"
 success " Image avant rollback conservée : $cached_image"
 
 rollback_compose() {
+  if [[ "$env" == recette ]]; then
+    python3 "$SCRIPT_DIR/release_images.py" recette-rollback "$component" "$version" "$@"
+    return
+  fi
   local -a env_args=(--env-file "$(env_file "$env")")
   [[ ! -f "$(versions_file "$env")" ]] || env_args+=(--env-file "$(versions_file "$env")")
   docker compose "${env_args[@]}" -p "$(project_name "$env")" \

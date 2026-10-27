@@ -6,6 +6,7 @@ source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/_common.sh"
 env="$(env_name)"
 [[ "$env" != preprod ]] || die 'PREPROD : utiliser la chaîne chiffrée backup-preprod.sh/restore-preprod.sh avec documents.'
 require_docker
+[[ "$env" != recette ]] || recette_operation_lock
 backup_root="$ROOT_DIR/backups"
 [[ -d "$backup_root" ]] || die "Aucun dossier backups trouvé : $backup_root"
 
@@ -22,6 +23,10 @@ select db in socle tiers contrats factures tresorerie; do
   [[ -n "$db" ]] && break
 done
 
+[[ ! -f "$backup_root/$backup/recette-pwa.json" && ! -f "$backup_root/$backup/justificatifs.tar" && "$backup" != .incomplete-* ]]   || die 'Lot DB + justificatifs RECETTE : restauration SQL seule interdite. Vérifier le lot, restaurer ensemble en environnement isolé, puis suivre la procédure de maintenance approuvée (docs/pwa-recette-permanente.md).'
+if [[ "$env" == recette && -n "$(env_value recette WAVY_FACTURES_JUSTIFICATIFS_VOLUME '')" ]]; then
+  die 'Stockage justificatifs configuré : restauration DB seule interdite ; procédure cohérente DB + documents requise.'
+fi
 dump="$backup_root/$backup/${db}.dump"
 [[ -f "$dump" ]] || die "Dump introuvable : $dump"
 
