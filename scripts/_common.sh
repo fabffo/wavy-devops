@@ -168,6 +168,10 @@ project_name() {
 
 compose() {
   local env="$1"
+  if [[ "$env" == recette ]]; then
+    python3 "$SCRIPT_DIR/release_images.py" "${@:2}"
+    return
+  fi
   if [[ "$env" == preprod ]]; then
     python3 "$SCRIPT_DIR/preprod_config.py" compose "$ROOT_DIR/.env.preprod" "${@:2}"
     return
@@ -279,9 +283,9 @@ restart_service() {
     return
   fi
   require_docker
-  info "Reconstruction de l'image $service ($env)..."
+  info "Préparation de l'image $service ($env)..."
   compose "$env" build "$service"
-  success " Image reconstruite : $service"
+  success " Image prête : $service"
   info "Recréation du conteneur $service ($env), dépendances conservées..."
   compose "$env" up -d --no-deps --force-recreate "$service"
   success " Service redémarré avec la nouvelle image : $service"

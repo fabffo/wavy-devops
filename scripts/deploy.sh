@@ -112,6 +112,7 @@ else
       || die "Version $version déjà enregistrée avec un digest différent : $historical_digest"
   fi
   image="$(component_image "$env" "$component" "$version")"
+  python3 "$SCRIPT_DIR/release_images.py" verify "$env"
   info "Image distante : $image"
   info "Vérification de l'existence du tag distant..."
   docker manifest inspect "$image" >/dev/null || die "Image distante introuvable ou inaccessible : $image"
@@ -143,7 +144,7 @@ else
   info "Mode IMAGE : aucun build Docker ne sera exécuté."
 fi
 info "Recréation ciblée de $service sans redémarrer ses dépendances..."
-compose "$env" up -d --no-deps --force-recreate --pull never "$service"
+compose "$env" up -d --no-deps --no-build --force-recreate --pull never "$service"
 
 wait_for_docker_health() {
   local container="$1" attempts="${WAVY_DEPLOY_HEALTH_ATTEMPTS:-60}" interval="${WAVY_DEPLOY_HEALTH_INTERVAL_SECONDS:-2}"

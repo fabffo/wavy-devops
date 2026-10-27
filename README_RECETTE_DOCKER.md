@@ -178,3 +178,32 @@ curl -i -X POST http://localhost:28088/api/factures/achats \
 
 - `.env.recette` ne doit pas être versionné.
 - les backups générés doivent rester en dehors du dépôt.
+
+### Images de release reproductibles
+
+`./wavy start recette` charge automatiquement `versions/recette.env` et
+`versions/recette.digests`. Les 13 services applicatifs utilisent la référence
+`ghcr.io/fabffo/wavy-<composant>:<version>@sha256:<digest>` : le tag conserve la
+traçabilité, le digest détermine exactement le contenu exécuté.
+
+Avant toute recréation, les 13 tags sont téléchargés et leurs RepoDigests sont
+comparés au manifeste ; les références épinglées sont ensuite téléchargées.
+Un digest absent, invalide ou incompatible avec la version bloque l'opération
+avant le remplacement des conteneurs. Le shell ne peut pas remplacer les
+versions ou digests déclarés. Aucun build n'est exécuté en RECETTE.
+
+Les commandes historiques `./wavy build recette [all|service]`,
+`./scripts/build-recette.sh` et les redémarrages restent disponibles : leur étape
+build télécharge et vérifie désormais les images de release. Le redémarrage
+complet des applications conserve les dépendances PostgreSQL ; aucune commande
+n'efface les volumes, bases ou documents.
+
+PREPROD charge également les 13 digests dans son Compose de base. Les mises à
+jour et rollbacks restent exclusivement dans l'orchestrateur sécurisé existant
+(verrou, contrôles hôte, configuration, sauvegarde et vérifications après
+remplacement). Il vérifie les 13 références de release avant le remplacement
+ciblé ; un rollback garde son digest historique autorisé.
+
+Validation locale sans daemon ni déploiement :
+`python3 scripts/test-release-images.py` (rendu Compose réel et Docker simulé
+pour les contrôles de téléchargement et de refus).

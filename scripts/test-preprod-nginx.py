@@ -97,6 +97,8 @@ class Nginx(unittest.TestCase):
                     shutil.copyfile(ROOT/'scripts'/name, scripts/name)
                     (scripts/name).chmod(0o700)
                 shutil.copyfile(ROOT/'wavy', root/'wavy')
+                # Le précontrôle des images est testé dans test-release-images.py.
+                (scripts/'release_images.py').write_text('import os\nwith open(os.environ["MOCK_LOG"], "a") as out: out.write("verify-all-images\\n")\n')
                 with (scripts/'_preprod.sh').open('a') as out:
                     out.write(MOCK + RELEASE_MOCK)
                 (root/'fixture.tsv').write_text('version\tdigest\tcommit\tdate_validation\n')

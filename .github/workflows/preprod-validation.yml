@@ -4,6 +4,8 @@ on:
   push:
     paths:
       - docker-compose.preprod*.yml
+      - docker-compose.recette.yml
+      - versions/recette.*
       - .env.preprod.example
       - versions/preprod.*
       - versions/history/preprod/**
@@ -30,6 +32,7 @@ jobs:
           for script in scripts/*.sh; do bash -n "$script"; done
       - name: Static PREPROD tests with fictional secrets outside repository
         run: |
+          python3 scripts/test-release-images.py
           python3 scripts/test-preprod-config.py
           python3 scripts/test-preprod-guards.py
           python3 scripts/test-preprod-nginx.py

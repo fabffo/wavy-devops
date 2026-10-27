@@ -3,7 +3,7 @@ name: ${COMPOSE_PROJECT_NAME:-wavy-recette}
 services:
   wavy-erp-shell-recette:
     container_name: wavy-erp-shell-recette
-    image: ${WAVY_IMAGE_REGISTRY}/wavy-erp-shell:${ERP_SHELL_VERSION}
+    image: ${WAVY_IMAGE_REGISTRY}/wavy-erp-shell:${ERP_SHELL_VERSION}@${ERP_SHELL_DIGEST:?Digest de release requis}
     ports:
       - "${WAVY_ERP_SHELL_HOST_PORT:-24207}:80"
     environment:
@@ -127,7 +127,7 @@ services:
 
   wavy-socle-api-recette:
     container_name: wavy-socle-api-recette
-    image: ${WAVY_IMAGE_REGISTRY}/wavy-socle-api:${SOCLE_API_VERSION}
+    image: ${WAVY_IMAGE_REGISTRY}/wavy-socle-api:${SOCLE_API_VERSION}@${SOCLE_API_DIGEST:?Digest de release requis}
     environment:
       WAVY_CORS_ALLOWED_ORIGIN_PATTERNS: ${WAVY_GATEWAY_CORS_ALLOWED_ORIGIN_PATTERNS}
       SPRING_PROFILES_ACTIVE: ${WAVY_SOCLE_SPRING_PROFILES_ACTIVE:-local}
@@ -164,7 +164,7 @@ services:
 
   wavy-tiers-api-recette:
     container_name: wavy-tiers-api-recette
-    image: ${WAVY_IMAGE_REGISTRY}/wavy-tiers-api:${TIERS_API_VERSION}
+    image: ${WAVY_IMAGE_REGISTRY}/wavy-tiers-api:${TIERS_API_VERSION}@${TIERS_API_DIGEST:?Digest de release requis}
     environment:
       SPRING_PROFILES_ACTIVE: ${WAVY_TIERS_SPRING_PROFILES_ACTIVE:-recette}
       WAVY_TIERS_DB_HOST: tiers-db-recette
@@ -193,7 +193,7 @@ services:
 
   wavy-contrats-api-recette:
     container_name: wavy-contrats-api-recette
-    image: ${WAVY_IMAGE_REGISTRY}/wavy-contrats-api:${CONTRATS_API_VERSION}
+    image: ${WAVY_IMAGE_REGISTRY}/wavy-contrats-api:${CONTRATS_API_VERSION}@${CONTRATS_API_DIGEST:?Digest de release requis}
     environment:
       WAVY_CORS_ALLOWED_ORIGIN_PATTERNS: ${WAVY_GATEWAY_CORS_ALLOWED_ORIGIN_PATTERNS}
       SPRING_PROFILES_ACTIVE: ${WAVY_CONTRATS_SPRING_PROFILES_ACTIVE:-recette}
@@ -223,7 +223,7 @@ services:
 
   wavy-factures-api-recette:
     container_name: wavy-factures-api-recette
-    image: ${WAVY_IMAGE_REGISTRY}/wavy-factures-api:${FACTURES_API_VERSION}
+    image: ${WAVY_IMAGE_REGISTRY}/wavy-factures-api:${FACTURES_API_VERSION}@${FACTURES_API_DIGEST:?Digest de release requis}
     environment:
       SPRING_PROFILES_ACTIVE: ${WAVY_FACTURES_SPRING_PROFILES_ACTIVE:-recette}
       WAVY_FACTURES_DB_HOST: factures-db-recette
@@ -267,7 +267,7 @@ services:
 
   wavy-tresorerie-api-recette:
     container_name: wavy-tresorerie-api-recette
-    image: ${WAVY_IMAGE_REGISTRY}/wavy-tresorerie-api:${TRESORERIE_API_VERSION}
+    image: ${WAVY_IMAGE_REGISTRY}/wavy-tresorerie-api:${TRESORERIE_API_VERSION}@${TRESORERIE_API_DIGEST:?Digest de release requis}
     environment:
       SPRING_PROFILES_ACTIVE: ${WAVY_TRESORERIE_SPRING_PROFILES_ACTIVE:-recette}
       WAVY_TRESORERIE_DB_HOST: tresorerie-db-recette
@@ -299,7 +299,7 @@ services:
 
   wavy-gateway-recette:
     container_name: wavy-gateway-recette
-    image: ${WAVY_IMAGE_REGISTRY}/wavy-gateway:${GATEWAY_VERSION}
+    image: ${WAVY_IMAGE_REGISTRY}/wavy-gateway:${GATEWAY_VERSION}@${GATEWAY_DIGEST:?Digest de release requis}
     environment:
       SPRING_PROFILES_ACTIVE: ${WAVY_GATEWAY_SPRING_PROFILES_ACTIVE:-recette}
       WAVY_GATEWAY_PORT: 8088
@@ -334,7 +334,7 @@ services:
 
   wavy-socle-front-recette:
     container_name: wavy-socle-front-recette
-    image: ${WAVY_IMAGE_REGISTRY}/wavy-socle-front:${SOCLE_FRONT_VERSION}
+    image: ${WAVY_IMAGE_REGISTRY}/wavy-socle-front:${SOCLE_FRONT_VERSION}@${SOCLE_FRONT_DIGEST:?Digest de release requis}
     environment:
       API_UPSTREAM: http://wavy-gateway-recette:8088
       SOCLE_API_UPSTREAM: http://wavy-socle-api-recette:8080
@@ -349,7 +349,7 @@ services:
 
   wavy-tiers-front-recette:
     container_name: wavy-tiers-front-recette
-    image: ${WAVY_IMAGE_REGISTRY}/wavy-tiers-front:${TIERS_FRONT_VERSION}
+    image: ${WAVY_IMAGE_REGISTRY}/wavy-tiers-front:${TIERS_FRONT_VERSION}@${TIERS_FRONT_DIGEST:?Digest de release requis}
     ports:
       - "${WAVY_TIERS_FRONT_HOST_PORT:-24201}:80"
     depends_on:
@@ -361,7 +361,7 @@ services:
 
   wavy-contrats-front-recette:
     container_name: wavy-contrats-front-recette
-    image: ${WAVY_IMAGE_REGISTRY}/wavy-contrats-front:${CONTRATS_FRONT_VERSION}
+    image: ${WAVY_IMAGE_REGISTRY}/wavy-contrats-front:${CONTRATS_FRONT_VERSION}@${CONTRATS_FRONT_DIGEST:?Digest de release requis}
     ports:
       - "${WAVY_CONTRATS_FRONT_HOST_PORT:-24202}:80"
     depends_on:
@@ -373,7 +373,7 @@ services:
 
   wavy-factures-front-recette:
     container_name: wavy-factures-front-recette
-    image: ${WAVY_IMAGE_REGISTRY}/wavy-factures-front:${FACTURES_FRONT_VERSION}
+    image: ${WAVY_IMAGE_REGISTRY}/wavy-factures-front:${FACTURES_FRONT_VERSION}@${FACTURES_FRONT_DIGEST:?Digest de release requis}
     ports:
       - "${WAVY_FACTURES_FRONT_HOST_PORT:-24203}:80"
     depends_on:
@@ -385,7 +385,7 @@ services:
 
   wavy-tresorerie-front-recette:
     container_name: wavy-tresorerie-front-recette
-    image: ${WAVY_IMAGE_REGISTRY}/wavy-tresorerie-front:${TRESORERIE_FRONT_VERSION}
+    image: ${WAVY_IMAGE_REGISTRY}/wavy-tresorerie-front:${TRESORERIE_FRONT_VERSION}@${TRESORERIE_FRONT_DIGEST:?Digest de release requis}
     ports:
       - "${WAVY_TRESORERIE_FRONT_HOST_PORT:-24206}:80"
     depends_on:
@@ -397,7 +397,7 @@ services:
 
   wavy-pwa-recette:
     container_name: wavy-pwa-recette
-    image: ${WAVY_IMAGE_REGISTRY}/wavy-pwa:${PWA_VERSION}
+    image: ${WAVY_IMAGE_REGISTRY}/wavy-pwa:${PWA_VERSION}@${PWA_DIGEST:?Digest de release requis}
     ports:
       - "${WAVY_PWA_HOST_PORT:-24204}:80"
     depends_on:

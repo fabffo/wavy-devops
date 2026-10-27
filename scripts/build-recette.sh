@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Reconstruit toutes les images de l'environnement recette.
+# Télécharge et vérifie toutes les images de l'environnement recette.
 set -euo pipefail
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/_common.sh"
 
 require_docker
-info "Reconstruction des images recette..."
+info "Téléchargement et vérification des images recette..."
 compose recette build
-success " Images recette reconstruites."
+success " Images recette validées et disponibles."

@@ -172,9 +172,9 @@ build_cmd() {
   fi
 
   validate_service_arg "$target"
-  info "Build de $(service_name "$target" "$env") ($env)..."
+  info "Préparation de $(service_name "$target" "$env") ($env)..."
   compose "$env" build "$(service_name "$target" "$env")"
-  success " Image reconstruite : $(service_name "$target" "$env")"
+  success " Image prête : $(service_name "$target" "$env")"
 }
 
 restart_all_cmd() {

@@ -89,7 +89,7 @@ services:
 
   wavy-socle-api-preprod:
     <<: *api
-    image: ${WAVY_IMAGE_REGISTRY:?required}/wavy-socle-api:${SOCLE_API_VERSION:?required}
+    image: ${WAVY_IMAGE_REGISTRY:?required}/wavy-socle-api:${SOCLE_API_VERSION:?required}@${SOCLE_API_DIGEST:?Digest de release requis}
     container_name: wavy-socle-api-preprod
     healthcheck:
       <<: *api-health
@@ -117,7 +117,7 @@ services:
     depends_on: {socle-postgres: {condition: service_healthy}}
   wavy-tiers-api-preprod:
     <<: *api
-    image: ${WAVY_IMAGE_REGISTRY:?required}/wavy-tiers-api:${TIERS_API_VERSION:?required}
+    image: ${WAVY_IMAGE_REGISTRY:?required}/wavy-tiers-api:${TIERS_API_VERSION:?required}@${TIERS_API_DIGEST:?Digest de release requis}
     container_name: wavy-tiers-api-preprod
     healthcheck:
       <<: *api-health
@@ -126,7 +126,7 @@ services:
     depends_on: {tiers-postgres: {condition: service_healthy}}
   wavy-contrats-api-preprod:
     <<: *api
-    image: ${WAVY_IMAGE_REGISTRY:?required}/wavy-contrats-api:${CONTRATS_API_VERSION:?required}
+    image: ${WAVY_IMAGE_REGISTRY:?required}/wavy-contrats-api:${CONTRATS_API_VERSION:?required}@${CONTRATS_API_DIGEST:?Digest de release requis}
     container_name: wavy-contrats-api-preprod
     healthcheck:
       <<: *api-health
@@ -136,7 +136,7 @@ services:
     depends_on: {contrats-postgres: {condition: service_healthy}}
   wavy-factures-api-preprod:
     <<: *api
-    image: ${WAVY_IMAGE_REGISTRY:?required}/wavy-factures-api:${FACTURES_API_VERSION:?required}
+    image: ${WAVY_IMAGE_REGISTRY:?required}/wavy-factures-api:${FACTURES_API_VERSION:?required}@${FACTURES_API_DIGEST:?Digest de release requis}
     container_name: wavy-factures-api-preprod
     healthcheck:
       <<: *api-health
@@ -145,7 +145,7 @@ services:
     depends_on: {factures-postgres: {condition: service_healthy}}
   wavy-tresorerie-api-preprod:
     <<: *api
-    image: ${WAVY_IMAGE_REGISTRY:?required}/wavy-tresorerie-api:${TRESORERIE_API_VERSION:?required}
+    image: ${WAVY_IMAGE_REGISTRY:?required}/wavy-tresorerie-api:${TRESORERIE_API_VERSION:?required}@${TRESORERIE_API_DIGEST:?Digest de release requis}
     container_name: wavy-tresorerie-api-preprod
     healthcheck:
       <<: *api-health
@@ -155,7 +155,7 @@ services:
 
   wavy-gateway-preprod:
     <<: *api
-    image: ${WAVY_IMAGE_REGISTRY:?required}/wavy-gateway:${GATEWAY_VERSION:?required}
+    image: ${WAVY_IMAGE_REGISTRY:?required}/wavy-gateway:${GATEWAY_VERSION:?required}@${GATEWAY_DIGEST:?Digest de release requis}
     container_name: wavy-gateway-preprod
     healthcheck:
       <<: *api-health
@@ -165,7 +165,7 @@ services:
 
   wavy-socle-front-preprod:
     <<: *front
-    image: ${WAVY_IMAGE_REGISTRY:?required}/wavy-socle-front:${SOCLE_FRONT_VERSION:?required}
+    image: ${WAVY_IMAGE_REGISTRY:?required}/wavy-socle-front:${SOCLE_FRONT_VERSION:?required}@${SOCLE_FRONT_DIGEST:?Digest de release requis}
     container_name: wavy-socle-front-preprod
     environment:
       NGINX_ENVSUBST_FILTER: _UPSTREAM$
@@ -173,14 +173,14 @@ services:
       SOCLE_API_UPSTREAM: http://wavy-socle-api-preprod:8080
     depends_on:
       wavy-gateway-preprod: {condition: service_healthy}
-  wavy-tiers-front-preprod: {<<: *front, image: "${WAVY_IMAGE_REGISTRY:?required}/wavy-tiers-front:${TIERS_FRONT_VERSION:?required}", container_name: wavy-tiers-front-preprod}
-  wavy-contrats-front-preprod: {<<: *front, image: "${WAVY_IMAGE_REGISTRY:?required}/wavy-contrats-front:${CONTRATS_FRONT_VERSION:?required}", container_name: wavy-contrats-front-preprod}
-  wavy-factures-front-preprod: {<<: *front, image: "${WAVY_IMAGE_REGISTRY:?required}/wavy-factures-front:${FACTURES_FRONT_VERSION:?required}", container_name: wavy-factures-front-preprod}
-  wavy-tresorerie-front-preprod: {<<: *front, image: "${WAVY_IMAGE_REGISTRY:?required}/wavy-tresorerie-front:${TRESORERIE_FRONT_VERSION:?required}", container_name: wavy-tresorerie-front-preprod}
-  wavy-pwa-preprod: {<<: *front, image: "${WAVY_IMAGE_REGISTRY:?required}/wavy-pwa:${PWA_VERSION:?required}", container_name: wavy-pwa-preprod}
+  wavy-tiers-front-preprod: {<<: *front, image: "${WAVY_IMAGE_REGISTRY:?required}/wavy-tiers-front:${TIERS_FRONT_VERSION:?required}@${TIERS_FRONT_DIGEST:?Digest de release requis}", container_name: wavy-tiers-front-preprod}
+  wavy-contrats-front-preprod: {<<: *front, image: "${WAVY_IMAGE_REGISTRY:?required}/wavy-contrats-front:${CONTRATS_FRONT_VERSION:?required}@${CONTRATS_FRONT_DIGEST:?Digest de release requis}", container_name: wavy-contrats-front-preprod}
+  wavy-factures-front-preprod: {<<: *front, image: "${WAVY_IMAGE_REGISTRY:?required}/wavy-factures-front:${FACTURES_FRONT_VERSION:?required}@${FACTURES_FRONT_DIGEST:?Digest de release requis}", container_name: wavy-factures-front-preprod}
+  wavy-tresorerie-front-preprod: {<<: *front, image: "${WAVY_IMAGE_REGISTRY:?required}/wavy-tresorerie-front:${TRESORERIE_FRONT_VERSION:?required}@${TRESORERIE_FRONT_DIGEST:?Digest de release requis}", container_name: wavy-tresorerie-front-preprod}
+  wavy-pwa-preprod: {<<: *front, image: "${WAVY_IMAGE_REGISTRY:?required}/wavy-pwa:${PWA_VERSION:?required}@${PWA_DIGEST:?Digest de release requis}", container_name: wavy-pwa-preprod}
   wavy-erp-shell-preprod:
     <<: *front
-    image: ${WAVY_IMAGE_REGISTRY:?required}/wavy-erp-shell:${ERP_SHELL_VERSION:?required}
+    image: ${WAVY_IMAGE_REGISTRY:?required}/wavy-erp-shell:${ERP_SHELL_VERSION:?required}@${ERP_SHELL_DIGEST:?Digest de release requis}
     container_name: wavy-erp-shell-preprod
     ports: ["127.0.0.1:${WAVY_PUBLIC_HTTP_PORT:-24443}:80"]
     environment: {NGINX_ENVSUBST_FILTER: "_UPSTREAM$", API_UPSTREAM: "http://wavy-gateway-preprod:8088", SOCLE_FRONT_UPSTREAM: "http://wavy-socle-front-preprod/", TIERS_FRONT_UPSTREAM: "http://wavy-tiers-front-preprod/", CONTRATS_FRONT_UPSTREAM: "http://wavy-contrats-front-preprod/", FACTURES_FRONT_UPSTREAM: "http://wavy-factures-front-preprod/", TRESORERIE_FRONT_UPSTREAM: "http://wavy-tresorerie-front-preprod/"}

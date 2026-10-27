@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Reconstruit puis redémarre tous les services applicatifs recette sans recréer les bases.
+# Télécharge puis redémarre tous les services applicatifs recette sans recréer les bases.
 set -euo pipefail
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/_common.sh"
 
@@ -20,10 +20,10 @@ services=(
   wavy-erp-shell-recette
 )
 
-info "Reconstruction de toutes les images applicatives recette..."
+info "Téléchargement des images applicatives recette validées..."
 compose recette build "${services[@]}"
 info "Redémarrage des services applicatifs recette, bases PostgreSQL conservées..."
-compose recette up -d --force-recreate "${services[@]}"
+compose recette up -d --no-deps --force-recreate "${services[@]}"
 success " Services applicatifs recette redémarrés."
 info "Statut actuel :"
 "$SCRIPT_DIR/status.sh"

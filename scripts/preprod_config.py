@@ -62,7 +62,7 @@ def compose_args(env_path, args):
     raw = (ROOT / 'docker-compose.preprod.yml').read_text()
     keys = set(re.findall(r'\$\{([A-Z][A-Z0-9_]*)', raw))
     clean = {k: val for k, val in os.environ.items() if k not in keys and not k.startswith('COMPOSE_')}
-    return (['docker', 'compose', '--env-file', str(env_path), '--env-file', str(ROOT / 'versions/preprod.env'),
+    return (['docker', 'compose', '--env-file', str(env_path), '--env-file', str(ROOT / 'versions/preprod.env'), '--env-file', str(ROOT / 'versions/preprod.digests'),
              '-p', 'wavy-preprod', '-f', str(ROOT / 'docker-compose.preprod.yml')] + args, clean)
 
 
@@ -185,7 +185,7 @@ def validate(env_path):
         service = services['wavy-'+c+'-preprod']
         check(service['container_name'] == 'wavy-'+c+'-preprod', f'Conteneur inattendu : {c}')
         key = c.upper().replace('-', '_')
-        check(service['image'] == v['WAVY_IMAGE_REGISTRY']+'/wavy-'+c+':'+v[key+'_VERSION'], f'Image différente du manifeste : {c}')
+        check(service['image'] == v['WAVY_IMAGE_REGISTRY']+'/wavy-'+c+':'+v[key+'_VERSION']+'@'+d[key+'_DIGEST'], f'Image différente du manifeste : {c}')
         if c.endswith('-api') or c == 'gateway':
             se = service['environment']
             if c.endswith('-api'):

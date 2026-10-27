@@ -56,10 +56,12 @@ class Validation(unittest.TestCase):
 
     def test_valid_and_inherited_version_ignored(self):
         os.environ['SOCLE_API_VERSION'] = 'latest'
+        os.environ['SOCLE_API_DIGEST'] = 'sha256:'+'0'*64
         try:
             self.valid()
         finally:
             del os.environ['SOCLE_API_VERSION']
+            del os.environ['SOCLE_API_DIGEST']
 
     def set_ai(self, values):
         lines = self.env.read_text().splitlines()
@@ -344,7 +346,7 @@ class Validation(unittest.TestCase):
         with self.assertRaises(ValueError): self.valid()
 
     def test_compose_config_quiet_explicit(self):
-        result = subprocess.run(['docker', 'compose', '--env-file', str(self.env), '--env-file', str(ROOT/'versions/preprod.env'), '-p', 'wavy-preprod', '-f', str(ROOT/'docker-compose.preprod.yml'), 'config', '--quiet'], capture_output=True)
+        result = subprocess.run(['docker', 'compose', '--env-file', str(self.env), '--env-file', str(ROOT/'versions/preprod.env'), '--env-file', str(ROOT/'versions/preprod.digests'), '-p', 'wavy-preprod', '-f', str(ROOT/'docker-compose.preprod.yml'), 'config', '--quiet'], capture_output=True)
         self.assertEqual(result.returncode, 0)
 
 

@@ -54,6 +54,7 @@ preprod_container_guard "$service" "$service"
 for db in socle tiers contrats factures tresorerie; do
   preprod_container_guard "$(db_container "$db" preprod)" "$db-postgres"
 done
+python3 "$SCRIPT_DIR/release_images.py" verify preprod
 preprod_verify_image "$component" "$version" "$digest"
 image="$(component_image preprod "$component" "$version")"
 pinned="${image%:*}@$digest"
