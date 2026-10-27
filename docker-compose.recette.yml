@@ -129,7 +129,7 @@ services:
     container_name: wavy-socle-api-recette
     image: ${WAVY_IMAGE_REGISTRY}/wavy-socle-api:${SOCLE_API_VERSION}@${SOCLE_API_DIGEST:?Digest de release requis}
     environment:
-      WAVY_CORS_ALLOWED_ORIGIN_PATTERNS: ${WAVY_GATEWAY_CORS_ALLOWED_ORIGIN_PATTERNS}
+      WAVY_CORS_ALLOWED_ORIGIN_PATTERNS: ${WAVY_CORS_ALLOWED_ORIGIN_PATTERNS:-https://recette.wavyservices.fr,http://localhost:24200,http://localhost:24201,http://localhost:24202,http://localhost:24203,http://localhost:24204,http://localhost:24206,http://localhost:24207}
       SPRING_PROFILES_ACTIVE: ${WAVY_SOCLE_SPRING_PROFILES_ACTIVE:-local}
       WAVY_SOCLE_DB_HOST: socle-db-recette
       WAVY_SOCLE_DB_PORT: 5432
@@ -176,7 +176,7 @@ services:
       WAVY_TIERS_API_PORT: 8081
       WAVY_TIERS_SERVICE_USERNAME: ${WAVY_TIERS_SERVICE_USERNAME}
       WAVY_TIERS_SERVICE_PASSWORD: ${WAVY_TIERS_SERVICE_PASSWORD}
-      WAVY_CORS_ALLOWED_ORIGIN_PATTERNS: ${WAVY_GATEWAY_CORS_ALLOWED_ORIGIN_PATTERNS}
+      WAVY_CORS_ALLOWED_ORIGIN_PATTERNS: ${WAVY_CORS_ALLOWED_ORIGIN_PATTERNS:-https://recette.wavyservices.fr,http://localhost:24200,http://localhost:24201,http://localhost:24202,http://localhost:24203,http://localhost:24204,http://localhost:24206,http://localhost:24207}
     ports:
       - "${WAVY_TIERS_API_HOST_PORT:-28081}:8081"
     depends_on:
@@ -195,7 +195,7 @@ services:
     container_name: wavy-contrats-api-recette
     image: ${WAVY_IMAGE_REGISTRY}/wavy-contrats-api:${CONTRATS_API_VERSION}@${CONTRATS_API_DIGEST:?Digest de release requis}
     environment:
-      WAVY_CORS_ALLOWED_ORIGIN_PATTERNS: ${WAVY_GATEWAY_CORS_ALLOWED_ORIGIN_PATTERNS}
+      WAVY_CORS_ALLOWED_ORIGIN_PATTERNS: ${WAVY_CORS_ALLOWED_ORIGIN_PATTERNS:-https://recette.wavyservices.fr,http://localhost:24200,http://localhost:24201,http://localhost:24202,http://localhost:24203,http://localhost:24204,http://localhost:24206,http://localhost:24207}
       SPRING_PROFILES_ACTIVE: ${WAVY_CONTRATS_SPRING_PROFILES_ACTIVE:-recette}
       WAVY_CONTRATS_DB_HOST: contrats-db-recette
       WAVY_CONTRATS_DB_PORT: 5432
@@ -248,7 +248,7 @@ services:
       WAVY_AI_MAX_FILE_SIZE_MB: ${WAVY_AI_MAX_FILE_SIZE_MB:-10}
       WAVY_AI_ACHAT_AUTO_CREATION_ENABLED: ${WAVY_AI_ACHAT_AUTO_CREATION_ENABLED:-true}
       WAVY_AI_ACHAT_MINIMUM_CONFIDENCE: ${WAVY_AI_ACHAT_MINIMUM_CONFIDENCE:-0.90}
-      WAVY_CORS_ALLOWED_ORIGIN_PATTERNS: ${WAVY_GATEWAY_CORS_ALLOWED_ORIGIN_PATTERNS}
+      WAVY_CORS_ALLOWED_ORIGIN_PATTERNS: ${WAVY_CORS_ALLOWED_ORIGIN_PATTERNS:-https://recette.wavyservices.fr,http://localhost:24200,http://localhost:24201,http://localhost:24202,http://localhost:24203,http://localhost:24204,http://localhost:24206,http://localhost:24207}
     ports:
       - "${WAVY_FACTURES_API_HOST_PORT:-28083}:8083"
     healthcheck:
@@ -278,7 +278,7 @@ services:
       WAVY_TRESORERIE_API_PORT: 8086
       WAVY_FACTURES_API_URL: http://wavy-factures-api-recette:8083
       WAVY_TIERS_API_URL: http://wavy-tiers-api-recette:8081
-      WAVY_CORS_ALLOWED_ORIGIN_PATTERNS: ${WAVY_GATEWAY_CORS_ALLOWED_ORIGIN_PATTERNS}
+      WAVY_CORS_ALLOWED_ORIGIN_PATTERNS: ${WAVY_CORS_ALLOWED_ORIGIN_PATTERNS:-https://recette.wavyservices.fr,http://localhost:24200,http://localhost:24201,http://localhost:24202,http://localhost:24203,http://localhost:24204,http://localhost:24206,http://localhost:24207}
     ports:
       - "${WAVY_TRESORERIE_API_HOST_PORT:-28086}:8086"
     healthcheck:
@@ -308,7 +308,7 @@ services:
       WAVY_CONTRATS_API_URI: http://wavy-contrats-api-recette:8082
       WAVY_FACTURES_API_URL: http://wavy-factures-api-recette:8083
       WAVY_TRESORERIE_API_URL: http://wavy-tresorerie-api-recette:8086
-      WAVY_CORS_ALLOWED_ORIGIN_PATTERNS: ${WAVY_GATEWAY_CORS_ALLOWED_ORIGIN_PATTERNS:-}
+      WAVY_CORS_ALLOWED_ORIGIN_PATTERNS: ${WAVY_CORS_ALLOWED_ORIGIN_PATTERNS:-https://recette.wavyservices.fr,http://localhost:24200,http://localhost:24201,http://localhost:24202,http://localhost:24203,http://localhost:24204,http://localhost:24206,http://localhost:24207}
     ports:
       - "${WAVY_GATEWAY_HOST_PORT:-28088}:8088"
     healthcheck:

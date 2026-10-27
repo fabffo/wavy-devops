@@ -27,7 +27,7 @@ Avant de lancer sur une VM accessible depuis une autre machine, adaptez dans `.e
 
 ```env
 WAVY_PUBLIC_GATEWAY_URL=http://<ip-ou-domaine-vm>:28088
-WAVY_CORS_ALLOWED_ORIGIN_PATTERNS=http://<ip-ou-domaine-vm>:*,https://<domaine-vm>
+WAVY_CORS_ALLOWED_ORIGIN_PATTERNS=https://recette.wavyservices.fr
 ```
 
 En local sur la VM elle-même, les valeurs `localhost` de l'exemple restent suffisantes. Depuis un navigateur distant, ne laissez pas `WAVY_PUBLIC_GATEWAY_URL` sur `localhost`, sinon le front appellera le poste client au lieu de la VM.
@@ -207,3 +207,23 @@ ciblé ; un rollback garde son digest historique autorisé.
 Validation locale sans daemon ni déploiement :
 `python3 scripts/test-release-images.py` (rendu Compose réel et Docker simulé
 pour les contrôles de téléchargement et de refus).
+
+### CORS HTTPS commun
+
+Gateway et les cinq APIs lisent `WAVY_CORS_ALLOWED_ORIGIN_PATTERNS` depuis la
+configuration machine, avec les origines exactes de référence du Compose si la
+variable est absente. La référence RECETTE inclut
+`https://recette.wavyservices.fr` et les ports historiques des fronts localhost.
+Le manifeste `versions/recette.env` ne définit plus de paramètre CORS distinct
+pour Gateway. Le profil Gateway `recette` doit provenir de l'image corrigée :
+il lit cette variable au lieu d'imposer uniquement localhost.
+
+PREPROD conserve son origine unique validée contre `WAVY_PUBLIC_URL` :
+`https://preprod.wavyservices.fr` en mode HTTPS, ou l'origine locale du tunnel.
+Le parcours HTTPS local conserve son origine exacte
+`https://recettelocal.wavyservices.fr` et ses paramètres de proxy.
+
+Une surcharge explicite `SPRING_APPLICATION_JSON` ou une propriété Spring
+passée en ligne de commande reste prioritaire sur les propriétés du profil ;
+elle doit désigner la même origine. Aucun ajustement direct de la map CORS
+Spring sur les VMs n'est nécessaire avec l'image Gateway corrigée.
