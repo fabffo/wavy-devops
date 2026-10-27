@@ -25,10 +25,10 @@ NO-GO, sans provisionnement ni changement de données.
 
 Le correctif Gateway ajoute les droits Notes et les seules routes Tiers de la PWA
 au profil RECETTE, en excluant PREPROD et production, y compris les profils mixtes.
-Les tests locaux vérifient les refus et le contexte ; une nouvelle image Gateway
-reste à commiter, construire et publier après accord. Le Gateway publié `38330ce`
-ne contient pas encore ces corrections et ne permet pas de qualifier un compte
-ordinaire. Ne pas remplacer ce compte par un administrateur pour masquer le défaut.
+Les tests locaux vérifient les refus et le contexte. Le Gateway
+`0.1.0-3ff5c3b` est publié et épinglé dans les deux environnements, avec les
+exceptions RECETTE exclues de PREPROD/production. Le précédent `38330ce`
+ne contient pas ces corrections. Les droits réels sur la cible restent à qualifier. Ne pas remplacer ce compte par un administrateur pour masquer le défaut.
 
 La visibilité et les écritures sont deux paramètres persistants. Ne mettre aucun
 paramètre à true avant la qualification correspondante. Garder le volume existant
@@ -155,9 +155,9 @@ GHCR sont autorisés. Les manifestes RECETTE et PREPROD peuvent référencer la
 nouvelle image sans modifier les règles PREPROD, explicitement exclues des
 nouvelles autorisations. Cela n’autorise ni déploiement ni activation.
 
-Activation RECETTE : NO-GO tant que la nouvelle image n'est pas publiée et épinglée,
-que volume, ports, sauvegarde/restauration réelle et parcours ERP/smartphone ne
-sont pas qualifiés sur la configuration cible. L'accès VM et les éventuelles
+Activation RECETTE : NO-GO tant que volume, ports, sauvegarde/restauration réelle
+et parcours ERP/smartphone ne sont pas qualifiés sur la configuration cible.
+La nouvelle image est publiée et épinglée ; elle n’est pas déployée. L'accès VM et les éventuelles
 écritures de qualification doivent être autorisés séparément.
 
 ## Résultats exécutés sur MSI pour cette finalisation
@@ -185,5 +185,5 @@ sur les permissions ou le volume de la VM distante, qui n'a pas été consultée
 
 État à la fin de la préparation, avant autorisation de publication : les commits
 étaient `cbcc098` DevOps et `38330ce` Gateway, sans push, build de release ni
-déploiement. Le rapport de publication consignera les nouveaux commits et le
-vrai digest GHCR ; les autres composants restent inchangés.
+déploiement. Le [rapport de publication](pwa-recette-publication.md) consigne les nouveaux
+commits et le vrai digest GHCR ; les autres composants restent inchangés.

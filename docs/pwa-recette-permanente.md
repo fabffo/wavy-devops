@@ -15,9 +15,10 @@ parcours PWA complet. Les prérequis distants suivants ne sont pas attestés ici
    par ce correctif. Un stockage existant différent nécessite une revue dédiée.
 2. Compte ordinaire `NOTE_DE_FRAIS`, association utilisateur/porteur Tiers,
    droits marchands et refus des rôles sans accès. Le correctif Gateway est
-   maintenant préparé et testé sur MSI, uniquement pour RECETTE ; l'image publiée
-   `38330ce` ne le contient pas. Une nouvelle image immuable doit être publiée
-   après accord. PREPROD/production, même en profils mixtes, ne gagnent aucun droit.
+   publié dans `0.1.0-3ff5c3b` et référencé par digest dans RECETTE et PREPROD.
+   Les nouvelles autorisations sont réservées à RECETTE ; PREPROD/production,
+   même en profils mixtes, ne gagnent aucun droit. La publication ne qualifie
+   pas les comptes ou les données de la VM cible.
 3. Qualification des sessions réelles, changement de société, deux tenants,
    droits sur les notes et les justificatifs, accès ERP intégré et connexion
    autonome smartphone / service worker sur l'origine HTTPS prévue.
