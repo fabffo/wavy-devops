@@ -1,4 +1,4 @@
-# Correctif CORS HTTPS Gateway — préparation MSI
+# Correctif CORS HTTPS Gateway — publication MSI
 
 ## Résultat
 
@@ -39,32 +39,40 @@ Ces vérifications ne sont pas une connexion réelle à Socle sur les données
 RECETTE/PREPROD, ni un test de la terminaison TLS Windows. Aucun accès aux VMs,
 aucun déploiement et aucune modification des données existantes.
 
-## Candidat local, non publié
+## Publication du 27 octobre 2026
 
-- Dépôt source : `wavy-gateway`, commit `38330ce`.
-- Image locale : `ghcr.io/fabffo/wavy-gateway:0.1.0-38330ce`.
+- Gateway publié sur `master` : `38330cef6a29a93e0056fe443807899499ea7ca4`.
+- Configuration DevOps publiée sur `master` : `2916b66e94eac6a0d5d2277e08c457515b2e435d`.
+- Image GHCR : `ghcr.io/fabffo/wavy-gateway:0.1.0-38330ce`.
+- Digest distant vérifié : `sha256:68d421619b1020d45e7195b38e9aa4ad94bcfffbddd424b66eda7d182d39c217`.
+- Référence immuable active RECETTE et PREPROD :
+  `ghcr.io/fabffo/wavy-gateway:0.1.0-38330ce@sha256:68d421619b1020d45e7195b38e9aa4ad94bcfffbddd424b66eda7d182d39c217`.
 - Plateforme : `linux/amd64` ; taille : 233787481 octets.
 - Image ID local : `sha256:c5c6823c3a603f5ab2de864c2d9954c45cae32f7e232636f04d0d07d65f90427`.
 - Labels OCI : version `0.1.0`, révision `38330ce`, source
   `https://github.com/fabffo/wavy-gateway`.
 
-L'Image ID local n'est pas un digest de manifeste GHCR. Les manifestes actifs
-RECETTE/PREPROD conservent leurs versions et digests publiés actuels.
+Le tag était absent de GHCR avant publication. L'image locale testée a été
+poussée sans reconstruction. Le digest du manifeste distant concorde avec le
+RepoDigest ; son digest de configuration correspond à l'Image ID testé. Le pull
+par la référence immuable a réussi et conserve cet Image ID. L'Image ID local
+n'a pas été utilisé comme digest de manifeste.
 
-## Publication proposée après validation
+Seuls `GATEWAY_VERSION` et `GATEWAY_DIGEST` changent dans les deux environnements.
+Les douze autres versions et digests sont strictement inchangés. Aucun historique
+de déploiement validé n'est ajouté : publier une image ne prouve pas son exécution.
+La configuration CORS de référence RECETTE autorise
+`https://recette.wavyservices.fr` et respecte une valeur machine explicite ;
+PREPROD conserve son origine propre et son validateur.
 
-1. Publier les commits locaux Gateway et DevOps sur leurs branches `master`.
-2. Vérifier les labels du candidat, l'authentification GHCR et l'absence du tag
-   distant. Toute erreur d'accès ou tag existant bloque la publication immuable.
-3. Pousser l'image candidate déjà construite, sans reconstruire ni remplacer un
-   tag existant. Le script de build refuse de reconstruire un tag local existant :
-   il ne faut pas le relancer avec `--push` sur ce candidat déjà construit.
-4. Relever et vérifier le vrai digest de manifeste publié, puis modifier seulement
-   `GATEWAY_VERSION` et `GATEWAY_DIGEST` dans les deux environnements. Conserver
-   les douze autres couples et le format final `version@sha256`.
-5. Relancer les tests DevOps et publier ce commit de manifestes séparé.
+## Décision d'installation
 
-Ces étapes de publication n'autorisent aucun déploiement. Une récupération Git
-seule ne remplace pas l'image Gateway déjà en cours d'exécution. Le déploiement
-RECETTE/PREPROD devra être autorisé séparément ; PREPROD passe obligatoirement
-par l'orchestrateur sécurisé existant.
+GO technique pour une installation contrôlée de Gateway sur RECETTE distante :
+image publiée et vérifiée, correctif CORS qualifié sur MSI, références immuables
+et tests DevOps cohérents. Aucune qualification de session réelle sur les bases
+distantes ni contrôle de l'état de la VM n'a été effectué.
+
+Cette publication n'effectue et n'autorise aucun déploiement. Une récupération
+Git seule ne remplace pas l'image Gateway en cours d'exécution. Le déploiement
+RECETTE/PREPROD reste une étape distincte ; PREPROD passe obligatoirement par
+l'orchestrateur sécurisé existant. Aucun accès VM ou changement de données.
