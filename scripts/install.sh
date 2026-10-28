@@ -27,7 +27,15 @@ require_docker
 require_command python3
 [[ "$(docker context inspect --format '{{.Endpoints.docker.Host}}')" == unix:///var/run/docker.sock ]] || die 'Socket Docker système local requis.'
 recette_operation_lock
-[[ -z "$(git -C "$ROOT_DIR" status --porcelain -- wavy scripts docker docker-compose.recette.yml versions)" ]] || die 'Livraison non synchronisée avec Git ; publier puis synchroniser le dépôt avant installation.'
+# Les historiques des 13 composants RECETTE sont enrichis par les déploiements.
+# Exclusions exactes : aucun autre fichier de versions/ n'échappe au contrôle.
+delivery_paths=(wavy scripts docker ':(glob)docker-compose*.yml' versions)
+for component in socle-api tiers-api contrats-api factures-api tresorerie-api gateway socle-front tiers-front contrats-front factures-front tresorerie-front pwa erp-shell; do
+  delivery_paths+=(":(exclude,literal)versions/history/recette/$component.tsv")
+done
+delivery_status="$(git -C "$ROOT_DIR" status --porcelain --untracked-files=all -- "${delivery_paths[@]}")" \
+  || die 'Impossible de vérifier la synchronisation Git de la livraison.'
+[[ -z "$delivery_status" ]] || die 'Livraison non synchronisée avec Git ; publier puis synchroniser le dépôt avant installation.'
 timeout="$(env_value recette WAVY_INSTALL_WAIT_SECONDS 600)"
 [[ "$timeout" =~ ^[1-9][0-9]*$ && "$timeout" -ge 180 && "$timeout" -le 3600 ]] || die 'Délai attendu entre 180 et 3600 secondes.'
 python3 "$SCRIPT_DIR/delivery_check.py" preflight

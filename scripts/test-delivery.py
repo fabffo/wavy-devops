@@ -166,4 +166,108 @@ compose() { echo up >> "$FIXTURE_LOG"; [[ $FIXTURE_FAIL != up ]]; }
         self.assertIn('WAVY_INSTALL_HOSTNAME',result.stderr)
 
 
+
+class GitDeliveryGuard(unittest.TestCase):
+    """Vrai Git isolé ; arrêt avant preflight, sans daemon ou données métier."""
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory(); self.addCleanup(self.tmp.cleanup)
+        self.root = Path(self.tmp.name)
+        scripts = self.root/'scripts'; scripts.mkdir()
+        (self.root/'bin').mkdir()
+        shutil.copy(ROOT/'scripts/install.sh', scripts)
+        shutil.copytree(ROOT/'versions', self.root/'versions')
+        for name in ('wavy','docker-compose.recette.yml','docker-compose.preprod.yml'):
+            shutil.copy(ROOT/name, self.root/name)
+        (self.root/'docker').mkdir()
+        (self.root/'docker/fixture.conf').write_text('fixture\n')
+        (scripts/'_common.sh').write_text("""set -euo pipefail
+ROOT_DIR="$FIXTURE_ROOT"; SCRIPT_DIR="$ROOT_DIR/scripts"
+die() { echo "$*" >&2; exit 1; }
+env_value() { case "$2" in WAVY_INSTALL_HOSTNAME) hostname -s;; *) echo 600;; esac; }
+require_docker() { :; }; require_command() { :; }; recette_operation_lock() { :; }
+""")
+        commands = {
+            'docker': '#!/bin/bash\n[[ $1 == context ]] || exit 99; echo unix:///var/run/docker.sock\n',
+            'python3': '#!/bin/bash\necho "$2"; exit 73\n'}
+        for name, body in commands.items():
+            path=self.root/'bin'/name; path.write_text(body); path.chmod(0o700)
+        self.git('init','-q')
+        self.git('add','.')
+        self.git('-c','user.name=Fixture','-c','user.email=fixture@example.invalid','commit','-qm','fixture')
+        self.env = dict(os.environ, PATH=str(self.root/'bin')+':'+os.environ['PATH'],
+                        FIXTURE_ROOT=str(self.root), HOME=str(self.root))
+        self.env.pop('DOCKER_HOST',None); self.env.pop('DOCKER_CONTEXT',None)
+
+    def git(self, *args):
+        return subprocess.check_output(['git','-C',str(self.root),*args],stderr=subprocess.STDOUT)
+
+    def install_guard(self):
+        history = {str(p.relative_to(self.root)):p.read_bytes()
+                   for p in (self.root/'versions/history').rglob('*') if p.is_file()}
+        staged = self.git('diff','--cached','--binary')
+        result = subprocess.run(['bash',str(self.root/'scripts/install.sh'),'recette'],
+                                env=self.env,capture_output=True,text=True)
+        self.assertEqual(history, {str(p.relative_to(self.root)):p.read_bytes()
+                         for p in (self.root/'versions/history').rglob('*') if p.is_file()})
+        self.assertEqual(staged,self.git('diff','--cached','--binary'))
+        return result
+
+    def test_modified_recette_history_reaches_preflight_and_is_preserved(self):
+        path=self.root/'versions/history/recette/gateway.tsv'
+        for staged in (False,True):
+            with self.subTest(staged=staged):
+                with path.open('a') as stream:
+                    stream.write('0.1.0-abcdef0\tsha256:'+'a'*64+'\tabcdef0\t2026-10-28T10:00:00+01:00\n')
+                if staged: self.git('add','versions/history/recette/gateway.tsv')
+                result=self.install_guard()
+                self.assertEqual(result.returncode,73,result.stderr)
+                self.assertEqual(result.stdout.strip(),'preflight')
+                self.assertNotIn('non synchronisée',result.stderr)
+
+    def test_dirty_active_manifests_block_even_with_modified_history(self):
+        history=self.root/'versions/history/recette/gateway.tsv'
+        with history.open('a') as stream: stream.write('# fixture runtime history\n')
+        for name in ('versions/recette.env','versions/recette.digests','versions/preprod.env','versions/preprod.digests'):
+            path=self.root/name; original=path.read_bytes()
+            for staged in (False,True):
+                with self.subTest(name=name,staged=staged):
+                    path.write_bytes(original+b'\n# unpublished fixture\n')
+                    if staged: self.git('add',name)
+                    result=self.install_guard()
+                    self.assertEqual(result.returncode,1)
+                    self.assertIn('Livraison non synchronisée',result.stderr)
+                    self.assertEqual(result.stdout,'')
+                    path.write_bytes(original)
+                    if staged: self.git('add',name)
+
+    def test_scripts_compose_and_other_version_files_remain_strict(self):
+        for name in ('wavy','scripts/unpublished.sh','docker/fixture.conf','docker-compose.recette.yml',
+                     'docker-compose.preprod.yml','docker-compose.unpublished.yml',
+                     'versions/unknown.env','versions/history/recette/unknown.tsv',
+                     'versions/history/preprod/gateway.tsv'):
+            with self.subTest(name=name):
+                path=self.root/name; original=path.read_bytes() if path.exists() else None
+                path.write_bytes((original or b'')+b'\n# unpublished fixture\n')
+                result=self.install_guard()
+                self.assertEqual(result.returncode,1)
+                self.assertIn('Livraison non synchronisée',result.stderr)
+                self.assertEqual(result.stdout,'')
+                if original is None: path.unlink()
+                else: path.write_bytes(original)
+
+    def test_runtime_history_digest_conflict_is_still_rejected(self):
+        versions, _, _ = release(self.root,'recette')
+        path=self.root/'versions/history/recette/gateway.tsv'
+        with path.open('a') as stream:
+            stream.write(versions['GATEWAY_VERSION']+'\tsha256:'+'0'*64+'\tfixture\t2026-10-28T10:00:00+01:00\n')
+        with self.assertRaisesRegex(ValueError,'Digest incompatible avec la release'):
+            release(self.root,'recette')
+
+    def test_git_failure_blocks_before_preflight(self):
+        executable=self.root/'bin/git'; executable.write_text('#!/bin/bash\nexit 128\n'); executable.chmod(0o700)
+        result=self.install_guard()
+        self.assertEqual(result.returncode,1)
+        self.assertIn('Impossible de vérifier',result.stderr)
+        self.assertEqual(result.stdout,'')
+
 if __name__ == '__main__': unittest.main()
