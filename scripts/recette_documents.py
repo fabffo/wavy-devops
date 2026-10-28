@@ -24,6 +24,17 @@ def private(path, directory=False):
         raise ValueError('Lot RECETTE absent, symbolique ou non privé')
 
 
+def validate_document_path(name, directory, size=0):
+    path=PurePosixPath(name)
+    if path.is_absolute() or '..' in path.parts or str(path)!=name:
+        raise ValueError('Chemin justificatif interdit')
+    if directory:
+        if name!='.' and (len(path.parts)>3 or not all(re.fullmatch(r'[1-9][0-9]*',p) for p in path.parts)):
+            raise ValueError('Hiérarchie tenant/société/note invalide')
+    elif len(path.parts)!=4 or not all(re.fullmatch(r'[1-9][0-9]*',p) for p in path.parts[:3]) or not re.fullmatch(r'[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}',path.name) or not 0 < size <= 50*1024*1024:
+        raise ValueError('Identifiant ou taille du justificatif invalide')
+
+
 def validate_archive(filename, uid, gid):
     seen = set(); hashes = {}
     with tarfile.open(filename,'r:') as archive:
@@ -36,12 +47,8 @@ def validate_archive(filename, uid, gid):
                 raise ValueError('Chemin justificatif interdit ou dupliqué')
             if not (entry.isdir() or entry.isfile()) or entry.uid != uid or entry.gid != gid or entry.mode != (0o700 if entry.isdir() else 0o600):
                 raise ValueError('Type, propriétaire ou permissions du justificatif refusés')
-            if entry.isdir():
-                if name != '.' and (len(path.parts)>3 or not all(re.fullmatch(r'[1-9][0-9]*',p) for p in path.parts)):
-                    raise ValueError('Hiérarchie tenant/société/note invalide')
-            else:
-                if len(path.parts)!=4 or not all(re.fullmatch(r'[1-9][0-9]*',p) for p in path.parts[:3]) or not re.fullmatch(r'[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}',path.name) or not 0 < entry.size <= 50*1024*1024:
-                    raise ValueError('Identifiant ou taille du justificatif invalide')
+            validate_document_path(name,entry.isdir(),entry.size)
+            if entry.isfile():
                 hashes[name] = hashlib.file_digest(archive.extractfile(entry),'sha256').hexdigest()
             seen.add(name)
     if '.' not in seen:

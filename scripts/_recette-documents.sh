@@ -9,7 +9,7 @@ import sys
 from pathlib import Path
 sys.path.insert(0,str(Path(sys.argv[1])/'scripts'))
 from release_images import manifest
-from recette_pwa import preserve_storage, literal, storage_permissions
+from recette_pwa import preserve_storage, literal, storage_permissions, EMPTY_STORAGE_PROBE
 import json,subprocess
 machine=manifest(Path(sys.argv[1])/'.env.recette',strict=False)
 volume=literal(machine.get('WAVY_FACTURES_JUSTIFICATIFS_VOLUME',''))
@@ -22,7 +22,7 @@ if volume:
         # Premier rattachement : stockage auparavant désactivé. Ne pas masquer
         # un répertoire existant ; l'archive initiale doit être vide et privée.
         subprocess.run(['docker','exec','wavy-factures-api-recette','sh','-ec',
-                        'test ! -e /app/justificatifs || { test -d /app/justificatifs; test ! -L /app/justificatifs; test -z "$(ls -A /app/justificatifs)"; }'],check=True)
+                        EMPTY_STORAGE_PROBE],check=True)
         from recette_storage import check_volume, tool
         image=obj['Image']
         check_volume(volume,image)

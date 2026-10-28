@@ -280,6 +280,10 @@ env_value() {
     return
   fi
   value="$(awk -F= -v key="$key" '$1 == key { value=$0; sub(/^[^=]*=/, "", value); print value }' "$file" 2>/dev/null | tail -n 1)"
+  # Les quotes dotenv sont de la syntaxe, pas une partie du hostname ou du nom DB.
+  if [[ "$value" == \"*\" || "$value" == \'*\' ]]; then
+    value="${value:1:${#value}-2}"
+  fi
   printf '%s\n' "${value:-$default_value}"
 }
 

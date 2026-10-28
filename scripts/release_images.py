@@ -27,11 +27,11 @@ def manifest(path, strict=True):
     return values
 
 
-def release(root, env):
+def release(root, env, components=None):
     versions = manifest(root / f'versions/{env}.env')
     digests = manifest(root / f'versions/{env}.digests')
     images = {}
-    for component in COMPONENTS:
+    for component in COMPONENTS if components is None else components:
         key = component.upper().replace('-', '_')
         version = versions.get(key+'_VERSION', '')
         digest = digests.get(key+'_DIGEST', '')
@@ -42,7 +42,10 @@ def release(root, env):
         history = root / f'versions/history/{env}/{component}.tsv'
         if history.exists():
             for line in history.read_text().splitlines()[1:]:
+                if not line.strip(): continue
                 fields = line.split('\t')
+                if len(fields) < 2:
+                    raise ValueError(f'Historique invalide : {env}/{component}')
                 if fields[0] == version and fields[1] != digest:
                     raise ValueError(f'Digest incompatible avec la release {env}/{component}/{version}')
         images[component] = f"{versions['WAVY_IMAGE_REGISTRY']}/wavy-{component}:{version}@{digest}"
@@ -56,6 +59,18 @@ def verify(root, env, references=None):
     # Vérifier l'ensemble avant toute recréation, même pour une commande ciblée.
     for component, pinned in images.items():
         tag, expected = pinned.split('@')
+        if env == 'recette':
+            # Le digest est l'autorité ; un tag mutable ne doit pas décider du
+            # contenu installé. Réutiliser une image épinglée déjà vérifiable
+            # évite un second téléchargement après la sauvegarde.
+            result = subprocess.run(['docker','image','inspect',pinned],capture_output=True,text=True)
+            if result.returncode:
+                subprocess.run(['docker','pull',pinned],check=True,stdout=subprocess.DEVNULL)
+                result = subprocess.run(['docker','image','inspect',pinned],check=True,capture_output=True,text=True)
+            repo = tag.rsplit(':',1)[0]
+            if repo+'@'+expected not in json.loads(result.stdout)[0].get('RepoDigests',[]):
+                raise ValueError(f'Digest incompatible avec la release {env}/{component}')
+            continue
         subprocess.run(['docker', 'pull', tag], check=True, stdout=subprocess.DEVNULL)
         result = subprocess.run(['docker', 'image', 'inspect', tag], check=True,
                                 capture_output=True, text=True)
@@ -104,7 +119,7 @@ def recette_compose(root, args, rollback=None, capture=False):
 
 
 def _recette_compose(root, args, rollback=None, capture=False):
-    from recette_pwa import overlay
+    from recette_pwa import overlay, literal
     versions, digests, images = release(root, 'recette')
     if rollback:
         component, version = rollback
@@ -114,7 +129,7 @@ def _recette_compose(root, args, rollback=None, capture=False):
         digests[key+'_DIGEST'] = images[component].split('@')[1]
     machine = manifest(root / '.env.recette', strict=False)
     pwa = overlay(root, machine, images, mutation=args[0] in ('up', 'create', 'run'),
-                  enforce=args[0] not in ('stop', 'down', 'ps', 'logs', 'images', 'restart', 'kill', 'pause', 'unpause', 'exec', 'version'))
+                  enforce=args[0] not in ('stop', 'down', 'ps', 'logs', 'images', 'restart', 'kill', 'pause', 'unpause', 'exec', 'version', 'config'))
     raw = (root / 'docker-compose.recette.yml').read_text()
     keys = set(re.findall(r'\$\{([A-Z][A-Z0-9_]*)', raw))
     clean = {k: v for k, v in os.environ.items() if k not in keys and not k.startswith('COMPOSE_')}
@@ -140,7 +155,7 @@ def _recette_compose(root, args, rollback=None, capture=False):
         result = subprocess.run(['docker', 'compose', '--env-file', str(root / '.env.recette'),
                                '--env-file', str(root / 'versions/recette.env'),
                                '--env-file', str(root / 'versions/recette.digests'),
-                               '-p', machine.get('COMPOSE_PROJECT_NAME', 'wavy-recette'),
+                               '-p', literal(machine.get('COMPOSE_PROJECT_NAME', 'wavy-recette')),
                                '-f', str(root / 'docker-compose.recette.yml'),
                                '-f', str(override), *args], env=clean,
                               **({'capture_output': True, 'text': True} if capture else {}))

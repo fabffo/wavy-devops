@@ -71,8 +71,8 @@ class ReleaseImages(unittest.TestCase):
             if cmd[:2] == ['docker', 'inspect']:
                 return subprocess.CompletedProcess(cmd, 1, '', 'No such container')
             if cmd[:3] == ['docker', 'image', 'inspect']:
-                pinned = next(i for i in images.values() if i.startswith(cmd[3]+'@'))
-                repo = cmd[3].rsplit(':', 1)[0]
+                pinned = next(i for i in images.values() if i.startswith(cmd[3].split('@')[0]+'@'))
+                repo = cmd[3].split('@')[0].rsplit(':', 1)[0]
                 digest = pinned.split('@')[1] if 'erp-shell:' not in pinned else 'sha256:'+'0'*64
                 return subprocess.CompletedProcess(cmd, 0, json.dumps([{'RepoDigests': [repo+'@'+digest]}]))
             return subprocess.CompletedProcess(cmd, 0)
@@ -81,6 +81,19 @@ class ReleaseImages(unittest.TestCase):
                 release.recette_compose(self.root, ['up', '-d'])
         self.assertEqual(sum(c[:3] == ['docker', 'image', 'inspect'] for c in calls), 13)
         self.assertFalse(any(c[:2] == ['docker', 'compose'] for c in calls))
+
+    def test_recette_cache_uses_only_immutable_references_without_tag_pull(self):
+        _, _, images = release.release(self.root,'recette')
+        calls=[]
+        def docker(cmd, **kwargs):
+            calls.append(cmd)
+            reference=cmd[-1]
+            repo,digest=reference.split('@')
+            return subprocess.CompletedProcess(cmd,0,json.dumps([{'RepoDigests':[repo.rsplit(':',1)[0]+'@'+digest]}]))
+        with patch.object(release.subprocess,'run',side_effect=docker):
+            release.verify(self.root,'recette')
+        self.assertEqual(len(calls),13)
+        self.assertTrue(all(c[:3]==['docker','image','inspect'] and c[3] in images.values() for c in calls))
 
     def test_historical_build_only_verifies_images(self):
         with patch.object(release, 'verify') as verify, patch.object(release.subprocess, 'run') as run:
@@ -96,8 +109,8 @@ class ReleaseImages(unittest.TestCase):
             if cmd[:2] == ['docker', 'inspect']:
                 return subprocess.CompletedProcess(cmd, 1, '', 'No such container')
             if cmd[:3] == ['docker', 'image', 'inspect']:
-                repo = cmd[3].rsplit(':', 1)[0]
-                pinned = next(i for i in images.values() if i.startswith(cmd[3]+'@'))
+                repo = cmd[3].split('@')[0].rsplit(':', 1)[0]
+                pinned = next(i for i in images.values() if i.startswith(cmd[3].split('@')[0]+'@'))
                 return subprocess.CompletedProcess(cmd, 0, json.dumps([{'RepoDigests': [repo+'@'+pinned.split('@')[1]]}]))
             if cmd[:2] == ['docker', 'compose']:
                 self.assertEqual(sum(c[:3] == ['docker', 'image', 'inspect'] for c in calls), 13)

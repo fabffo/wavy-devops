@@ -2,6 +2,10 @@
 
 ## Décision
 
+> Installations suspendues après les refus observés. La [revue ciblée de
+> l’installateur](revue-installateur-recette.md) corrige le contrat des profils et
+> décrit le diagnostic consolidé sans mutation, avant toute reprise autorisée.
+
 **GO technique pour publication**, autorisée par l’utilisateur le 28 octobre
 2026 après revue. Les 109 tests ont été rejoués avec succès avant commit/push ;
 les 13 digests sont inchangés et aucun secret, temporaire ou historique privé
@@ -20,7 +24,7 @@ reste à contrôler automatiquement lors de l'installation autorisée.
 | Sujet | MSI local HTTPS | RECETTE distante | PREPROD | Cause / correction ou différence normale |
 | --- | --- | --- | --- | --- |
 | Images | Cycle local existant, pouvant inclure des builds ; état actif non observé | 13 références `version@sha256` via `release_images.py` | Mêmes 13 références dans les manifestes | Correction digests déjà présente ; parité vérifiée automatiquement, disponibilité GHCR contrôlée à l'installation |
-| Spring | Configuration locale du cycle `./wavy local` | Profils `recette` exigés pour les cinq API et Gateway par l'installation | `preprod,secure`, gardes existantes | Différence normale ; profils local/dev/test refusés sur RECETTE |
+| Spring | Configuration locale du cycle `./wavy local` | Socle `local` historique accepté ; autres API/Gateway `recette`, profils actifs conservés | `preprod,secure`, gardes existantes | Ne pas transformer Socle local en recette sans tester le changement secure/DDL |
 | Priorité des variables | Cycle HTTPS MSI conservé | Dotenv privé machine, puis manifestes version/digest ; shell neutralisé pour les clés Compose | Parseur strict PREPROD conservé | Doublon ERP retiré de l'exemple ; l'installation refuse doublons et versions/digests dans le dotenv machine |
 | CORS et HTTPS | Origine locale distincte | Une seule variable CORS partagée, contenant l'origine HTTPS ; stratégie Spring `framework` ajoutée | Politique CORS/secure existante | CORS déjà corrigé ; transmission des en-têtes proxy explicitée pour les API et Gateway RECETTE |
 | Routes ERP/PWA | Intégration locale déjà validée par l'utilisateur | Montages Nginx/manifeste existants réutilisés | Workflow protégé inchangé | Routes déjà corrigées ; nouveau mode technique évite le prérequis circulaire d'une qualification des images déjà actives |
@@ -57,7 +61,9 @@ WAVY_INSTALL_WAIT_SECONDS=600
 
 Le dotenv doit appartenir à l'opérateur et être privé (0600). Les mots de passe
 DB et du compte interservices doivent être configurés, sans valeurs d'exemple.
-Tous les profils doivent être `recette`. Le nom de projet reste `wavy-recette`.
+Conserver les profils actifs : Socle `local` historique est accepté ; les autres
+API et Gateway conservent `recette`. Une transition de profil n’est pas implicite.
+Le nom de projet reste `wavy-recette`.
 
 Pour un volume absent uniquement, ajouter
 `WAVY_RECETTE_PROVISION_JUSTIFICATIFS=true`. Le script relève UID/GID dans l'image

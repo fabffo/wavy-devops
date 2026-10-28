@@ -42,44 +42,45 @@ def policy(root, machine, images):
         raise ValueError('WAVY_PWA_PUBLIC_ORIGIN : origine HTTPS exacte requise')
     volume = literal(machine.get('WAVY_FACTURES_JUSTIFICATIFS_VOLUME', ''))
     missing = []
-    proof = None
-    filename = literal(machine.get('WAVY_PWA_QUALIFICATION_FILE', ''))
-    if filename:
-        path = Path(filename)
-        if not path.is_absolute():
-            path = root/path
-        if not path.is_file() or path.is_symlink() or path.stat().st_uid != os.getuid() or path.stat().st_mode & 0o077:
-            missing.append('qualification privée absente ou permissions différentes de 0600')
-        else:
-            try:
-                proof = json.loads(path.read_text())
-                if not isinstance(proof, dict):
-                    proof = None
-                    missing.append('qualification JSON objet requise')
-            except (ValueError, OSError):
-                missing.append('qualification illisible')
-    else:
-        missing.append('WAVY_PWA_QUALIFICATION_FILE absent')
-    if not re.fullmatch(r'[a-zA-Z0-9][a-zA-Z0-9_.-]*', volume):
-        missing.append('volume privé existant WAVY_FACTURES_JUSTIFICATIFS_VOLUME absent ou invalide')
-    if proof is not None:
-        if proof.get('environment') != 'recette' or proof.get('origin') != origin or proof.get('approved') is not True or not proof.get('reviewer'):
-            missing.append('qualification non approuvée pour cette origine RECETTE')
-        if proof.get('images') != {c: images[c] for c in COMPONENTS}:
-            missing.append('qualification incompatible avec les images de la release')
-        if proof.get('storageVolume') != volume:
-            missing.append('qualification incompatible avec le stockage configuré')
-        backup = proof.get('backup', {})
-        if not isinstance(backup, dict) or not re.fullmatch(r'[0-9a-f]{64}', str(backup.get('manifestSha256',''))) or backup.get('restoredManifestSha256') != backup.get('manifestSha256'):
-            missing.append('lot de sauvegarde et exercice de restauration non liés par SHA256')
-        checks = READ_CHECKS + (WRITE_CHECKS if writes else ())
-        observed = proof.get('checks', {})
-        if not isinstance(observed, dict):
-            observed = {}
-        missing.extend(check for check in checks if observed.get(check) is not True)
     mode = literal(machine.get('WAVY_RECETTE_VALIDATION_MODE', 'qualification'))
     if mode not in ('qualification', 'technical'):
         raise ValueError('Mode de validation RECETTE invalide')
+    if mode == 'qualification':
+        proof = None
+        filename = literal(machine.get('WAVY_PWA_QUALIFICATION_FILE', ''))
+        if filename:
+            path = Path(filename)
+            if not path.is_absolute():
+                path = root/path
+            if not path.is_file() or path.is_symlink() or path.stat().st_uid != os.getuid() or path.stat().st_mode & 0o077:
+                missing.append('qualification privée absente ou permissions différentes de 0600')
+            else:
+                try:
+                    proof = json.loads(path.read_text())
+                    if not isinstance(proof, dict):
+                        proof = None
+                        missing.append('qualification JSON objet requise')
+                except (ValueError, OSError):
+                    missing.append('qualification illisible')
+        else:
+            missing.append('WAVY_PWA_QUALIFICATION_FILE absent')
+        if not re.fullmatch(r'[a-zA-Z0-9][a-zA-Z0-9_.-]*', volume):
+            missing.append('volume privé existant WAVY_FACTURES_JUSTIFICATIFS_VOLUME absent ou invalide')
+        if proof is not None:
+            if proof.get('environment') != 'recette' or proof.get('origin') != origin or proof.get('approved') is not True or not proof.get('reviewer'):
+                missing.append('qualification non approuvée pour cette origine RECETTE')
+            if proof.get('images') != {c: images[c] for c in COMPONENTS}:
+                missing.append('qualification incompatible avec les images de la release')
+            if proof.get('storageVolume') != volume:
+                missing.append('qualification incompatible avec le stockage configuré')
+            backup = proof.get('backup', {})
+            if not isinstance(backup, dict) or not re.fullmatch(r'[0-9a-f]{64}', str(backup.get('manifestSha256',''))) or backup.get('restoredManifestSha256') != backup.get('manifestSha256'):
+                missing.append('lot de sauvegarde et exercice de restauration non liés par SHA256')
+            checks = READ_CHECKS + (WRITE_CHECKS if writes else ())
+            observed = proof.get('checks', {})
+            if not isinstance(observed, dict):
+                observed = {}
+            missing.extend(check for check in checks if observed.get(check) is not True)
     if mode == 'technical':
         # RECETTE sert à la validation humaine après installation. Aucune
         # attestation fonctionnelle n'est fabriquée pour ouvrir les routes.
@@ -178,20 +179,39 @@ def overlay(root, machine, images, mutation=False, enforce=True):
     return result
 
 
-STORAGE_PROBE = r"""set -eu
+EMPTY_STORAGE_PROBE = ('test ! -e /app/justificatifs && test ! -L /app/justificatifs || { '
+                       'test -d /app/justificatifs; test ! -L /app/justificatifs; '
+                       'test -z "$(ls -A /app/justificatifs)"; }')
+
+
+STORAGE_PROBE = r"""set -u
 root=/app/justificatifs
+failed=0
+fail() { printf 'storage-error:%s\n' "$1"; failed=1; }
 uid="$(id -u)"; gid="$(id -g)"
-test "$uid" -ne 0
-test -d "$root"; test ! -L "$root"; test -r "$root"; test -w "$root"
-test "$(stat -c '%u:%g:%a' "$root")" = "$uid:$gid:700"
-test -z "$(find "$root" ! -type f ! -type d -print -quit)"
-test -z "$(find "$root" ! -user "$uid" -print -quit)"
-test -z "$(find "$root" ! -group "$gid" -print -quit)"
-test -z "$(find "$root" -type d ! -perm 0700 -print -quit)"
-test -z "$(find "$root" -type f ! -perm 0600 -print -quit)"
-available="$(df -Pk "$root" | awk 'NR==2 {print $4}')"
-test "$available" -ge 1048576
-printf 'private-storage-ok\n'
+[ "$uid" -ne 0 ] || fail root-user
+if [ ! -d "$root" ] || [ -L "$root" ]; then
+  fail root-directory
+else
+  [ -r "$root" ] && [ -w "$root" ] && [ -x "$root" ] || fail root-access
+  [ "$(stat -c '%u:%g:%a' "$root")" = "$uid:$gid:700" ] || fail root-owner-mode
+  scan() {
+    code="$1"; shift
+    if found="$(find "$root" "$@" -print -quit 2>/dev/null)"; then
+      [ -z "$found" ] || fail "$code"
+    else
+      fail scan-inaccessible
+    fi
+  }
+  scan unsupported-type ! -type f ! -type d
+  scan owner ! -user "$uid"
+  scan group ! -group "$gid"
+  scan directory-mode -type d ! -perm 0700
+  scan file-mode -type f ! -perm 0600
+  available="$(df -Pk "$root" | awk 'NR==2 {print $4}')"
+  case "$available" in ''|*[!0-9]*) fail capacity-unreadable;; *) [ "$available" -ge 1048576 ] || fail capacity;; esac
+fi
+if [ "$failed" -eq 0 ]; then printf 'private-storage-ok\n'; else exit 1; fi
 """
 
 
@@ -200,7 +220,10 @@ def storage_permissions(container="wavy-factures-api-recette", require_capacity=
     result = subprocess.run(['docker','exec',container,'sh','-ec',STORAGE_PROBE if require_capacity else STORAGE_PROBE.replace('-ge 1048576','-ge 0')],
                             capture_output=True,text=True,timeout=30)
     if result.returncode or result.stdout.strip()!='private-storage-ok':
-        raise ValueError('Stockage privé : UID/GID, modes 0700/0600, absence de liens et espace libre à vérifier')
+        details = [line.split(':',1)[1] for line in result.stdout.splitlines()
+                   if re.fullmatch(r'storage-error:[a-z-]+',line)]
+        raise ValueError('Stockage privé : UID/GID, modes 0700/0600, absence de liens et espace libre à vérifier'
+                         + (' ('+', '.join(dict.fromkeys(details))+')' if details else ''))
 
 
 def direct_ports():

@@ -118,7 +118,7 @@ class Delivery(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,'Validation fonctionnelle'): delivery.promotion(self.root)
 
     def test_install_order_and_fail_closed_without_real_docker(self):
-        for failure in ('', 'preflight', 'storage', 'backup', 'up', 'runtime'):
+        for failure in ('', 'diagnose', 'preflight', 'storage', 'backup', 'up', 'runtime'):
             with self.subTest(failure=failure), tempfile.TemporaryDirectory() as tmp:
                 root=Path(tmp); scripts=root/'scripts'; scripts.mkdir(); (root/'deployments').mkdir()
                 binary=root/'bin'; binary.mkdir(); log=root/'events'
@@ -132,7 +132,7 @@ require_docker() { :; }; require_command() { :; }; recette_operation_lock() { :;
 compose() { echo up >> "$FIXTURE_LOG"; [[ $FIXTURE_FAIL != up ]]; }
 """)
                 commands={
-                    'python3': '#!/bin/bash\naction=${2:-}; echo "$action" >> "$FIXTURE_LOG"; [[ $FIXTURE_FAIL != "$action" ]]\n',
+                    'python3': '#!/bin/bash\n[[ ${1:-} != -B ]] || shift\naction=${2:-}; echo "$action" >> "$FIXTURE_LOG"; [[ $FIXTURE_FAIL != "$action" ]]\n',
                     'docker': '#!/bin/bash\nif [[ $1 == context ]]; then echo unix:///var/run/docker.sock; fi\n',
                     'git': '#!/bin/bash\nexit 0\n'}
                 for name, body in commands.items():
@@ -142,7 +142,7 @@ compose() { echo up >> "$FIXTURE_LOG"; [[ $FIXTURE_FAIL != up ]]; }
                 env=dict(os.environ, PATH=str(binary)+':'+os.environ['PATH'], FIXTURE_ROOT=str(root), FIXTURE_LOG=str(log), FIXTURE_FAIL=failure, HOME=str(root))
                 result=subprocess.run(['bash',str(scripts/'install.sh'),'recette'],env=env,capture_output=True,text=True)
                 events=log.read_text().splitlines()
-                expected=['preflight','verify','storage','backup','up','migrations','runtime']
+                expected=['diagnose','preflight','verify','storage','backup','up','migrations','runtime']
                 self.assertEqual(events,expected[:expected.index(failure)+1] if failure else expected)
                 self.assertEqual(result.returncode == 0,not bool(failure),result.stderr)
                 if failure in ('up','runtime'):
@@ -163,7 +163,7 @@ compose() { echo up >> "$FIXTURE_LOG"; [[ $FIXTURE_FAIL != up ]]; }
     def test_cli_refuses_wrong_host_before_mutation(self):
         result=subprocess.run([str(ROOT/'wavy'),'install','recette'],capture_output=True,text=True)
         self.assertNotEqual(result.returncode,0)
-        self.assertIn('WAVY_INSTALL_HOSTNAME',result.stderr)
+        self.assertIn('WAVY_INSTALL_HOSTNAME',result.stdout+result.stderr)
 
 
 
@@ -188,7 +188,7 @@ require_docker() { :; }; require_command() { :; }; recette_operation_lock() { :;
 """)
         commands = {
             'docker': '#!/bin/bash\n[[ $1 == context ]] || exit 99; echo unix:///var/run/docker.sock\n',
-            'python3': '#!/bin/bash\necho "$2"; exit 73\n'}
+            'python3': '#!/bin/bash\n[[ ${1:-} != -B ]] || shift\n[[ $2 != diagnose ]] || exit 0; echo "$2"; exit 73\n'}
         for name, body in commands.items():
             path=self.root/'bin'/name; path.write_text(body); path.chmod(0o700)
         self.git('init','-q')

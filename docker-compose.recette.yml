@@ -131,7 +131,7 @@ services:
     environment:
       WAVY_CORS_ALLOWED_ORIGIN_PATTERNS: ${WAVY_CORS_ALLOWED_ORIGIN_PATTERNS:-https://recette.wavyservices.fr,http://localhost:24200,http://localhost:24201,http://localhost:24202,http://localhost:24203,http://localhost:24204,http://localhost:24206,http://localhost:24207}
       SERVER_FORWARD_HEADERS_STRATEGY: framework
-      SPRING_PROFILES_ACTIVE: ${WAVY_SOCLE_SPRING_PROFILES_ACTIVE:-recette}
+      SPRING_PROFILES_ACTIVE: ${WAVY_SOCLE_SPRING_PROFILES_ACTIVE:-local}
       WAVY_SOCLE_DB_HOST: socle-db-recette
       WAVY_SOCLE_DB_PORT: 5432
       WAVY_SOCLE_DB_NAME: ${WAVY_SOCLE_DB_NAME:-wavy_socle_db}

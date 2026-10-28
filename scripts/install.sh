@@ -3,8 +3,11 @@
 set -euo pipefail
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/_common.sh"
 umask 077
-[[ $# == 1 && ( $1 == recette || $1 == preprod ) ]] || die 'Usage : ./wavy install recette|preprod'
+[[ ( $# == 1 && ( $1 == recette || $1 == preprod ) ) || ( $# == 2 && $1 == recette && $2 == --check ) ]] || die 'Usage : ./wavy install recette [--check] | preprod'
 env="$1"
+if [[ "${2:-}" == --check ]]; then
+  exec python3 -B "$SCRIPT_DIR/delivery_check.py" diagnose
+fi
 if [[ "$env" == preprod ]]; then
   if [[ ${WAVY_PREPROD_WRAPPED_ENTRY:-} != "${BASH_SOURCE[0]}" ]]; then
     export WAVY_PREPROD_WRAPPED_ENTRY="${BASH_SOURCE[0]}"
@@ -20,6 +23,8 @@ if [[ "$env" == preprod ]]; then
   done
   exit 0
 fi
+# Un seul rapport de tous les prérequis avant verrou, pull, backup ou provisionnement.
+python3 -B "$SCRIPT_DIR/delivery_check.py" diagnose
 [[ -z "${DOCKER_HOST:-}" && -z "${DOCKER_CONTEXT:-}" ]] || die 'Daemon distant interdit.'
 [[ "$(env_value recette WAVY_INSTALL_HOSTNAME '')" == "$(hostname -s)" ]] || die 'Configurer WAVY_INSTALL_HOSTNAME sur la VM cible ; installation refusée sur cet hôte.'
 [[ ! -f "$ROOT_DIR/deployments/recette-https-reservation.json" && ! -f "$HOME/.local/state/wavy/recettelocal/runtime-info.json" ]] || die 'Session MSI réservée : utiliser ./wavy local.'

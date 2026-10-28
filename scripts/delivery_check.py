@@ -22,6 +22,14 @@ def require(condition, message):
         raise ValueError(message)
 
 
+def dotenv_literal(value):
+    value = value.strip()
+    if value.startswith(('"', "'")):
+        require(len(value) >= 2 and value[-1] == value[0], 'Quotes dotenv incomplètes')
+        return value[1:-1]
+    return value
+
+
 def machine(root):
     path = root/'.env.recette'
     require(not path.is_symlink() and path.stat().st_uid == os.getuid() and not path.stat().st_mode & 0o077,
@@ -29,34 +37,56 @@ def machine(root):
     values = manifest(path)  # les doublons sont des erreurs, même de valeur identique
     forbidden = [k for k in values if k.endswith(('_VERSION', '_DIGEST')) or k in ('WAVY_IMAGE_REGISTRY','WAVY_GATEWAY_CORS_ALLOWED_ORIGIN_PATTERNS')]
     require(not forbidden, 'Versions/digests ou ancien CORS Gateway présents dans le dotenv machine')
-    return {k: literal(v) for k,v in values.items()}
+    return {k: dotenv_literal(v) for k,v in values.items()}
 
 
-def rendered_checks(config, env, images, origin=None):
-    services = config['services']
-    actual = {c: services[f'wavy-{c}-{env}']['image'] for c in COMPONENTS}
-    require(actual == images, f'{env} : les 13 images rendues doivent correspondre aux manifestes')
-    require(not any('build' in s for s in services.values()), 'Build distant interdit')
+def profiles(value):
+    return tuple(part.strip() for part in value.split(',') if part.strip())
+
+
+def valid_profile(component, value, env='recette'):
+    selected = profiles(value)
+    if env != 'recette':
+        return env in selected and not set(selected).intersection({'local','dev','test'})
+    allowed = {('recette',), ('recette','secure')}
+    if component == 'socle-api': allowed.add(('local',))
+    return selected in allowed
+
+
+def rendered_checks(config, env, images, origin=None, check=require):
+    services = config.get('services', {})
+    for c in COMPONENTS:
+        svc = services.get(f'wavy-{c}-{env}')
+        check(svc is not None, f'{env}/{c} : service absent')
+        if svc is not None:
+            check(svc.get('image') == images.get(c), f'{env}/{c} : image différente du manifeste')
+    check(not any('build' in s for s in services.values()), 'Build distant interdit')
     cors = set()
     for c in ('socle-api','tiers-api','contrats-api','factures-api','tresorerie-api','gateway'):
-        e = services[f'wavy-{c}-{env}']['environment']
-        profiles = set(e['SPRING_PROFILES_ACTIVE'].split(','))
-        require(env in profiles and not profiles.intersection({'local','dev','test'}), f'Profil incohérent : {env}/{c}')
-        cors.add(e['WAVY_CORS_ALLOWED_ORIGIN_PATTERNS'])
+        e = services.get(f'wavy-{c}-{env}', {}).get('environment', {})
+        selected = profiles(e.get('SPRING_PROFILES_ACTIVE', ''))
         if env == 'recette':
-            require(e.get('SERVER_FORWARD_HEADERS_STRATEGY') == 'framework', 'Transmission HTTPS Spring absente')
-    require(len(cors) == 1 and '*' not in next(iter(cors)), f'{env} : CORS contradictoire ou wildcard')
+            # Le nom de l'environnement Docker n'est pas un contrat de profil Spring.
+            # Socle local est le contrat historique publié. Aucune activation de secure implicite.
+            check(valid_profile(c,e.get('SPRING_PROFILES_ACTIVE','')),  f'Profil incohérent : {env}/{c}')
+            check(e.get('SERVER_FORWARD_HEADERS_STRATEGY') == 'framework', f'{c} : transmission HTTPS Spring absente')
+        else:
+            check(env in selected and not set(selected).intersection({'local','dev','test'}), f'Profil incohérent : {env}/{c}')
+        cors.add(e.get('WAVY_CORS_ALLOWED_ORIGIN_PATTERNS', ''))
+    check(len(cors) == 1 and bool(next(iter(cors), '')) and all('*' not in v for v in cors), f'{env} : CORS contradictoire ou wildcard')
     if origin:
-        require(origin in next(iter(cors)).split(','), 'Origine HTTPS absente de CORS')
-    for s in services.values():
+        check(all(origin in [part.strip() for part in value.split(',')] for value in cors), 'Origine HTTPS absente de CORS')
+    for name, s in services.items():
         for port in s.get('ports', []):
-            require(port.get('host_ip') in ('127.0.0.1','::1'), f'{env} : port publié hors loopback')
+            check(port.get('host_ip') in ('127.0.0.1','::1'), f'{env}/{name} : port publié hors loopback')
     if env == 'recette':
-        factures = services['wavy-factures-api-recette']
-        require(factures['environment'].get('WAVY_FACTURES_STOCKAGE_JUSTIFICATIFS') == '/app/justificatifs', 'Stockage Factures persistant absent')
+        factures = services.get('wavy-factures-api-recette', {})
+        check(factures.get('environment', {}).get('WAVY_FACTURES_STOCKAGE_JUSTIFICATIFS') == '/app/justificatifs', 'Stockage Factures persistant absent')
         mounts = [m for m in factures.get('volumes', []) if m['target'] == '/app/justificatifs']
-        require(len(mounts) == 1 and mounts[0]['type'] == 'volume', 'Montage documentaire invalide')
-        require(config['volumes'][mounts[0]['source']].get('external'), 'Le volume documentaire doit être externe')
+        valid = len(mounts) == 1 and mounts[0]['type'] == 'volume'
+        check(valid, 'Montage documentaire invalide')
+        if valid:
+            check(config.get('volumes', {}).get(mounts[0]['source'], {}).get('external'), 'Le volume documentaire doit être externe')
 
 
 def check_recette(root):
@@ -97,6 +127,13 @@ def preflight(root):
     for obj in objects:
         require(obj['Config'].get('Labels', {}).get('com.docker.compose.project') == 'wavy-recette', 'Conteneur hors projet RECETTE')
         require(obj['State']['Running'], 'Reprendre les services existants avant installation')
+        name = obj['Name'].lstrip('/')
+        if name.startswith('wavy-') and ('-api-' in name or name == 'wavy-gateway-recette'):
+            active = dict(item.split('=',1) for item in obj['Config'].get('Env',[]) if '=' in item)
+            key = 'WAVY_'+name[5:-8].upper().replace('-','_').replace('_API','')+'_SPRING_PROFILES_ACTIVE'
+            wanted = values.get(key, 'local' if name == 'wavy-socle-api-recette' else 'recette')
+            require(profiles(active.get('SPRING_PROFILES_ACTIVE','')) == profiles(wanted),
+                    'Changement de profil à tester avant installation : '+name)
     preserve_storage(state)
     docker_root = subprocess.check_output(['docker','info','--format','{{.DockerRootDir}}'], text=True).strip()
     for path in (root, root/'backups', Path(docker_root)):
@@ -176,7 +213,12 @@ def approve(root):
 
 def main():
     action = sys.argv[1] if len(sys.argv) >= 2 else ''
-    if action == 'migrations':
+    if action == 'diagnose':
+        from recette_diagnostic import diagnose
+        report = diagnose(ROOT)
+        print(json.dumps(report, ensure_ascii=False, indent=2))
+        return 1 if report['errors'] else 0
+    elif action == 'migrations':
         for c in ('socle-api','tiers-api','contrats-api','factures-api','tresorerie-api'):
             logs = subprocess.check_output(['docker','logs','--since',sys.argv[2],f'wavy-{c}-recette'], stderr=subprocess.STDOUT, text=True)
             require(not re.search(r'checksum mismatch|Validate failed|migration failed|FlywayValidateException|FlywayMigrateException', logs, re.I), f'Migration en échec : {c}')
@@ -193,7 +235,7 @@ def main():
 
 
 if __name__ == '__main__':
-    try: main()
+    try: sys.exit(main())
     except (ValueError, KeyError, OSError, subprocess.SubprocessError) as error:
         # Les sorties Compose/Docker ne sont jamais imprimées : secrets possibles.
         print('NO-GO livraison : '+(str(error) if isinstance(error, ValueError) else type(error).__name__), file=sys.stderr)

@@ -49,7 +49,8 @@ Usage :
   ./wavy
   ./wavy help
   ./wavy doctor
-  ./wavy install recette|preprod
+  ./wavy install recette [--check]
+  ./wavy install preprod
   ./wavy validate recette
   ./wavy start local|recette
   ./scripts/initialize-preprod.sh --empty-installation
