@@ -49,6 +49,8 @@ Usage :
   ./wavy
   ./wavy help
   ./wavy doctor
+  ./wavy install recette|preprod
+  ./wavy validate recette
   ./wavy start local|recette
   ./scripts/initialize-preprod.sh --empty-installation
   ./scripts/deploy.sh preprod <composant>
@@ -609,6 +611,10 @@ main() {
 
   case "$command" in
     local) exec python3 -B "$ROOT_DIR/preparation/https-msi/wavy_deploy.py" --local-cli "$@" ;;
+    validate)
+      [[ "$#" -eq 1 && "$1" == recette ]] || die "Usage : ./wavy validate recette"
+      exec python3 -B "$SCRIPT_DIR/delivery_check.py" approve ;;
+    install) exec "$SCRIPT_DIR/install.sh" "$@" ;;
     pwa) exec python3 -B "$SCRIPT_DIR/recette_pwa.py" "$@" ;;
     promotion-plan)
       [[ "$#" -eq 1 && ( "$1" == recette || "$1" == preprod ) ]] || die "Usage : ./wavy promotion-plan recette|preprod"

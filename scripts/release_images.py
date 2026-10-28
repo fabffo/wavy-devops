@@ -98,12 +98,12 @@ def recette_operation(root, mutation):
         if not inherited: os.close(fd)
 
 
-def recette_compose(root, args, rollback=None):
+def recette_compose(root, args, rollback=None, capture=False):
     with recette_operation(root,args[0] in ('up','create','run','stop','down','restart','kill','pause','unpause','exec')):
-        return _recette_compose(root,args,rollback)
+        return _recette_compose(root,args,rollback,capture)
 
 
-def _recette_compose(root, args, rollback=None):
+def _recette_compose(root, args, rollback=None, capture=False):
     from recette_pwa import overlay
     versions, digests, images = release(root, 'recette')
     if rollback:
@@ -137,12 +137,18 @@ def _recette_compose(root, args, rollback=None):
     with tempfile.TemporaryDirectory(prefix='wavy-recette-compose-') as temporary:
         override = Path(temporary)/'pwa.json'
         override.write_text(json.dumps(pwa))
-        return subprocess.run(['docker', 'compose', '--env-file', str(root / '.env.recette'),
+        result = subprocess.run(['docker', 'compose', '--env-file', str(root / '.env.recette'),
                                '--env-file', str(root / 'versions/recette.env'),
                                '--env-file', str(root / 'versions/recette.digests'),
                                '-p', machine.get('COMPOSE_PROJECT_NAME', 'wavy-recette'),
                                '-f', str(root / 'docker-compose.recette.yml'),
-                               '-f', str(override), *args], env=clean).returncode
+                               '-f', str(override), *args], env=clean,
+                              **({'capture_output': True, 'text': True} if capture else {}))
+        if capture:
+            if result.returncode:
+                raise ValueError('Rendu Compose RECETTE refusé (sortie masquée)')
+            return json.loads(result.stdout)
+        return result.returncode
 
 
 

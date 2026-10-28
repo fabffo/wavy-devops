@@ -35,6 +35,7 @@ jobs:
           for script in scripts/*.sh; do bash -n "$script"; done
       - name: Static PREPROD tests with fictional secrets outside repository
         run: |
+          python3 scripts/test-delivery.py
           python3 scripts/test-release-images.py
           python3 scripts/test-gateway-cors.py
           python3 scripts/test-recette-pwa.py

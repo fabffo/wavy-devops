@@ -35,3 +35,6 @@ preparation/https-msi/FILES.txt
 
 # Verrou RECETTE partagé avec le cycle local permanent et les backups.
 deployments/recette.lock
+
+# Historique append-only de l’installation RECETTE.
+deployments/recette-install.tsv

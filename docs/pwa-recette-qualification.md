@@ -1,5 +1,9 @@
 # Qualification et restauration PWA RECETTE
 
+> Parcours standard actualisé : [livraison et installation](livraison-standard.md).
+> Le mode `technical` RECETTE remplace les attestations fonctionnelles préalables
+> par les contrôles techniques automatiques ; le mode historique reste disponible.
+
 Préparation MSI uniquement. Ce document et `./wavy pwa recette check --plan`
 n'autorisent ni accès VM, ni déploiement, ni écriture dans les données existantes.
 

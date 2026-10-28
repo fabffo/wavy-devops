@@ -40,7 +40,7 @@ class IsolatedRestore(unittest.TestCase):
                 run(['docker','run','-d','--name',postgres,'--pull','never','--network','none',
                      '--tmpfs','/var/lib/postgresql/data','-e','POSTGRES_HOST_AUTH_METHOD=trust',TOOL]);created.append(postgres)
                 for attempt in range(60):
-                    ready=subprocess.run(['docker','exec',postgres,'pg_isready','-U','postgres'],capture_output=True)
+                    ready=subprocess.run(['docker','exec',postgres,'pg_isready','-h','127.0.0.1','-U','postgres'],capture_output=True)
                     if ready.returncode==0:break
                     time.sleep(.2)
                 self.assertEqual(ready.returncode,0)

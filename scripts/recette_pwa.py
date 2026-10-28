@@ -77,12 +77,21 @@ def policy(root, machine, images):
         if not isinstance(observed, dict):
             observed = {}
         missing.extend(check for check in checks if observed.get(check) is not True)
+    mode = literal(machine.get('WAVY_RECETTE_VALIDATION_MODE', 'qualification'))
+    if mode not in ('qualification', 'technical'):
+        raise ValueError('Mode de validation RECETTE invalide')
+    if mode == 'technical':
+        # RECETTE sert à la validation humaine après installation. Aucune
+        # attestation fonctionnelle n'est fabriquée pour ouvrir les routes.
+        missing = []
+        if not re.fullmatch(r'[a-zA-Z0-9][a-zA-Z0-9_.-]*', volume):
+            missing.append('volume privé WAVY_FACTURES_JUSTIFICATIFS_VOLUME absent ou invalide')
     if enabled or writes:
         cors = literal(machine.get('WAVY_CORS_ALLOWED_ORIGIN_PATTERNS', 'https://recette.wavyservices.fr'))
         if origin not in [value.strip() for value in cors.split(',')]:
             missing.append('origine PWA absente de la liste CORS exacte des APIs')
     return {'enabled': enabled, 'writes': writes, 'origin': origin, 'volume': volume,
-            'missing': missing, 'go': not missing, 'environment': 'recette'}
+            'missing': missing, 'go': not missing, 'environment': 'recette', 'mode': mode}
 
 
 def has_subpath(obj, target):
@@ -102,7 +111,7 @@ def preserve_storage(state):
     obj = json.loads(result.stdout)[0]
     environment = dict(item.split('=', 1) for item in obj['Config'].get('Env', []) if '=' in item)
     old = environment.get('WAVY_FACTURES_STOCKAGE_JUSTIFICATIFS', '')
-    if old:
+    if old or any(m.get('Destination') == '/app/justificatifs' for m in obj.get('Mounts', [])):
         mounts = [m for m in obj.get('Mounts', []) if m['Destination'] == old]
         if old != '/app/justificatifs' or len(mounts) != 1 or mounts[0].get('Type') != 'volume' or mounts[0].get('Name') != state['volume'] or has_subpath(obj,old):
             raise ValueError('PWA : préserver le stockage existant ; aucune migration ou suppression de montage automatique')
@@ -142,7 +151,11 @@ def overlay(root, machine, images, mutation=False, enforce=True):
     if mutation:
         preserve_storage(state)
     if mutation and (state['enabled'] or state['writes']):
-        runtime_check(state, images)
+        if state['mode'] == 'technical':
+            from recette_storage import check_volume
+            check_volume(state['volume'], images['factures-api'])
+        else:
+            runtime_check(state, images)
     directory = root/'docker/recette-pwa'
     def mount(filename, target):
         source = directory/filename

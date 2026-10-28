@@ -18,9 +18,19 @@ if volume:
     obj=json.loads(subprocess.check_output(['docker','inspect','wavy-factures-api-recette']))[0]
     env=dict(x.split('=',1) for x in obj['Config']['Env'] if '=' in x)
     mounts=[m for m in obj.get('Mounts',[]) if m['Destination']=='/app/justificatifs']
-    if env.get('WAVY_FACTURES_STOCKAGE_JUSTIFICATIFS')!='/app/justificatifs' or len(mounts)!=1 or mounts[0].get('Type')!='volume' or mounts[0].get('Name')!=volume:
-        raise SystemExit('Stockage Factures à qualifier avant sauvegarde complète')
-    storage_permissions(require_capacity=False)
+    if not env.get('WAVY_FACTURES_STOCKAGE_JUSTIFICATIFS') and not mounts and literal(machine.get('WAVY_RECETTE_VALIDATION_MODE',''))=='technical':
+        # Premier rattachement : stockage auparavant désactivé. Ne pas masquer
+        # un répertoire existant ; l'archive initiale doit être vide et privée.
+        subprocess.run(['docker','exec','wavy-factures-api-recette','sh','-ec',
+                        'test ! -e /app/justificatifs || { test -d /app/justificatifs; test ! -L /app/justificatifs; test -z "$(ls -A /app/justificatifs)"; }'],check=True)
+        from recette_storage import check_volume, tool
+        image=obj['Image']
+        check_volume(volume,image)
+        tool(volume,image,'test -z "$(ls -A /app/justificatifs)"')
+    else:
+        if env.get('WAVY_FACTURES_STOCKAGE_JUSTIFICATIFS')!='/app/justificatifs' or len(mounts)!=1 or mounts[0].get('Type')!='volume' or mounts[0].get('Name')!=volume:
+            raise SystemExit('Stockage Factures à qualifier avant sauvegarde complète')
+        storage_permissions(require_capacity=False)
 PY
   if [[ -z "$DOCUMENT_VOLUME" ]]; then
     [[ "$(env_value recette WAVY_PWA_ENABLED false)" != true && "$(env_value recette WAVY_NOTES_WRITES_ENABLED false)" != true ]] \

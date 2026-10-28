@@ -1,5 +1,9 @@
 # Mobile PWA permanente en RECETTE — configuration et prérequis
 
+> Parcours standard actualisé : [livraison et installation](livraison-standard.md).
+> Le mode `technical` RECETTE remplace les attestations fonctionnelles préalables
+> par les contrôles techniques automatiques ; le mode historique reste disponible.
+
 ## Décision actuelle : NO-GO pour l'activation distante
 
 Le diagnostic fourni confirme un problème de configuration du Shell : manifeste

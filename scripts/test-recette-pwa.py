@@ -28,7 +28,7 @@ class RecettePwa(unittest.TestCase):
         self.machine = {'WAVY_PWA_ENABLED': 'false', 'WAVY_NOTES_WRITES_ENABLED': 'false'}
 
     def approve(self, writes=False):
-        self.machine.update(WAVY_PWA_ENABLED='true', WAVY_NOTES_WRITES_ENABLED=str(writes).lower(),
+        self.machine.update(WAVY_RECETTE_VALIDATION_MODE='qualification', WAVY_PWA_ENABLED='true', WAVY_NOTES_WRITES_ENABLED=str(writes).lower(),
             WAVY_PWA_QUALIFICATION_FILE='qualification.private.json', WAVY_FACTURES_JUSTIFICATIFS_VOLUME='existing-private-documents')
         self.proof = {'environment': 'recette', 'origin': 'https://recette.wavyservices.fr', 'approved': True,
             'reviewer': 'test-fixture-only', 'backup':{'manifestSha256':'a'*64,'restoredManifestSha256':'a'*64}, 'images': {c:self.images[c] for c in pwa.COMPONENTS},

@@ -1,5 +1,7 @@
 # Docker Recette Wavy
 
+Parcours standard : [installation via ./wavy](docs/livraison-standard.md).
+
 Cette documentation décrit la pile Docker globale de recette pour le dépôt `wavy-devops`.
 
 ## Principe
