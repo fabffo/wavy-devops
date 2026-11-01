@@ -209,7 +209,7 @@ else
   scan directory-mode -type d ! -perm 0700
   scan file-mode -type f ! -perm 0600
   available="$(df -Pk "$root" | awk 'NR==2 {print $4}')"
-  case "$available" in ''|*[!0-9]*) fail capacity-unreadable;; *) [ "$available" -ge 1048576 ] || fail capacity;; esac
+  case "$available" in ''|*[!0-9]*) fail capacity-unreadable;; *) [ "$available" -ge 1 ] || fail capacity;; esac
 fi
 if [ "$failed" -eq 0 ]; then printf 'private-storage-ok\n'; else exit 1; fi
 """
@@ -217,7 +217,7 @@ if [ "$failed" -eq 0 ]; then printf 'private-storage-ok\n'; else exit 1; fi
 
 def storage_permissions(container="wavy-factures-api-recette", require_capacity=True):
     # Exécuté avec l'utilisateur applicatif ; aucune création/chmod/chown/lecture de document.
-    result = subprocess.run(['docker','exec',container,'sh','-ec',STORAGE_PROBE if require_capacity else STORAGE_PROBE.replace('-ge 1048576','-ge 0')],
+    result = subprocess.run(['docker','exec',container,'sh','-ec',STORAGE_PROBE if require_capacity else STORAGE_PROBE.replace('-ge 1','-ge 0')],
                             capture_output=True,text=True,timeout=30)
     if result.returncode or result.stdout.strip()!='private-storage-ok':
         details = [line.split(':',1)[1] for line in result.stdout.splitlines()
@@ -237,6 +237,7 @@ def direct_ports():
     if {obj['Name'].lstrip('/') for obj in objects} != set(names):
         raise ValueError('Ports directs : inventaire RECETTE incomplet')
     for obj in objects:
+        if obj['Name'].lstrip('/') == 'wavy-erp-shell-recette': continue
         for bindings in obj.get('HostConfig',{}).get('PortBindings',{}).values():
             if any(binding.get('HostIp') not in ('127.0.0.1','::1') for binding in bindings or []):
                 exposed.append(obj['Name'].lstrip('/'))

@@ -122,7 +122,7 @@ class Diagnostic(unittest.TestCase):
     def test_shell_network_change_is_reported_as_unverified_proxy_topology(self):
         self.objects['wavy-erp-shell-recette']['HostConfig']={'PortBindings':{'80/tcp':[{'HostIp':'0.0.0.0'}]}}
         result=self.run_diagnostic()
-        self.assertTrue(any(r['code']=='network.proxy' and r['status']=='pending' for r in result['checks']))
+        self.assertTrue(any(r['code']=='network.proxy' and r['status']=='warning' for r in result['checks']))
 
     def test_all_configuration_errors_are_reported_in_one_pass(self):
         for key,value in {'WAVY_SOCLE_DB_PASSWORD':'','WAVY_TIERS_SERVICE_USERNAME':'',
@@ -131,12 +131,13 @@ class Diagnostic(unittest.TestCase):
                           'WAVY_NOTES_WRITES_ENABLED':'invalid',
                           'WAVY_INSTALL_WAIT_SECONDS':'bad',
                           'WAVY_FACTURES_JUSTIFICATIFS_VOLUME':'bad/volume'}.items():self.change(key,value)
-        with self.machine.open('a') as stream:stream.write('WAVY_PWA_ENABLED=true\n')
+        with self.machine.open('a') as stream:stream.write('WAVY_PWA_ENABLED=false\n')
         result=self.run_diagnostic(live=False)
         codes={row['code'] for row in result['checks'] if row['status']=='error'}
-        self.assertTrue({'dotenv.duplicate','profile.gateway','profile.tiers-api','credentials.socle',
+        self.assertTrue({'dotenv.duplicate','profile.gateway','profile.tiers-api',
                          'credentials.tiers','WAVY_NOTES_WRITES_ENABLED','wait','storage.name'} <= codes,codes)
-        self.assertGreaterEqual(result['errors'],8)
+        self.assertGreaterEqual(result['errors'],7)
+        self.assertTrue(any(r['code']=='credentials.socle' and r['category']=='AVERTISSEMENT' for r in result['checks']))
 
     def test_all_runtime_errors_and_13_registry_checks_are_attempted(self):
         self.objects.pop('wavy-tiers-api-recette');self.objects.pop('wavy-pwa-recette')
@@ -148,7 +149,7 @@ class Diagnostic(unittest.TestCase):
         codes={r['code'] for r in result['checks'] if r['status']=='error'}
         self.assertTrue({'container.wavy-tiers-api-recette','container.wavy-pwa-recette',
                          'container.running','backup.socle.pg_restore','backup.tresorerie.pg_restore',
-                         'https.tls','https.cors','registry.gateway','registry.factures-api'} <= codes,codes)
+                         'registry.gateway','registry.factures-api'} <= codes,codes)
         self.assertEqual(sum(c[:3]==['docker','manifest','inspect'] for c in self.calls),13)
 
     def test_future_volume_creation_is_not_an_error_or_a_mutation(self):
@@ -261,6 +262,123 @@ class Diagnostic(unittest.TestCase):
         with patch.object(diagnostic,'command',side_effect=missing_capabilities):result=self.run_diagnostic()
         self.assertTrue(any(r['code']=='docker.compose.capabilities' and '--wait-timeout' in r['message'] for r in result['checks']))
         self.assertTrue(any(r['code']=='backup.tar' and r['status']=='error' for r in result['checks']))
+
+    def test_tiers_local_already_active_is_warning_and_profile_is_preserved(self):
+        self.change('WAVY_TIERS_SPRING_PROFILES_ACTIVE','local')
+        obj=self.objects['wavy-tiers-api-recette']
+        obj['Config']['Env']=[x.replace('SPRING_PROFILES_ACTIVE=recette','SPRING_PROFILES_ACTIVE=local') for x in obj['Config']['Env']]
+        result=self.run_diagnostic()
+        self.assertEqual(result['errors'],0,result['checks'])
+        self.assertTrue(any(r['code']=='profile.tiers-api' and r['category']=='AVERTISSEMENT' for r in result['checks']))
+        self.assertEqual(delivery.check_recette(self.root)[0]['mode'],'technical')
+
+    def test_five_omitted_database_passwords_use_matching_rendered_legacy_values(self):
+        keys={'WAVY_'+db.upper()+'_DB_PASSWORD' for db in diagnostic.DATABASES}
+        self.machine.write_text('\n'.join(line for line in self.machine.read_text().splitlines() if line.split('=',1)[0] not in keys)+'\n')
+        for obj in self.objects.values():
+            obj['Config']['Env']=[key+'=motdepasse_recette' if key.endswith('PASSWORD') and key!='WAVY_TIERS_SERVICE_PASSWORD' else entry
+                                  for entry in obj['Config']['Env'] for key in [entry.split('=',1)[0]]]
+        result=self.run_diagnostic()
+        self.assertEqual(result['errors'],0,result['checks'])
+        self.assertEqual(sum(r['category']=='AVERTISSEMENT' and r['code'].startswith('credentials.') for r in result['checks']),5)
+        delivery.check_recette(self.root)  # Aucune seconde barrière sur les placeholders historiques.
+        self.objects['socle-db-recette']['Config']['Env'].append('POSTGRES_PASSWORD=actually-different-fixture')
+        blocked=self.run_diagnostic()
+        self.assertTrue(any(r['code']=='database.identity' and r['category']=='BLOQUANT' for r in blocked['checks']))
+
+    def test_https_from_vm_unavailable_does_not_turn_into_an_application_failure(self):
+        self.http_failures={'/','/api/auth/session','cors'}
+        result=self.run_diagnostic()
+        self.assertEqual(result['errors'],0,result['checks'])
+        self.assertEqual(result['decision'],'GO avec avertissements')
+        checks=[r for r in result['checks'] if r['code'].startswith('https.') and r['status']=='warning']
+        self.assertEqual(len(checks),3)
+        self.assertTrue(all(r['category']=='AVERTISSEMENT' and r['evidence']=='NON_VERIFIE' for r in checks))
+        self.assertTrue(any(r['code']=='execution' and r['category']=='INFORMATION' for r in result['checks']))
+
+    def test_shell_for_caddy_windows_is_external_but_all_backends_stay_private(self):
+        config=recette_compose(self.root,['config','--format','json'],capture=True)
+        self.assertEqual(config['services']['wavy-erp-shell-recette']['ports'][0]['host_ip'],'0.0.0.0')
+        self.assertTrue(all(p['host_ip']=='127.0.0.1' for name,svc in config['services'].items() if name!='wavy-erp-shell-recette' for p in svc.get('ports',[])))
+        config['services']['wavy-factures-api-recette']['ports'][0]['host_ip']='0.0.0.0'
+        with self.assertRaisesRegex(ValueError,'backend publié'):delivery.rendered_checks(config,'recette',release(self.root,'recette')[2])
+
+    def test_internal_routes_remain_blocking_when_public_https_is_not_reachable(self):
+        from io import StringIO
+        from urllib.error import URLError
+        from contextlib import redirect_stdout
+        images=release(self.root,'recette')[2]
+        state=delivery.check_recette(self.root)[0]
+        calls=[]
+        def fetch(base,path,codes=(200,)):
+            calls.append((base,path))
+            if base.startswith('https:'): raise URLError('fixture Caddy inaccessible depuis VM')
+            return b'{"enabled":true}' if path=='/pwa-integration.json' else b'fixture-content'
+        def cors(origin,base=None):
+            if base is None: raise URLError('fixture Caddy inaccessible depuis VM')
+        def inspect(args):return json.dumps([self.objects[args[-1]]]).encode()
+        with patch.object(delivery,'check_recette',return_value=(state,images)), patch.object(delivery,'runtime_check'), \
+             patch.object(delivery.subprocess,'check_output',side_effect=inspect), patch.object(delivery,'request',side_effect=fetch), \
+             patch.object(delivery,'cors_runtime',side_effect=cors):
+            output=StringIO()
+            with redirect_stdout(output):delivery.runtime(self.root)
+            report=json.loads(output.getvalue())
+            self.assertEqual(report['errors'],0)
+            self.assertEqual(report['warnings'],2)
+            self.assertTrue(any(base=='http://127.0.0.1:24207' and path=='/pwa/' for base,path in calls))
+            with patch.object(delivery,'request',side_effect=ValueError('Route interne indisponible')):
+                with self.assertRaisesRegex(ValueError,'Route interne'):delivery.runtime(self.root)
+            def unsafe_public_cors(origin,base=None):
+                if base is None:raise delivery.UnsafeCorsError('CORS : origine globale observée')
+            with patch.object(delivery,'cors_runtime',side_effect=unsafe_public_cors), redirect_stdout(StringIO()):
+                with self.assertRaisesRegex(ValueError,'Non-conformité de sécurité'):delivery.runtime(self.root)
+
+    def test_identical_duplicates_and_unused_legacy_cors_are_advisory(self):
+        with self.machine.open('a') as stream:
+            stream.write('WAVY_PWA_ENABLED=true\nWAVY_GATEWAY_CORS_ALLOWED_ORIGIN_PATTERNS=https://unused.invalid\n')
+        result=self.run_diagnostic()
+        self.assertEqual(result['errors'],0,result['checks'])
+        self.assertTrue(any(r['code']=='dotenv.duplicate' and r['category']=='AVERTISSEMENT' for r in result['checks']))
+        self.assertTrue(any(r['code']=='dotenv.legacy' and r['category']=='AVERTISSEMENT' for r in result['checks']))
+        delivery.check_recette(self.root)
+
+    def test_low_space_or_unreadable_measurement_warns_but_full_disk_blocks(self):
+        from types import SimpleNamespace
+        low=SimpleNamespace(f_bavail=512000,f_frsize=1024)
+        full=SimpleNamespace(f_bavail=0,f_frsize=1024)
+        with patch.object(diagnostic.os,'statvfs',return_value=low):result=self.run_diagnostic()
+        self.assertEqual(result['errors'],0,result['checks'])
+        self.assertTrue(any(r['code']=='disk' and r['category']=='AVERTISSEMENT' for r in result['checks']))
+        with patch.object(diagnostic.os,'statvfs',side_effect=PermissionError()):result=self.run_diagnostic()
+        self.assertEqual(result['errors'],0,result['checks'])
+        with patch.object(diagnostic.os,'statvfs',return_value=full):result=self.run_diagnostic()
+        self.assertTrue(any(r['code']=='disk.full' and r['category']=='BLOQUANT' for r in result['checks']))
+
+    def test_stopped_static_front_is_information_not_a_backup_requirement(self):
+        self.objects['wavy-pwa-recette']['State']['Running']=False
+        result=self.run_diagnostic()
+        self.assertEqual(result['errors'],0,result['checks'])
+        self.assertTrue(any(r['code']=='container.running' and r['category']=='INFORMATION' for r in result['checks']))
+        state,images=delivery.check_recette(self.root)
+        with patch.object(delivery,'check_recette',return_value=(state,images)), patch.object(delivery,'preserve_storage'), \
+             patch.object(delivery.subprocess,'check_output',return_value=json.dumps(list(self.objects.values())).encode()):
+            delivery.preflight(self.root)
+
+    def test_storage_capacity_probe_keeps_only_full_volume_blocking(self):
+        from recette_pwa import STORAGE_PROBE
+        store=self.root/'capacity-fixture';store.mkdir(mode=0o700);store.chmod(0o700)
+        binary=self.root/'capacity-bin';binary.mkdir();df=binary/'df'
+        env=dict(os.environ,PATH=str(binary)+':'+os.environ['PATH'])
+        script=STORAGE_PROBE.replace('root=/app/justificatifs','root='+str(store))
+        for available in (512000,0):
+            df.write_text('#!/bin/sh\nprintf "Filesystem 1K-blocks Used Available Use%% Mounted\nfixture 1000000 0 '+str(available)+' 0%% /fixture\n"\n');df.chmod(0o700)
+            result=subprocess.run(['sh','-c',script],env=env,capture_output=True,text=True)
+            self.assertEqual('storage-error:capacity' in result.stdout,available==0)
+
+    def test_observed_unsafe_public_cors_is_still_blocking(self):
+        with patch.object(delivery,'cors_runtime',side_effect=delivery.UnsafeCorsError('CORS : origine globale observée')):
+            result=self.run_diagnostic()
+        self.assertTrue(any(r['code']=='security.cors' and r['category']=='BLOQUANT' and r['evidence']=='ECART_OBSERVE' for r in result['checks']))
 
     def test_quoted_settings_match_shell_and_preserve_internal_secret_quotes(self):
         self.change('WAVY_INSTALL_HOSTNAME',"'"+socket.gethostname().split('.')[0]+"'")

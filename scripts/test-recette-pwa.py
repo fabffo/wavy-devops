@@ -209,7 +209,8 @@ class RecettePwa(unittest.TestCase):
         self.assertEqual(len(shell['volumes']),4)
         ports=[p for service in configs[0]['services'].values() for p in service.get('ports',[])]
         self.assertEqual(len(ports),18)
-        self.assertTrue(all(p['host_ip']=='127.0.0.1' for p in ports))
+        self.assertTrue(all(p['host_ip']=='127.0.0.1' for name,service in configs[0]['services'].items() if name!='wavy-erp-shell-recette' for p in service.get('ports',[])))
+        self.assertEqual(shell['ports'][0]['host_ip'],'0.0.0.0')
         self.assertTrue(all(str(self.root/'docker/recette-pwa') in m['source'] for m in shell['volumes']))
         self.assertEqual(sum('@sha256:' in s['image'] for s in configs[0]['services'].values()),13)
 

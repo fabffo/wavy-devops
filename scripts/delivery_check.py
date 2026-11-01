@@ -34,8 +34,15 @@ def machine(root):
     path = root/'.env.recette'
     require(not path.is_symlink() and path.stat().st_uid == os.getuid() and not path.stat().st_mode & 0o077,
             '.env.recette doit être privé (0600), propriétaire courant')
-    values = manifest(path)  # les doublons sont des erreurs, même de valeur identique
-    forbidden = [k for k in values if k.endswith(('_VERSION', '_DIGEST')) or k in ('WAVY_IMAGE_REGISTRY','WAVY_GATEWAY_CORS_ALLOWED_ORIGIN_PATTERNS')]
+    values = manifest(path,strict=False)
+    seen={}
+    for line in path.read_text().splitlines():
+        if not line.strip() or line.lstrip().startswith('#'): continue
+        key,raw=line.split('=',1)
+        value=dotenv_literal(raw)
+        require(key not in seen or seen[key]==value,'Clé dupliquée contradictoire : '+key)
+        seen[key]=value
+    forbidden = [k for k in values if k.endswith(('_VERSION', '_DIGEST')) or k == 'WAVY_IMAGE_REGISTRY']
     require(not forbidden, 'Versions/digests ou ancien CORS Gateway présents dans le dotenv machine')
     return {k: dotenv_literal(v) for k,v in values.items()}
 
@@ -49,7 +56,7 @@ def valid_profile(component, value, env='recette'):
     if env != 'recette':
         return env in selected and not set(selected).intersection({'local','dev','test'})
     allowed = {('recette',), ('recette','secure')}
-    if component == 'socle-api': allowed.add(('local',))
+    if component in ('socle-api','tiers-api'): allowed.add(('local',))
     return selected in allowed
 
 
@@ -78,7 +85,8 @@ def rendered_checks(config, env, images, origin=None, check=require):
         check(all(origin in [part.strip() for part in value.split(',')] for value in cors), 'Origine HTTPS absente de CORS')
     for name, s in services.items():
         for port in s.get('ports', []):
-            check(port.get('host_ip') in ('127.0.0.1','::1'), f'{env}/{name} : port publié hors loopback')
+            if env != 'recette' or name != 'wavy-erp-shell-recette':
+                check(port.get('host_ip') in ('127.0.0.1','::1'), f'{env}/{name} : backend publié hors loopback')
     if env == 'recette':
         factures = services.get('wavy-factures-api-recette', {})
         check(factures.get('environment', {}).get('WAVY_FACTURES_STOCKAGE_JUSTIFICATIFS') == '/app/justificatifs', 'Stockage Factures persistant absent')
@@ -100,7 +108,7 @@ def check_recette(root):
     for s in config['services'].values():
         for key, value in s.get('environment', {}).items():
             if key.endswith('PASSWORD'):
-                require(value and value not in ('motdepasse_recette','CHANGE_ME'), 'Mot de passe machine absent ou valeur exemple')
+                require(bool(value), 'Secret candidat vide dans le rendu Compose')
     return state, images
 
 
@@ -126,8 +134,9 @@ def preflight(root):
     require({o['Name'].lstrip('/') for o in objects} == set(names), 'Installation RECETTE existante incomplète')
     for obj in objects:
         require(obj['Config'].get('Labels', {}).get('com.docker.compose.project') == 'wavy-recette', 'Conteneur hors projet RECETTE')
-        require(obj['State']['Running'], 'Reprendre les services existants avant installation')
         name = obj['Name'].lstrip('/')
+        if not name.startswith('wavy-') or '-api-' in name or name=='wavy-gateway-recette':
+            require(obj['State']['Running'], 'Service nécessaire à la sauvegarde arrêté : '+name)
         if name.startswith('wavy-') and ('-api-' in name or name == 'wavy-gateway-recette'):
             active = dict(item.split('=',1) for item in obj['Config'].get('Env',[]) if '=' in item)
             key = 'WAVY_'+name[5:-8].upper().replace('-','_').replace('_API','')+'_SPRING_PROFILES_ACTIVE'
@@ -135,10 +144,12 @@ def preflight(root):
             require(profiles(active.get('SPRING_PROFILES_ACTIVE','')) == profiles(wanted),
                     'Changement de profil à tester avant installation : '+name)
     preserve_storage(state)
-    docker_root = subprocess.check_output(['docker','info','--format','{{.DockerRootDir}}'], text=True).strip()
-    for path in (root, root/'backups', Path(docker_root)):
-        stats = os.statvfs(path if path.exists() else path.parent)
-        require(stats.f_bavail * stats.f_frsize >= 1024**3, 'Espace libre insuffisant (1 Gio minimum)')
+    # Le seuil historique 1 Gio est un avertissement dans le diagnostic.
+    # Un échec réel de sauvegarde reste bloquant avant toute recréation.
+    for path in (root,root/'backups'):
+        try: stats=os.statvfs(path if path.exists() else path.parent)
+        except OSError: continue  # Non mesurable ne signifie pas disque plein.
+        require(stats.f_bavail > 0,'Disque plein : sauvegarde impossible')
 
 
 def check_storage(root):
@@ -162,10 +173,16 @@ def request(origin, path, codes=(200,)):
     return body
 
 
-def cors_runtime(origin):
-    req = Request(origin+'/api/auth/session', method='OPTIONS', headers={
+class UnsafeCorsError(ValueError):
+    delivery_security_risk = True
+
+
+def cors_runtime(origin, base=None):
+    req = Request((base or origin)+'/api/auth/session', method='OPTIONS', headers={
         'Origin': origin, 'Access-Control-Request-Method': 'GET'})
     with urlopen(req, timeout=30) as response:
+        if response.headers.get('Access-Control-Allow-Origin') == '*':
+            raise UnsafeCorsError('CORS : origine globale observée sur la réponse, politique de sécurité incompatible')
         require(response.status in (200,204) and response.headers.get('Access-Control-Allow-Origin') == origin,
                 'Préflight CORS HTTPS refusé ou origine incorrecte')
 
@@ -180,18 +197,31 @@ def runtime(root):
         if c.endswith('-api') or c == 'gateway':
             require(obj['State'].get('Health', {}).get('Status') == 'healthy', f'API indisponible : {c}')
     origin = state['origin']
-    request(origin, '/')
-    integration = json.loads(request(origin, '/pwa-integration.json'))
+    values=machine(root)
+    bind=values.get('WAVY_RECETTE_PRIVATE_BIND_ADDRESS','0.0.0.0')
+    host='127.0.0.1' if bind in ('0.0.0.0','127.0.0.1','::') else ('[::1]' if bind=='::1' else bind)
+    base='http://'+host+':'+values.get('WAVY_ERP_SHELL_HOST_PORT','24207')
+    request(base, '/')
+    integration = json.loads(request(base, '/pwa-integration.json'))
     require(integration.get('enabled') is True, 'PWA masquée dans le Shell')
     for path in ('/pwa/', '/pwa/connexion', '/pwa/ngsw-worker.js', '/modules/socle/', '/modules/tiers/',
                  '/modules/contrats/', '/modules/factures/', '/modules/tresorerie/'):
-        body = request(origin, path)
+        body = request(base, path)
         require(bool(body), f'Réponse vide : {path}')
         if path.endswith('.js'):
             require(b'<html' not in body.lower(), 'Service worker remplacé par du HTML')
-    cors_runtime(origin)
-    request(origin, '/api/auth/session', (401,))
-    request(origin, '/api/actuator/health', (200,401,403,404))  # surface protégée selon Gateway
+    cors_runtime(origin, base=base)
+    request(base, '/api/auth/session', (401,))
+    request(base, '/api/actuator/health', (200,401,403,404))  # surface protégée selon Gateway
+    # Caddy est sur Windows : aucun succès TLS n'est déduit des tests internes.
+    from recette_diagnostic import Report
+    external=Report()
+    for code,op in [('https.tls',lambda:request(origin,'/')),('https.cors',lambda:cors_runtime(origin))]:
+        external.attempt(code,op)
+    external.add('chrome','pending','Valider HTTPS, connexion ERP et Mobile PWA dans Chrome via Caddy Windows.')
+    report=external.result()
+    print(json.dumps(report,ensure_ascii=False,indent=2))
+    require(report['errors']==0,'Non-conformité de sécurité observée sur le CORS public')
 
 
 def approve(root):

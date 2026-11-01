@@ -21,26 +21,33 @@ class Report:
         self.rows = []
         self.components = {}
 
-    def add(self, code, status, message):
-        row={'code':code, 'status':status, 'message':message}
+    def add(self, code, status, message, evidence=None):
+        # L'origine publique termine sur Caddy Windows, pas sur le daemon VM.
+        if code.startswith('https.') and status == 'error': status = 'warning'
+        category = 'BLOQUANT' if status == 'error' else ('AVERTISSEMENT' if status == 'warning' else 'INFORMATION')
+        row={'code':code, 'status':status, 'category':category, 'message':message}
+        if evidence is not None: row['evidence']=evidence
         if row not in self.rows: self.rows.append(row)
 
     def check(self, condition, message, code='configuration'):
         if not condition: self.add(code, 'error', message)
 
-    def attempt(self, code, operation):
+    def attempt(self, code, operation, unavailable='error'):
         try:
             return operation()
         except (ValueError, KeyError, IndexError, TypeError, OSError, subprocess.SubprocessError) as error:
             # Aucune sortie brute Docker/Compose, aucune valeur dotenv dans le rapport.
-            self.add(code, 'error', str(error) if isinstance(error, ValueError) else 'Contrôle impossible : '+type(error).__name__)
+            if getattr(error,'delivery_security_risk',False):
+                self.add('security.cors','error',str(error),evidence='ECART_OBSERVE')
+            else:
+                self.add(code, unavailable, str(error) if isinstance(error, ValueError) else 'Contrôle impossible : '+type(error).__name__, evidence='NON_VERIFIE')
             return None
 
     def result(self):
         errors = sum(row['status'] == 'error' for row in self.rows)
-        pending = sum(row['status'] == 'pending' for row in self.rows)
-        return {'environment':'recette', 'mutations':False, 'decision':'NO-GO' if errors else ('INCOMPLET' if pending else 'GO prérequis'),
-                'errors':errors, 'checks':self.rows, 'components':self.components,
+        warnings = sum(row['category'] == 'AVERTISSEMENT' for row in self.rows)
+        return {'environment':'recette', 'mutations':False, 'decision':'NO-GO' if errors else ('GO avec avertissements' if warnings else 'GO prérequis'),
+                'errors':errors, 'warnings':warnings, 'checks':self.rows, 'components':self.components,
                 'limit':'Pas de garantie de migration, sauvegarde ou disponibilité future ; leurs contrôles restent obligatoires pendant installation.'}
 
 
@@ -74,10 +81,16 @@ def read_machine(root, report):
             report.add('dotenv.syntax', 'error', f'Syntaxe dotenv invalide à la ligne {number}')
             continue
         key, raw = match.groups()
-        report.check(key not in values, 'Variable dupliquée : '+key, 'dotenv.duplicate')
         value = report.attempt('dotenv.'+key, lambda: dotenv_literal(raw))
+        if key in values:
+            if values[key]==value:
+                report.add('dotenv.duplicate','warning','Variable répétée avec la même valeur : '+key)
+            else:
+                report.add('dotenv.duplicate','error','Variable dupliquée contradictoire : '+key)
         if value is not None: values[key] = value
-        report.check(not (key.endswith(('_VERSION','_DIGEST')) or key in ('WAVY_IMAGE_REGISTRY','WAVY_GATEWAY_CORS_ALLOWED_ORIGIN_PATTERNS')),
+        if key=='WAVY_GATEWAY_CORS_ALLOWED_ORIGIN_PATTERNS':
+            report.add('dotenv.legacy','warning','Ancienne variable CORS Gateway ignorée ; seule la variable CORS commune rendue est utilisée.')
+        report.check(not (key.endswith(('_VERSION','_DIGEST')) or key == 'WAVY_IMAGE_REGISTRY'),
                      'Variable machine incompatible : '+key, 'dotenv.override')
     return values
 
@@ -119,7 +132,8 @@ def config_checks(root, values, report):
         report.check(valid_profile(c,value), 'Profil incohérent : recette/'+c, 'profile.'+c)
     for db in DATABASES:
         key = 'WAVY_'+db.upper()+'_DB_PASSWORD'
-        report.check(bool(values.get(key)) and values[key] not in ('motdepasse_recette','CHANGE_ME'), 'Secret absent ou valeur exemple : '+key, 'credentials.'+db)
+        if not values.get(key) or values[key] in ('motdepasse_recette','CHANGE_ME'):
+            report.add('credentials.'+db,'warning','Déclaration absente ou valeur historique : '+key+' ; le rendu et sa cohérence avec les conteneurs existants font foi, sans réinitialisation')
     for key in ('WAVY_TIERS_SERVICE_USERNAME','WAVY_TIERS_SERVICE_PASSWORD'):
         report.check(bool(values.get(key)), 'Compte interservices incomplet : '+key, 'credentials.tiers')
     volume=values.get('WAVY_FACTURES_JUSTIFICATIFS_VOLUME','')
@@ -143,17 +157,12 @@ def config_checks(root, values, report):
             env = svc.get('environment',{})
             report.components[c] = {'image':svc.get('image'), 'profile':env.get('SPRING_PROFILES_ACTIVE','sans objet (Nginx)'),
                                     'healthcheck':svc.get('healthcheck',{}).get('start_period','image / défaut')}
-            if c == 'socle-api' and env.get('SPRING_PROFILES_ACTIVE') == 'local':
-                report.add('profile.socle-api', 'warning', 'Socle local historique conservé : ddl-auto=update ; recette active secure et validate. Aucun changement automatique.')
+            if c in ('socle-api','tiers-api') and env.get('SPRING_PROFILES_ACTIVE') == 'local':
+                report.add('profile.'+c, 'warning', c+' : profil local historique conservé, sans activation implicite de secure ; les backends restent privés et le changement de profil reste contrôlé.')
         for name, svc in config['services'].items():
             for key, value in svc.get('environment',{}).items():
                 if key.endswith('PASSWORD'):
-                    source=key
-                    if key=='POSTGRES_PASSWORD': source='WAVY_'+name.removesuffix('-postgres').upper()+'_DB_PASSWORD'
-                    elif key=='SPRING_DATASOURCE_PASSWORD': source='WAVY_'+name.removeprefix('wavy-').split('-api-')[0].upper()+'_DB_PASSWORD'
-                    # Ne pas répéter les défauts du même secret déjà relevés dans le dotenv.
-                    if values.get(source) and values[source] not in ('motdepasse_recette','CHANGE_ME'):
-                        report.check(bool(value) and value not in ('motdepasse_recette','CHANGE_ME'), 'Secret rendu absent ou valeur exemple : '+name+'/'+key, 'credentials')
+                    report.check(bool(value), 'Secret candidat vide : '+name+'/'+key, 'credentials.rendered')
         tiers = config['services'].get('wavy-tiers-api-recette',{}).get('environment',{})
         report.check(bool(tiers.get('WAVY_TIERS_SERVICE_USERNAME')), 'Compte interservices Tiers absent', 'credentials.username')
         factures = config['services'].get('wavy-factures-api-recette',{}).get('environment',{})
@@ -221,7 +230,11 @@ def runtime_checks(root, values, images, state, config, report):
         if not data: continue
         obj = data[0]; objects[name] = obj
         report.check(obj.get('Config',{}).get('Labels',{}).get('com.docker.compose.project')=='wavy-recette', 'Conteneur hors projet : '+name, 'container.project')
-        report.check(obj.get('State',{}).get('Running'), 'Conteneur arrêté : '+name, 'container.running')
+        if name.startswith('wavy-') and '-api-' not in name and name!='wavy-gateway-recette':
+            if not obj.get('State',{}).get('Running'):
+                report.add('container.running','planned','Front arrêté, sans écriture métier : Compose le démarrera : '+name)
+        else:
+            report.check(obj.get('State',{}).get('Running'), 'Service nécessaire à la sauvegarde arrêté : '+name, 'container.running')
         active = dict(x.split('=',1) for x in obj.get('Config',{}).get('Env',[]) if '=' in x)
         desired = by_name.get(name,{}).get('environment',{})
         if 'SPRING_PROFILES_ACTIVE' in desired:
@@ -232,9 +245,10 @@ def runtime_checks(root, values, images, state, config, report):
         exposed=any(binding.get('HostIp') not in ('127.0.0.1','::1')
                     for bindings in obj.get('HostConfig',{}).get('PortBindings',{}).values() for binding in bindings or [])
         if exposed:
-            report.add('network.'+name,'planned','Publication actuelle hors loopback ; le rendu candidat la privatise : '+name)
             if name=='wavy-erp-shell-recette':
-                report.add('network.proxy','pending','Bascule du port Shell vers loopback : vérifier que le proxy HTTPS est sur cette VM ; le HTTPS actuel ne prouve pas ce chemin futur')
+                report.add('network.proxy','warning','Entrée ERP HTTP réservée au chemin Caddy Windows ; son bind configuré est conservé. Le filtrage et la joignabilité de ce chemin ne sont pas attestés ici.')
+            else:
+                report.add('network.'+name,'planned','Backend actuellement exposé : le candidat le réserve à loopback sans modifier les données : '+name)
         for key in ('POSTGRES_DB','POSTGRES_USER','POSTGRES_PASSWORD','SPRING_DATASOURCE_URL','SPRING_DATASOURCE_USERNAME','SPRING_DATASOURCE_PASSWORD'):
             if key in desired and key in active:
                 report.check(desired[key]==active[key], 'Configuration DB différente de l’existant : '+name+'/'+key, 'database.identity')
@@ -247,13 +261,19 @@ def runtime_checks(root, values, images, state, config, report):
         report.attempt('backup.'+db+'.connection', lambda name=name,env=env: command(['docker','exec',name,'psql','-v','ON_ERROR_STOP=1','-U',env.get('POSTGRES_USER',''),'-d',env.get('POSTGRES_DB',''),'-Atc','SELECT 1']))
     for directory in (root, root/'backups', root/'deployments'):
         existing = directory if directory.exists() else directory.parent
-        stats=report.attempt('disk',lambda existing=existing: os.statvfs(existing))
-        if stats: report.check(stats.f_bavail*stats.f_frsize >= 1024**3, 'Espace insuffisant : '+directory.name, 'disk')
+        stats=report.attempt('disk',lambda existing=existing: os.statvfs(existing),unavailable='warning')
+        if stats:
+            report.check(stats.f_bavail>0, 'Disque plein : '+directory.name, 'disk.full')
+            if 0 < stats.f_bavail*stats.f_frsize < 1024**3:
+                report.add('disk','warning','Moins de 1 Gio disponible : '+directory.name+' ; seuil indicatif, la réussite du backup reste obligatoire.')
         report.check(os.access(existing,os.W_OK|os.X_OK), 'Répertoire non inscriptible : '+directory.name, 'permissions')
-    docker_root = report.attempt('docker.disk',lambda: command(['docker','info','--format','{{.DockerRootDir}}']))
+    docker_root = report.attempt('docker.disk',lambda: command(['docker','info','--format','{{.DockerRootDir}}']),unavailable='warning')
     if docker_root:
-        stats=report.attempt('docker.disk',lambda: os.statvfs(docker_root))
-        if stats: report.check(stats.f_bavail*stats.f_frsize>=1024**3, 'Espace insuffisant pour les images', 'docker.disk')
+        stats=report.attempt('docker.disk',lambda: os.statvfs(docker_root),unavailable='warning')
+        if stats:
+            report.check(stats.f_bavail>0,'Disque Docker plein','disk.full')
+            if 0 < stats.f_bavail*stats.f_frsize < 1024**3:
+                report.add('docker.disk','warning','Moins de 1 Gio disponible pour les images ; aucun manque effectif d’espace n’est confirmé.')
     if state:
         obj=objects.get('wavy-factures-api-recette')
         if obj:

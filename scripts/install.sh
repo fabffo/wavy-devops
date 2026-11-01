@@ -66,4 +66,4 @@ docker exec wavy-erp-shell-recette nginx -t
 docker exec wavy-erp-shell-recette nginx -s reload
 python3 "$SCRIPT_DIR/delivery_check.py" runtime
 result=OK
-success 'RECETTE disponible pour vos tests : https://recette.wavyservices.fr ; services laissés démarrés.'
+success 'RECETTE installée, contrôles internes réussis ; services laissés démarrés. Tester HTTPS / ERP / PWA dans Chrome : https://recette.wavyservices.fr.'

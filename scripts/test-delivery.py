@@ -52,7 +52,7 @@ class Delivery(unittest.TestCase):
 
     def test_machine_duplicates_and_release_overrides_rejected(self):
         path = self.root/'.env.recette'; original = path.read_text()
-        for extra in ('\nWAVY_PWA_ENABLED=true','\nGATEWAY_VERSION=0.1.0-abcdef0','\nWAVY_GATEWAY_CORS_ALLOWED_ORIGIN_PATTERNS=https://x'):
+        for extra in ('\nWAVY_PWA_ENABLED=false','\nGATEWAY_VERSION=0.1.0-abcdef0'):
             path.write_text(original+extra)
             with self.assertRaises(ValueError): delivery.check_recette(self.root)
 

@@ -1,5 +1,8 @@
 # Livraison Wavy — préparation du 28 octobre 2026
 
+> Politique GO/NO-GO actualisée : [classement des contrôles et topologie Caddy Windows](decision-livraison.md).
+> Elle remplace les classements antérieurs, sans modifier les preuves historiques de tests.
+
 ## Décision
 
 > Installations suspendues après les refus observés. La [revue ciblée de
