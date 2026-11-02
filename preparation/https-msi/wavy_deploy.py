@@ -77,6 +77,14 @@ def lazy_module_routes(text, upstreams):
     return text
 
 
+def local_caddy_candidate(template,source):
+    # Les blocs distants actifs appartiennent à l'opérateur, pas au modèle MSI.
+    marker=b'\n\nrecette.wavyservices.fr'
+    if marker not in source or marker not in template:
+        raise ValueError('Séparation Caddy locale/distante absente : aucun remplacement')
+    return template.partition(marker)[0]+marker+source.partition(marker)[2]
+
+
 def read_values(path):
     values = {}
     for line in path.read_text().splitlines():
@@ -401,6 +409,7 @@ def local_main(argv):
     parser.add_argument('--dry-run',action='store_true')
     parser.add_argument('--layout',choices=['before','after'],help='test : captures et mesures responsive Chrome')
     parser.add_argument('--build-frontends',action='store_true',help='up/restart : reconstruire les fronts pour MSI uniquement')
+    parser.add_argument('--build-apis',action='store_true',help='up/restart : compiler et monter Factures API corrigée sur MSI uniquement')
     parser.add_argument('--chrome',action='store_true',help='test : parcours Chrome réel, sans écriture métier automatique')
     parser.add_argument('--databases',action='store_true',help='down : arrêter aussi les bases devenues inutilisées, sans supprimer les volumes')
     parser.add_argument('--tail',type=int,default=100)
@@ -420,6 +429,8 @@ def local_main(argv):
         if args.chrome and args.action!='test':parser.error('--chrome est réservé à test')
         cycle=f.PermanentLocalCycle(a)
         if args.build_frontends and args.action not in ('up','restart'):parser.error('--build-frontends est réservé à up/restart')
+        if args.build_apis and args.action not in ('up','restart'):parser.error('--build-apis est réservé à up/restart')
+        if args.build_apis and not args.dry_run:cycle.build_apis(selected)
         if args.build_frontends and not args.dry_run:cycle.build_frontends()
         result=cycle.command(args.action,selected,dry_run=args.dry_run,databases=args.databases,tail=args.tail)
         if (args.chrome or args.layout) and result.get('passed') and not args.dry_run:result['chrome']=cycle.browser_test(layout=args.layout)

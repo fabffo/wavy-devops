@@ -57,7 +57,7 @@ def baseline(db,ids=()):
  return answer
 
 def compose(overlay=None):
- args=['docker','compose','-p','wavy-recette','--env-file',str(REPO/'.env.recette'),'--env-file',str(REPO/'versions/recette.env'),'-f',str(REPO/'docker-compose.recette.yml')]
+ args=['docker','compose','-p','wavy-recette','--env-file',str(REPO/'.env.recette'),'--env-file',str(REPO/'versions/recette.env'),'--env-file',str(REPO/'versions/recette.digests'),'-f',str(REPO/'docker-compose.recette.yml')]
  if overlay:args+=['-f',str(overlay)]
  return args
 

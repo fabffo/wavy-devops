@@ -66,6 +66,7 @@ Usage :
   ./wavy ai recette
   ./wavy local up|down|restart|status|logs|test [modules...] [--dry-run]
   ./wavy local up pwa --build-frontends
+  ./wavy local up factures --build-frontends --build-apis
   ./wavy local test pwa --chrome
   ./wavy pwa recette check [--runtime] [--backup-dir <lot>] [--plan]
   ./wavy promotion-plan recette|preprod

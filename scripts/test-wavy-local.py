@@ -69,6 +69,41 @@ class PermanentPolicy(unittest.TestCase):
   self.assertIn('return 404',m.CLOSED)
   self.assertIn('closed.conf',m.shell_config('preprod.wavyservices.fr'))
 
+class LocalApiArtifacts(unittest.TestCase):
+ def test_local_caddy_keeps_current_remote_blocks_byte_for_byte(self):
+  marker=b'\n\nrecette.wavyservices.fr'
+  template=b'local-new'+marker+b' old remote template'
+  source=b'local-old'+marker+b' operator current recette and PREPROD guards'
+  result=m.local_caddy_candidate(template,source)
+  self.assertEqual(result.partition(marker)[0],b'local-new')
+  self.assertEqual(result.partition(marker)[2],source.partition(marker)[2])
+  with self.assertRaises(ValueError):m.local_caddy_candidate(template,b'no split marker')
+
+ def test_local_compose_loads_digest_manifest_before_base_file(self):
+  args=a.compose()
+  path=str(a.REPO/'versions/recette.digests')
+  self.assertIn(path,args);self.assertEqual(args[args.index(path)-1],'--env-file')
+  self.assertLess(args.index(path),args.index('-f'))
+
+ def test_only_verified_local_jar_is_mounted_without_changing_images_or_documents(self):
+  import hashlib
+  with tempfile.TemporaryDirectory() as tmp:
+   root=Path(tmp);builds=root/'api-builds';builds.mkdir();jar=builds/'factures.jar';jar.write_bytes(b'fixture-jar')
+   artifact=root/'local-apis.private.json';artifact.write_text(json.dumps({'factures-api':{'path':str(jar),'sha256':hashlib.sha256(jar.read_bytes()).hexdigest()}}));artifact.chmod(0o600)
+   c=object.__new__(f.PermanentLocalCycle);c.directory=root;c.a=types.SimpleNamespace(private_file=a.private_file,Refused=ValueError)
+   conf={'services':{'wavy-factures-api-recette':{'image':'pinned@sha256:fixture','volumes':[{'target':'/app/justificatifs','source':'existing-store'}],'environment':{}}}}
+   c.apply_local_apis(conf);service=conf['services']['wavy-factures-api-recette']
+   self.assertEqual(service['image'],'pinned@sha256:fixture');self.assertEqual(service['volumes'][0]['source'],'existing-store')
+   self.assertTrue(service['volumes'][1]['read_only']);self.assertEqual(service['volumes'][1]['target'],'/app/app.jar')
+   self.assertEqual(service['environment']['SPRING_FLYWAY_ENABLED'],'false');self.assertEqual(service['environment']['WAVY_AI_ACHAT_AUTO_CREATION_ENABLED'],'false')
+   jar.write_bytes(b'changed')
+   with self.assertRaisesRegex(ValueError,'LOCAL_API_ARTIFACT'):c.apply_local_apis(conf)
+ def test_external_jar_path_is_refused(self):
+  with tempfile.TemporaryDirectory() as tmp:
+   root=Path(tmp);artifact=root/'local-apis.private.json';artifact.write_text(json.dumps({'factures-api':{'path':'/tmp/untrusted.jar','sha256':'invalid'}}));artifact.chmod(0o600)
+   c=object.__new__(f.PermanentLocalCycle);c.directory=root;c.a=types.SimpleNamespace(private_file=a.private_file,Refused=ValueError)
+   with self.assertRaisesRegex(ValueError,'LOCAL_API_ARTIFACT'):c.apply_local_apis({})
+
 class RuntimeOperations(unittest.TestCase):
  def fake(self,root):
   c=object.__new__(f.LocalCycle);c.m=m;c.directory=root;c.scope='HTTPS_MANUAL_12_SERVICES_READONLY_NO_FIXTURES';c.components=m.COMPONENTS;c.session={};c.ledger={}

@@ -1,0 +1,247 @@
+{
+  "scope": "MSI_RECETTE_LOCALE_ONLY",
+  "browser": "156.0.8078.73",
+  "chromeChecks": [
+    {
+      "control": "real-login",
+      "passed": true
+    },
+    {
+      "control": "first-opening-current-year-no-end",
+      "passed": true,
+      "detail": {
+        "start": "2026-01-01",
+        "end": ""
+      }
+    },
+    {
+      "control": "filter-real-backend",
+      "passed": true
+    },
+    {
+      "control": "explicit-filters-retained",
+      "passed": true,
+      "detail": {
+        "start": "2025-03-01",
+        "end": "2028-05-01"
+      }
+    },
+    {
+      "control": "partial-url-preserves-stored-start",
+      "passed": true,
+      "detail": {
+        "start": "2025-03-01",
+        "end": "2029-06-30"
+      }
+    },
+    {
+      "control": "unrelated-url-keeps-explicit-dates",
+      "passed": true,
+      "detail": {
+        "start": "2025-03-01",
+        "end": "2029-06-30"
+      }
+    },
+    {
+      "control": "partial-url-empty-end-preserved",
+      "passed": true,
+      "detail": {
+        "start": "2025-03-01",
+        "end": ""
+      }
+    },
+    {
+      "control": "explicit-recette-dates-respected",
+      "passed": true,
+      "detail": {
+        "start": "2026-10-31",
+        "end": "2026-11-29"
+      }
+    },
+    {
+      "control": "reset-current-year-no-end",
+      "passed": true,
+      "detail": {
+        "start": "2026-01-01",
+        "end": ""
+      }
+    },
+    {
+      "control": "reset-http-no-upper-bound",
+      "passed": true
+    },
+    {
+      "control": "reset-retained-after-navigation",
+      "passed": true,
+      "detail": {
+        "start": "2026-01-01",
+        "end": ""
+      }
+    },
+    {
+      "control": "real-provider-extraction-http",
+      "passed": true
+    },
+    {
+      "control": "real-provider-invoice-returned",
+      "passed": true
+    },
+    {
+      "control": "one-global-line-quantity-one",
+      "passed": true
+    },
+    {
+      "control": "global-3000-ht-equals-ttc",
+      "passed": true
+    },
+    {
+      "control": "unknown-vat-provisional",
+      "passed": true
+    },
+    {
+      "control": "vat-explicit-confirmation-unchecked",
+      "passed": true
+    },
+    {
+      "control": "creation-disabled-without-validation",
+      "passed": true
+    },
+    {
+      "control": "no-automatic-creation-request",
+      "passed": true
+    },
+    {
+      "control": "no-business-write-request",
+      "passed": true
+    }
+  ],
+  "chromePassed": true,
+  "realProvider": "anthropic",
+  "model": "claude-sonnet-4-5-20250929",
+  "extraction": {
+    "http": 200,
+    "invoiceCount": 1,
+    "codes": [
+      "LIGNE_MONTANT_GLOBAL",
+      "TVA_NON_DETERMINEE",
+      "FOURNISSEUR_NON_RAPPROCHE"
+    ],
+    "totals": {
+      "ht": 3000,
+      "tva": 0,
+      "ttc": 3000
+    },
+    "lines": [
+      {
+        "quantity": 1,
+        "unitHt": 3000,
+        "ht": 3000,
+        "tva": 0,
+        "ttc": 3000,
+        "rate": 0,
+        "unknownVat": true
+      }
+    ]
+  },
+  "businessMutationRequests": 0,
+  "dataPreservation": {
+    "databasesMatch": true,
+    "tables": 50,
+    "tablesChanged": {
+      "socle": [],
+      "tiers": [],
+      "contrats": [],
+      "factures": []
+    },
+    "documentsMatch": true,
+    "documentFiles": 1,
+    "sourcePdfUnchanged": true
+  },
+  "runtime": {
+    "jarSha256": "bdd49f6ceb58bcb11336cba7556a135c952b5eb9c8ef4ca5141ae21d4f297c65",
+    "containerJarSha256": "bdd49f6ceb58bcb11336cba7556a135c952b5eb9c8ef4ca5141ae21d4f297c65",
+    "sourceFingerprintMatchesBuild": true,
+    "localApiRunning": true
+  },
+  "committed": false,
+  "pushed": false,
+  "remoteDeployment": false,
+  "remoteConfigurationVerified": false,
+  "apiTests": {
+    "exitCode": 0,
+    "summary": [
+      "[INFO] Tests run: 286, Failures: 0, Errors: 0, Skipped: 0"
+    ],
+    "buildSuccess": true
+  },
+  "frontTests": 179,
+  "localCycleTests": 63,
+  "localHealth": {
+    "passed": true,
+    "scope": "Non-mutating health/HTTPS; no login, Notes/IA, fixtures or isolation-suite replay",
+    "checks": [
+      {
+        "control": "contrats-api",
+        "passed": true
+      },
+      {
+        "control": "contrats-postgres",
+        "passed": true
+      },
+      {
+        "control": "erp-shell",
+        "passed": true
+      },
+      {
+        "control": "factures-api",
+        "passed": true
+      },
+      {
+        "control": "factures-front",
+        "passed": true
+      },
+      {
+        "control": "factures-postgres",
+        "passed": true
+      },
+      {
+        "control": "gateway",
+        "passed": true
+      },
+      {
+        "control": "socle-api",
+        "passed": true
+      },
+      {
+        "control": "socle-postgres",
+        "passed": true
+      },
+      {
+        "control": "tiers-api",
+        "passed": true
+      },
+      {
+        "control": "tiers-postgres",
+        "passed": true
+      },
+      {
+        "control": "HTTPS /",
+        "passed": true,
+        "expected": 200
+      },
+      {
+        "control": "HTTPS /api/auth/session",
+        "passed": true,
+        "expected": 401
+      },
+      {
+        "control": "HTTPS /pwa/",
+        "passed": true,
+        "expected": 404
+      }
+    ],
+    "pwaAccess": "application authentication and Notes permissions; no temporary gate",
+    "mode": "MSI_LOCAL_PERMANENT",
+    "autoCleanup": false
+  }
+}

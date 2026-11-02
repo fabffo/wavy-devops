@@ -905,6 +905,36 @@ class PermanentLocalCycle(LocalCycle):
    if temporary:temporary.cleanup()
   a.save(self.directory/'local-frontends.private.json',artifacts)
   return {'built':list(artifacts),'scope':'MSI local assets only; no image publication'}
+ def build_apis(self,selected):
+  # Sources non publiées : même cycle local et mêmes conteneurs, JAR privé en lecture seule.
+  import shutil
+  if 'factures-api' not in self.m.local_services(selected):raise self.a.Refused('Sélectionner Factures ou sa dépendance PWA pour compiler Factures API')
+  source=self.a.REPO.parent/'wavy-factures-api'
+  result=subprocess.run(['./mvnw','-q','-DskipTests','package'],cwd=source,capture_output=True,timeout=240)
+  log=self.directory/'factures-api-build.private.log';log.write_bytes(result.stdout+result.stderr);log.chmod(0o600)
+  if result.returncode:raise self.a.Refused('Compilation Factures API en échec : '+str(log))
+  jars=list((source/'target').glob('*.jar'))
+  if len(jars)!=1:raise self.a.Refused('Un seul JAR Factures API attendu')
+  digest=hashlib.sha256(jars[0].read_bytes()).hexdigest()
+  builds=self.directory/'api-builds';builds.mkdir(mode=0o755,exist_ok=True)
+  target=builds/('factures-api-'+digest+'.jar')
+  if not target.exists():shutil.copyfile(jars[0],target);target.chmod(0o444)
+  sources=[source/'pom.xml',source/'mvnw',*(source/'src').rglob('*'),*(source/'.mvn').rglob('*')]
+  fingerprint=hashlib.sha256(b''.join(str(p.relative_to(source)).encode()+p.read_bytes() for p in sorted(sources) if p.is_file())).hexdigest()
+  self.a.save(self.directory/'local-apis.private.json',{'factures-api':{'path':str(target),'sha256':digest,'sourcesSha256':fingerprint}})
+  return {'built':['factures-api'],'scope':'MSI local JAR only; no image publication'}
+ def apply_local_apis(self,conf):
+  artifact=self.directory/'local-apis.private.json'
+  if not artifact.exists():return
+  self.a.private_file(artifact)
+  entries=json.loads(artifact.read_text())
+  if set(entries)!={'factures-api'}:raise self.a.Refused('LOCAL_API_COMPONENT')
+  entry=entries['factures-api'];path=Path(entry['path']).resolve()
+  if not path.is_relative_to(self.directory/'api-builds') or not path.is_file() or path.is_symlink() or hashlib.sha256(path.read_bytes()).hexdigest()!=entry['sha256']:raise self.a.Refused('LOCAL_API_ARTIFACT')
+  service=conf['services'][self.name('factures-api')]
+  service.setdefault('volumes',[]).append({'type':'bind','source':str(path),'target':'/app/app.jar','read_only':True,'bind':{'create_host_path':False}})
+  # Qualification sur schéma existant, aucune migration ou écriture automatique au démarrage.
+  service['environment'].update(SPRING_FLYWAY_ENABLED='false',SPRING_JPA_HIBERNATE_DDL_AUTO='validate',SPRING_SQL_INIT_MODE='never',WAVY_AI_ACHAT_AUTO_CREATION_ENABLED='false')
  def prepare_permanent(self):
   a=self.a
   # Transfer the old temporary session once, without running its teardown.
@@ -952,6 +982,7 @@ class PermanentLocalCycle(LocalCycle):
     if len(mounts)!=1 or mounts[0]['Type']!='volume':raise a.Refused('Stockage existant à préserver : configuration manuelle requise')
     conf['volumes']['local-justificatifs']['name']=mounts[0]['Name']
     if mounts[0].get('SubPath') or any(v.get('VolumeOptions',{}).get('Subpath') for v in obj.get('HostConfig',{}).get('Mounts',[])):raise a.Refused('Sous-volume documentaire existant à examiner')
+  self.apply_local_apis(conf)
   self.config=conf;a.save(self.directory/'candidate-runtime.private.json',conf)
   if legacy_root:
    state=json.loads((legacy_root/'state.private.json').read_text());state['permanentLocal']=str(self.directory);a.save(legacy_root/'state.private.json',state)
@@ -961,8 +992,8 @@ class PermanentLocalCycle(LocalCycle):
   network=json.loads(self.a.run(['docker','network','inspect','wavy-recette']))[0]
   subnet=network['IPAM']['Config'][0]['Subnet'];self.m.proxy_regex(subnet);return subnet
  def ensure_https(self):
-  a=self.a;file=Path('/mnt/c/Wavy/Caddy/Caddyfile');candidate=(a.PTH/'Caddyfile.local-only.candidate').read_bytes();source=file.read_bytes();marker=b'\n\nrecette.wavyservices.fr'
-  if marker not in source or source.partition(marker)[2]!=candidate.partition(marker)[2]:raise a.Refused('Blocs HTTPS distants différents : aucun remplacement')
+  a=self.a;file=Path('/mnt/c/Wavy/Caddy/Caddyfile');source=file.read_bytes()
+  candidate=self.m.local_caddy_candidate((a.PTH/'Caddyfile.local-only.candidate').read_bytes(),source)
   expected=a.adapted(candidate)
   if a.canonical(a.caddy_config())!=a.canonical(expected):
    a.caddy(['--header','Content-Type: application/json','--data-binary','@-','http://127.0.0.1:2019/load'],json.dumps(expected).encode())

@@ -30,6 +30,16 @@ Les écritures Notes, JPEG/PNG/PDF et extraction IA passent par les API existant
 
 La configuration IA de `.env.recette` est réutilisée sans afficher la clé ; un appel réel peut être facturé. Modifier cette configuration puis exécuter `./wavy local up pwa` applique les paramètres à Factures. La création **automatique** de facture achat reste désactivée ; aucun appel IA n’a été lancé par la conversion.
 
+## Essai local des corrections Factures non publiées
+
+```bash
+./wavy local up factures --build-frontends --build-apis
+```
+
+Le même cycle local compile les fronts et Factures API depuis les sources de travail. Les fronts et le JAR sont montés en lecture seule depuis le dossier privé local, sans image construite/publiée ni modification des manifestes de release. Les appels `local up` suivants réutilisent ces artefacts ; refaire la commande avec les options de build après une nouvelle correction de sources. Le JAR conserve la JVM de l'image existante. Son activation désactive Flyway et l'initialisation SQL, valide le schéma existant et maintient la création automatique d'achat désactivée. Les volumes documentaires existants sont conservés.
+
+Cette option est réservée au profil MSI, aux actions `up/restart` et à une sélection qui nécessite Factures API. Elle ne participe pas à `./wavy install recette` et n'ajoute aucun parcours de livraison.
+
 ## Configuration et limites locales
 
 Le point d’entrée reste `./wavy`. Il réutilise les Compose, images par digest et graphe de dépendances existants. La configuration effective privée est dans `~/.local/state/wavy/recettelocal`, sans modifier les manifestes actifs. Les fichiers `.env.recette` et de versions restent les sources de configuration. Les images doivent être disponibles localement : pas de rebuild/pull implicite. Les schémas existants sont validés, pas recréés.

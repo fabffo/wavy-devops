@@ -45,6 +45,28 @@ class ReleaseImages(unittest.TestCase):
                 self.assertTrue(all('@sha256:' in image for image in actual.values()))
                 self.assertFalse(any('build' in svc for svc in services.values()))
 
+    def test_install_render_transmits_machine_ai_config_without_shell_override_or_secret_output(self):
+        # L'installateur appelle ce même chemin Compose, avec les trois env-files.
+        path = self.root / '.env.recette'
+        original = path.read_text()
+        values = {'WAVY_AI_PROVIDER': 'anthropic', 'WAVY_AI_MODEL': 'claude-msi-fixture',
+                  'WAVY_AI_API_KEY': 'private-fixture-key', 'WAVY_AI_TIMEOUT_SECONDS': '75',
+                  'WAVY_AI_MAX_FILE_SIZE_MB': '12'}
+        import re
+        for key, value in values.items():
+            original, count = re.subn(r'^'+key+r'=.*$', key+"='"+value+"'", original, flags=re.M)
+            self.assertEqual(count, 1)
+        path.write_text(original)
+        with patch.dict(os.environ, {key: 'wrong-inherited-fixture' for key in values}):
+            config = release.recette_compose(self.root, ['config', '--format', 'json'], capture=True)
+        actual = config['services']['wavy-factures-api-recette']['environment']
+        # Pas de valeur de clé dans un éventuel message d'assertion.
+        for key, value in values.items():
+            self.assertTrue(actual.get(key) == value, key+' not transmitted from machine dotenv')
+        path.write_text(original.replace("WAVY_AI_API_KEY='private-fixture-key'", "WAVY_AI_API_KEY="))
+        config = release.recette_compose(self.root, ['config', '--format', 'json'], capture=True)
+        self.assertTrue(config['services']['wavy-factures-api-recette']['environment']['WAVY_AI_API_KEY'] == '')
+
     def test_missing_invalid_and_release_mismatch_fail_before_docker(self):
         p = self.root/'versions/recette.digests'
         original = p.read_text()
