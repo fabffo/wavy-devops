@@ -1,0 +1,9 @@
+{
+  "Caddy": "C:\\path-to-existing-caddy\\caddy.exe",
+  "Caddyfile": "C:\\Wavy\\Caddy\\Caddyfile",
+  "IdentityFile": "C:\\Users\\YOUR_USER\\.ssh\\id_ed25519",
+  "Tunnels": [
+    { "Name": "recette", "Destination": "wavyadmin@localhost", "SshPort": 2222, "LocalPort": 34443, "RemotePort": 24207, "HttpsUrl": "https://recette.wavyservices.fr" },
+    { "Name": "preprod", "Destination": "wavyadmin@localhost", "SshPort": 2223, "LocalPort": 24443, "RemotePort": 24443, "HttpsUrl": "https://preprod.wavyservices.fr" }
+  ]
+}
