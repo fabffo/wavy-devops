@@ -1,0 +1,76 @@
+{
+  "environments": [
+    "recette",
+    "preprod"
+  ],
+  "identicalCohort": true,
+  "components": {
+    "socle-api": {
+      "reference": "ghcr.io/fabffo/wavy-socle-api:0.1.0-8b7a3f0@sha256:640253c045feabd0be90a81e29b46af28b2c3c5e19d0fb81c0e89b7da45bdf31",
+      "registrySha256Verified": true,
+      "tagMatchesDigest": true
+    },
+    "tiers-api": {
+      "reference": "ghcr.io/fabffo/wavy-tiers-api:0.1.0-7642a09@sha256:6c91e16bd3f5211c892273031f5ab1f1d56d6007e4003e0dd382fef845f2400e",
+      "registrySha256Verified": true,
+      "tagMatchesDigest": true
+    },
+    "contrats-api": {
+      "reference": "ghcr.io/fabffo/wavy-contrats-api:0.1.0-527874b@sha256:f60edb42690fa005748cdf6bbf9f2b9fdeb956ce3001c1e3ae0655dc2ad72ff0",
+      "registrySha256Verified": true,
+      "tagMatchesDigest": true
+    },
+    "factures-api": {
+      "reference": "ghcr.io/fabffo/wavy-factures-api:0.1.0-49b1f95@sha256:73f8cf7d5de61af86efc034864d0bd6e969980b9b77d8ab46f632fb765ed742e",
+      "registrySha256Verified": true,
+      "tagMatchesDigest": true
+    },
+    "tresorerie-api": {
+      "reference": "ghcr.io/fabffo/wavy-tresorerie-api:0.1.0-45fd268@sha256:e45d7063a3715d8dc370458960d6dcda7fa731582ceb902ea42e2f8b3dd33f56",
+      "registrySha256Verified": true,
+      "tagMatchesDigest": true
+    },
+    "gateway": {
+      "reference": "ghcr.io/fabffo/wavy-gateway:0.1.0-3ff5c3b@sha256:6bb0ff5ea147fd5b51a6dbb00f8333d84220b6160696a64186f53f512b53587e",
+      "registrySha256Verified": true,
+      "tagMatchesDigest": true
+    },
+    "socle-front": {
+      "reference": "ghcr.io/fabffo/wavy-socle-front:0.1.0-d4c76c5@sha256:1d32cb2cc8cbb5c334800d6fa13df2dff9e1293988179f0df8138b77958fbdaa",
+      "registrySha256Verified": true,
+      "tagMatchesDigest": true
+    },
+    "tiers-front": {
+      "reference": "ghcr.io/fabffo/wavy-tiers-front:0.2.0-05594f9@sha256:45cd1ad15e450946e360347ae76738b28f20e69517e82313c5061f15dbc457ef",
+      "registrySha256Verified": true,
+      "tagMatchesDigest": true
+    },
+    "contrats-front": {
+      "reference": "ghcr.io/fabffo/wavy-contrats-front:0.2.0-e05aabc@sha256:5562ba2cf480630aa66cc1ced8484f61b24c1dbf619966464f27a9df0d7484a6",
+      "registrySha256Verified": true,
+      "tagMatchesDigest": true
+    },
+    "factures-front": {
+      "reference": "ghcr.io/fabffo/wavy-factures-front:0.2.0-4c52d7d@sha256:65146af9c4f84d9ee01913060c2991e49a28d774f4db30e5ac9aac19ae312df8",
+      "registrySha256Verified": true,
+      "tagMatchesDigest": true
+    },
+    "tresorerie-front": {
+      "reference": "ghcr.io/fabffo/wavy-tresorerie-front:0.2.0-ebe7584@sha256:f715747e88cbf942a6d61d68a6c68e2adaa35812afefd86a70e654baa64ebb9c",
+      "registrySha256Verified": true,
+      "tagMatchesDigest": true
+    },
+    "pwa": {
+      "reference": "ghcr.io/fabffo/wavy-pwa:0.2.0-9507982@sha256:eb04852ea2b7cf33e733502e89600cc9858a0ce44503bb4a8fcb928afe1d6c18",
+      "registrySha256Verified": true,
+      "tagMatchesDigest": true
+    },
+    "erp-shell": {
+      "reference": "ghcr.io/fabffo/wavy-erp-shell:0.2.0-f6ee944@sha256:450328d7bea84b1c9e11616daa03067f6fe6da8dcc2d5bf929a46c909940ae96",
+      "registrySha256Verified": true,
+      "tagMatchesDigest": true
+    }
+  },
+  "count": 13,
+  "vmAccess": false
+}
