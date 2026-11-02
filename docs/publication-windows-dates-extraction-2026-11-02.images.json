@@ -1,0 +1,57 @@
+{
+  "factures-api": {
+    "commit": "ac6b6daeaba1c6de259c6548f54563d04fc07085",
+    "version": "0.1.0-ac6b6da",
+    "digest": "sha256:16cdd278ea4326e6528f84341de9cc08464def7c7837be329d6a8ba3cb9e96ae",
+    "reference": "ghcr.io/fabffo/wavy-factures-api@sha256:16cdd278ea4326e6528f84341de9cc08464def7c7837be329d6a8ba3cb9e96ae",
+    "platform": "linux/amd64",
+    "labels": {
+      "org.opencontainers.image.revision": "ac6b6da",
+      "org.opencontainers.image.source": "https://github.com/fabffo/wavy-factures-api",
+      "org.opencontainers.image.version": "0.1.0"
+    },
+    "verification": "registry tag + immutable digest + SHA256 raw manifest and config + local image ID"
+  },
+  "factures-front": {
+    "commit": "39667865315f229bab377340ed60f3ab32756790",
+    "version": "0.2.0-3966786",
+    "digest": "sha256:f91f34c14b880f0d4eabb96b094b85b0ca41686bdb127ebf2ec047d68c31da9d",
+    "reference": "ghcr.io/fabffo/wavy-factures-front@sha256:f91f34c14b880f0d4eabb96b094b85b0ca41686bdb127ebf2ec047d68c31da9d",
+    "platform": "linux/amd64",
+    "labels": {
+      "maintainer": "NGINX Docker Maintainers <docker-maint@nginx.com>",
+      "org.opencontainers.image.revision": "3966786",
+      "org.opencontainers.image.source": "https://github.com/fabffo/wavy-factures-front",
+      "org.opencontainers.image.version": "0.2.0"
+    },
+    "verification": "registry tag + immutable digest + SHA256 raw manifest and config + local image ID"
+  },
+  "tresorerie-front": {
+    "commit": "ebe75844e081a85a77f401e268ed274a6696d53b",
+    "version": "0.2.0-ebe7584",
+    "digest": "sha256:f715747e88cbf942a6d61d68a6c68e2adaa35812afefd86a70e654baa64ebb9c",
+    "reference": "ghcr.io/fabffo/wavy-tresorerie-front@sha256:f715747e88cbf942a6d61d68a6c68e2adaa35812afefd86a70e654baa64ebb9c",
+    "platform": "linux/amd64",
+    "labels": {
+      "maintainer": "NGINX Docker Maintainers <docker-maint@nginx.com>",
+      "org.opencontainers.image.revision": "ebe7584",
+      "org.opencontainers.image.source": "https://github.com/fabffo/wavy-tresorerie-front",
+      "org.opencontainers.image.version": "0.2.0"
+    },
+    "verification": "registry tag + immutable digest + SHA256 raw manifest and config + local image ID"
+  },
+  "pwa": {
+    "commit": "95079827f2e924479ac657c32ad38e460e83e52c",
+    "version": "0.2.0-9507982",
+    "digest": "sha256:eb04852ea2b7cf33e733502e89600cc9858a0ce44503bb4a8fcb928afe1d6c18",
+    "reference": "ghcr.io/fabffo/wavy-pwa@sha256:eb04852ea2b7cf33e733502e89600cc9858a0ce44503bb4a8fcb928afe1d6c18",
+    "platform": "linux/amd64",
+    "labels": {
+      "maintainer": "NGINX Docker Maintainers <docker-maint@nginx.com>",
+      "org.opencontainers.image.revision": "9507982",
+      "org.opencontainers.image.source": "https://github.com/fabffo/wavy-pwa",
+      "org.opencontainers.image.version": "0.2.0"
+    },
+    "verification": "registry tag + immutable digest + SHA256 raw manifest and config + local image ID"
+  }
+}

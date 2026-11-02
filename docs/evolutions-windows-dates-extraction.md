@@ -1,6 +1,6 @@
 # Évolutions Windows, recherches par date et extraction à montant unique
 
-Préparation locale sur MSI, sans commit/push ni publication d'image. Aucune modification des données RECETTE/PREPROD, aucun déploiement. Les manifestes des 13 images et les historiques restent inchangés.
+Préparation locale initiale sur MSI, suivie de la publication autorisée le 2 novembre 2026. Voir le [bilan de publication](publication-windows-dates-extraction-2026-11-02.md) pour les commits, digests et réserves. Aucun déploiement ni modification des données RECETTE/PREPROD.
 
 ## Dépôts concernés
 
@@ -44,7 +44,7 @@ Le cas « LOYER WAVY IMMO mai 26.pdf » est couvert par une fixture : référenc
 
 ## Livraison ultérieure
 
-Ce lot n'est présent que dans les sources locales et dans l'automatisation Windows installée. Il faudra autoriser les commits/push et une nouvelle release des seuls composants applicatifs concernés (`factures-api`, `factures-front`, `tresorerie-front`, `pwa`) avant d'en attendre le comportement sur une VM.
+La publication des seuls composants applicatifs concernés (`factures-api`, `factures-front`, `tresorerie-front`, `pwa`) est désormais autorisée et réalisée ; le bilan lié ci-dessus fait foi pour la release publiée. Les résultats ci-dessous décrivent la préparation initiale.
 
 Le parcours reste celui déjà validé : publication autorisée des images, synchronisation de la release, **`./wavy install recette`**, tests manuels Chrome ERP/PWA, puis décision humaine de promotion de la même cohorte vers PREPROD. Aucun nouveau critère de qualification ou orchestrateur de livraison n'est ajouté. Les contrôles de sécurité, données, stockage, sauvegarde et migrations restent en place.
 
