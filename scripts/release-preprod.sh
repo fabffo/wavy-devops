@@ -80,7 +80,11 @@ trap finish EXIT
 printf 'services:\n  %s:\n    image: %s\n' "$service" "$pinned" > "$tmp/pinned.yml"
 preprod_compose -f "$tmp/pinned.yml" config --quiet >/dev/null 2>&1 || die 'Compose final invalide.'
 # Sauvegarde des cinq bases même pour un front ou Gateway.
-"$SCRIPT_DIR/backup-preprod.sh"
+"$SCRIPT_DIR/backup-preprod.sh" || {
+  code=$?
+  error "PREPROD $component interrompu : sauvegarde en echec (code=$code), aucune image remplacee pour ce composant."
+  exit "$code"
+}
 cache="wavy-rollback-cache/preprod-${component}:before-$(date +%Y%m%dT%H%M%S)"
 docker image tag "$current_id" "$cache"
 success " Cache avant remplacement : $cache"

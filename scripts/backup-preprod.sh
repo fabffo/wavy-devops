@@ -16,9 +16,34 @@ retention="$(preprod_value WAVY_BACKUP_RETENTION_DAYS)"
 preprod_host_guard
 "$SCRIPT_DIR/validate-preprod-config.sh"
 preprod_document_volume_guard
-# Dès qu'un lot PWA a été préparé, une archive Contrats seule ne doit plus masquer un stockage absent.
+# Un abandon avant toute preparation de stockage ne rend pas Notes obligatoire.
+# Tout etat engage, ambigu ou illisible conserve le controle strict existant.
 if [[ -f "$ROOT_DIR/deployments/pwa-release/state.json" ]]; then
-  preprod_document_tool ro 'test -d /documents/notes-frais; test ! -L /documents/notes-frais'
+  notes_policy="$(python3 - "$SCRIPT_DIR" "$ROOT_DIR" <<'PY'
+import sys
+from pathlib import Path
+sys.path.insert(0, sys.argv[1])
+from preprod_operation import read_private
+try:
+    state = read_private(Path(sys.argv[2]) / 'deployments/pwa-release/state.json')
+    unused = (state.get('phase') == 'abandoned' and state.get('mutationStarted') is False
+              and 'previous' in state and state['previous'] is None
+              and state.get('completed') == [] and state.get('observed') == {}
+              and 'storagePreconditions' not in state and 'backup' not in state)
+except Exception:
+    unused = False
+print('optional' if unused else 'required')
+PY
+)"
+  notes_probe='test -d /documents/notes-frais; test ! -L /documents/notes-frais'
+  if [[ "$notes_policy" == optional ]]; then
+    notes_probe='test -r /documents; test -x /documents; test ! -L /documents/notes-frais; if test -e /documents/notes-frais; then test -d /documents/notes-frais; fi'
+  fi
+  preprod_document_tool ro "$notes_probe" || {
+    code=$?
+    error "Sauvegarde PREPROD refusee : controle documentaire PWA en echec (code=$code, notes=$notes_policy). Verifier /documents/notes-frais (presence requise selon l'etat PWA, type, acces, lien symbolique) et le conteneur utilitaire."
+    exit "$code"
+  }
 fi
 require_command openssl
 require_command flock
