@@ -61,6 +61,16 @@ Ces valeurs doivent venir du gestionnaire de secrets ou de l'environnement du
 processus. Elles ne doivent jamais être écrites dans Git. Le script ne les
 affiche pas.
 
+Pour `./wavy install preprod` (ainsi que les déploiements et rollbacks PREPROD),
+les cinq variables `WAVY_SMOKE_*` sont chargées depuis le fichier privé
+`.env.preprod` et transmises aux commandes enfants, dont les smoke tests des
+13 composants. Le fichier prévaut sur les exports du terminal ; une variable
+absente du fichier reste absente, sans récupération d'une ancienne valeur
+exportée. Les contrôles existants refusent toujours un contexte incomplet.
+Le parseur dotenv littéral existant est utilisé, sans `source` ni `eval` : les
+caractères shell d'un mot de passe entre quotes simples restent des caractères.
+Aucun export manuel ni changement de procédure de livraison n'est nécessaire.
+
 ## Résultats
 
 `OK` signifie que la requête a réussi et que son contenu respecte le contrat

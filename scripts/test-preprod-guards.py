@@ -14,6 +14,26 @@ DIGEST = 'sha256:'+'a'*64
 
 
 class Guards(unittest.TestCase):
+    def smoke_environment(self, dotenv, assertion, overrides=None):
+        with tempfile.TemporaryDirectory(prefix='wavy-smoke-environment-') as tmp:
+            (Path(tmp)/'.env.preprod').write_text(dotenv)
+            return subprocess.run(['python3', '-B', str(ROOT/'scripts/preprod_operation.py'),
+                                   '--root', tmp, '--', 'python3', '-B', '-c', assertion],
+                                  env=dict(os.environ, **(overrides or {})), capture_output=True)
+
+    def test_smoke_dotenv_overrides_stale_exports_without_exporting_other_secrets(self):
+        result = self.smoke_environment(
+            'WAVY_SMOKE_TENANT_ID=41\nWAVY_AI_API_KEY=fixture-not-for-child\n',
+            "import os; assert os.environ['WAVY_SMOKE_TENANT_ID']=='41'; "
+            "assert os.environ['WAVY_AI_API_KEY']=='fixture-inherited'",
+            {'WAVY_SMOKE_TENANT_ID': '999', 'WAVY_AI_API_KEY': 'fixture-inherited'})
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_smoke_parser_errors_are_redacted(self):
+        result = self.smoke_environment('INVALID fixture-secret-must-stay-private\n', 'raise SystemExit(99)')
+        self.assertEqual(result.returncode, 1)
+        self.assertNotIn(b'fixture-secret', result.stdout + result.stderr)
+
     def verify(self, *, digest=DIGEST, revision='6570deb', version='0.1.0', source='https://github.com/fabffo/wavy-socle-api', missing=False):
         labels = {'org.opencontainers.image.revision': revision, 'org.opencontainers.image.version': version, 'org.opencontainers.image.source': source}
         shell = '''

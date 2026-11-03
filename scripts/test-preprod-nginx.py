@@ -85,7 +85,7 @@ df() { printf 'Filesystem blocks used available capacity mount\nfixture 99999999
 
 
 class Nginx(unittest.TestCase):
-    def run_case(self, case='ok', command=None, conditional=False):
+    def run_case(self, case='ok', command=None, conditional=False, dotenv_smoke=None):
         with tempfile.TemporaryDirectory(prefix='wavy-nginx-test-') as tmp:
             root = Path(tmp)
             log = root/'calls'
@@ -93,12 +93,13 @@ class Nginx(unittest.TestCase):
             if command:
                 scripts = root/'scripts'
                 scripts.mkdir()
-                for name in ('_common.sh', '_preprod.sh', 'preprod_operation.py', 'release-preprod.sh', 'deploy.sh', 'rollback.sh'):
+                for name in ('_common.sh', '_preprod.sh', 'preprod_operation.py', 'preprod_config.py', 'release-preprod.sh', 'deploy.sh', 'rollback.sh', 'install.sh'):
                     shutil.copyfile(ROOT/'scripts'/name, scripts/name)
                     (scripts/name).chmod(0o700)
                 shutil.copyfile(ROOT/'wavy', root/'wavy')
                 # Le précontrôle des images est testé dans test-release-images.py.
                 (scripts/'release_images.py').write_text('import os\nwith open(os.environ["MOCK_LOG"], "a") as out: out.write("verify-all-images\\n")\n')
+                (scripts/'delivery_check.py').write_text('import sys\nassert sys.argv[1:] == ["promotion"]\n')
                 with (scripts/'_preprod.sh').open('a') as out:
                     out.write(MOCK + RELEASE_MOCK)
                 (root/'fixture.tsv').write_text('version\tdigest\tcommit\tdate_validation\n')
@@ -107,6 +108,21 @@ class Nginx(unittest.TestCase):
                     (scripts/name).chmod(0o700)
                 env.update(WAVY_SMOKE_TENANT_ID='1', WAVY_SMOKE_USER_ID='1', WAVY_SMOKE_COMPANY_ID='1',
                            WAVY_SMOKE_USER='fictional', WAVY_SMOKE_PASSWORD='fictional')
+                if dotenv_smoke is not None:
+                    for key in list(env):
+                        if key.startswith('WAVY_SMOKE_'):
+                            del env[key]
+                    (root/'.env.preprod').write_text(dotenv_smoke)
+                    # Le vrai enfant smoke vérifie la transmission sans imprimer les valeurs.
+                    (scripts/'smoke-test.sh').write_text('''#!/usr/bin/env python3
+import os
+assert os.environ['WAVY_SMOKE_TENANT_ID'] == '41'
+assert os.environ['WAVY_SMOKE_USER_ID'] == '42'
+assert os.environ['WAVY_SMOKE_COMPANY_ID'] == '43'
+assert os.environ['WAVY_SMOKE_USER'] == 'fixture@example.test'
+assert os.environ['WAVY_SMOKE_PASSWORD'] == 'fixture $HOME `false` $(false) ; # literal'
+with open(os.environ['MOCK_LOG'], 'a') as out: out.write('smoke-test.sh\\n')
+''')
                 args = ['bash', str(root/command[0]), *command[1:]]
             else:
                 shell = 'source "$1/scripts/_preprod.sh"\n' + MOCK
@@ -119,6 +135,30 @@ class Nginx(unittest.TestCase):
             calls = log.read_text() if log.exists() else ''
             journal = root/'deployments/preprod.tsv'
             return result, calls, journal.read_text() if journal.exists() else ''
+
+    def test_dotenv_only_smoke_reaches_all_thirteen_deployments(self):
+        values = """WAVY_SMOKE_TENANT_ID=41
+WAVY_SMOKE_USER_ID=42
+WAVY_SMOKE_COMPANY_ID=43
+WAVY_SMOKE_USER=fixture@example.test
+WAVY_SMOKE_PASSWORD='fixture $HOME `false` $(false) ; # literal'
+"""
+        result, calls, journal = self.run_case(command=('wavy', 'install', 'preprod'), dotenv_smoke=values)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(calls.count('smoke-test.sh'), 13)
+        self.assertEqual(calls.count('backup-preprod.sh'), 13)
+        self.assertEqual(calls.count('validated'), 13)
+        self.assertEqual(len(journal.splitlines()), 14)
+        for component in ('socle-api tiers-api contrats-api factures-api tresorerie-api gateway '
+                          'socle-front tiers-front contrats-front factures-front tresorerie-front pwa erp-shell').split():
+            self.assertIn('--pull never wavy-' + component + '-preprod', calls)
+        self.assertNotIn('fixture $HOME', result.stdout + result.stderr + calls + journal)
+
+    def test_missing_dotenv_context_still_refused_before_backup(self):
+        result, calls, _ = self.run_case(command=('scripts/release-preprod.sh', 'DEPLOY', 'socle-api'), dotenv_smoke='')
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('Contexte smoke requis avant déploiement : WAVY_SMOKE_TENANT_ID', result.stderr)
+        self.assertNotIn('backup-preprod.sh', calls)
 
     def test_success_order_and_no_unconditional_sleep(self):
         result, calls, _ = self.run_case()

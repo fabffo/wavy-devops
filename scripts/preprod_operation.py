@@ -12,6 +12,23 @@ import uuid
 
 sys.dont_write_bytecode = True
 ROOT = Path(__file__).resolve().parent.parent
+SMOKE_KEYS = ('WAVY_SMOKE_TENANT_ID', 'WAVY_SMOKE_USER_ID', 'WAVY_SMOKE_COMPANY_ID',
+              'WAVY_SMOKE_USER', 'WAVY_SMOKE_PASSWORD')
+
+
+def command_environment(root, fd):
+    env = dict(os.environ, WAVY_PREPROD_LOCK_FD=str(fd))
+    path = Path(root) / '.env.preprod'
+    if path.exists():
+        # Même parseur littéral que Compose/validate ; jamais source/eval.
+        # Le fichier machine prévaut sur les exports obsolètes du terminal.
+        from preprod_config import dotenv
+        values = dotenv(path)
+        for key in SMOKE_KEYS:
+            env.pop(key, None)
+            if key in values:
+                env[key] = values[key]
+    return env
 
 
 def read_private(path):
@@ -106,11 +123,11 @@ def main():
         # Le wrapper classique n'accepte JAMAIS de propriétaire par environnement.
         with Operation(args.root) as operation:
             if args.check: return 0
-            env = dict(os.environ, WAVY_PREPROD_LOCK_FD=str(operation.fd))
+            env = command_environment(args.root, operation.fd)
             result = subprocess.run(command, env=env, pass_fds=(operation.fd,))
             return result.returncode
     except (OSError, ValueError, KeyError):
-        print('Opération PREPROD refusée : verrou occupé ou réservation persistante.', file=sys.stderr)
+        print('Opération PREPROD refusée : verrou, réservation ou configuration invalide (détails masqués).', file=sys.stderr)
         return 1
 
 
