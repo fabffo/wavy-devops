@@ -84,6 +84,48 @@ case "$*" in *Config.Image*) echo fixture-old-reference;; *) echo fixture-old-im
         self.assertTrue(Path(record['backup']).is_dir())
         self.assertFalse(record['backupVerified'])
 
+    def test_real_recette_preflight_accepts_parent_lock_before_one_backup_and_13_components(self):
+        # Scripts reels ; seuls les controles Docker/hote/Git et donnees sont simules.
+        scripts = self.root/'scripts'
+        shutil.copyfile(ROOT/'scripts/delivery-preflight.sh', scripts/'delivery-preflight.sh')
+        common = (ROOT/'scripts/_common.sh').read_text()
+        common += '''
+require_docker() { :; }
+require_command() { :; }
+env_value() { case "$2" in WAVY_INSTALL_HOSTNAME) hostname -s;; *) printf '600\\n';; esac; }
+'''
+        (scripts/'_common.sh').write_text(common)
+        # Executer le vrai controle de verrou du diagnostic appele par le preflight.
+        (scripts/'delivery_check.py').write_text(
+            'import sys, os, subprocess\nfrom pathlib import Path\n'
+            'sys.path.insert(0, '+repr(str(ROOT/'scripts'))+')\n'
+            'from recette_diagnostic import Report, lock_check\n'
+            'if sys.argv[1] == "diagnose":\n'
+            ' root=Path(__file__).resolve().parent.parent\n'
+            ' report=Report(); lock_check(root/"deployments/recette.lock", report, operation=True)\n'
+            ' print(report.rows)\n'
+            ' if report.rows: sys.exit(1)\n'
+            # Un autre processus sans FD herite doit toujours etre refuse.
+            ' env=dict(os.environ); env.pop("WAVY_RECETTE_LOCK_FD", None)\n'
+            ' code="import sys;from pathlib import Path;sys.path.insert(0,sys.argv[1]);from release_images import recette_operation;\\nwith recette_operation(Path(sys.argv[2]),True): pass"\n'
+            ' rival=subprocess.run([sys.executable,"-B","-c",code,'+repr(str(ROOT/'scripts'))+',str(root)], env=env, capture_output=True)\n'
+            ' assert rival.returncode != 0, "Concurrent operation admitted"\n')
+        # Le verificateur d'images est hors sujet : pas de daemon utilise.
+        (scripts/'release_images.py').write_text((ROOT/'scripts/release_images.py').read_text().split("if __name__")[0])
+        docker = self.root/'bin/docker'
+        docker.write_text('''#!/bin/sh
+case "$*" in context*) echo unix:///var/run/docker.sock;; *Config.Image*) echo fixture-old-reference;; *) echo fixture-old-image;; esac
+''')
+        git = self.root/'bin/git'; git.write_text('#!/bin/sh\nexit 0\n'); git.chmod(0o700)
+        result = self.run_batch(dict(self.env, HOME=str(self.root/'home'), DOCKER_HOST='', DOCKER_CONTEXT=''))
+        self.assertEqual(result.returncode, 0, result.stdout+result.stderr)
+        events = self.events.read_text().splitlines()
+        self.assertEqual(events.count('backup'), 1)
+        self.assertEqual(len([e for e in events if e.startswith('apply ')]), 13)
+        # Le moteur a ferme son FD : une operation independante peut reprendre.
+        command = ['bash', '-c', 'source "$1"; recette_operation_lock', '_', str(scripts/'_common.sh')]
+        self.assertEqual(subprocess.run(command, env=self.env, capture_output=True).returncode, 0)
+
     def test_a_successful_provider_without_a_lot_does_not_skip_backup(self):
         (self.root/'scripts/backup-db.sh').write_text('#!/bin/sh\nexit 0\n')
         result=self.run_batch()

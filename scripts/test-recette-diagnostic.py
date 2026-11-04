@@ -391,4 +391,46 @@ class Diagnostic(unittest.TestCase):
         self.assertEqual(output.strip(),socket.gethostname().split('.')[0])
 
 
+class InheritedLock(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory(); self.addCleanup(self.tmp.cleanup)
+        self.root = Path(self.tmp.name)
+        (self.root/'deployments').mkdir()
+        self.path = self.root/'deployments/recette.lock'
+        self.path.touch(mode=0o600)
+
+    def check(self, operation=True):
+        report = diagnostic.Report()
+        diagnostic.lock_check(self.path, report, operation=operation)
+        return report.rows
+
+    def test_old_unheld_file_is_not_a_stale_lock(self):
+        with patch.dict(os.environ, {}, clear=True):
+            self.assertEqual(self.check(), [])
+
+    def test_invalid_inherited_descriptor_is_rejected(self):
+        for value in ('not-a-descriptor', '999999'):
+            with self.subTest(value=value), patch.dict(os.environ, WAVY_RECETTE_LOCK_FD=value):
+                self.assertTrue(self.check())
+
+    def test_descriptor_for_another_file_cannot_bypass_lock(self):
+        other = self.root/'other'; other.touch()
+        with other.open() as stream, patch.dict(os.environ, WAVY_RECETTE_LOCK_FD=str(stream.fileno())):
+            self.assertTrue(self.check())
+
+    def test_symlink_is_rejected_even_with_inherited_descriptor(self):
+        target = self.root/'target'; target.touch()
+        self.path.unlink(); self.path.symlink_to(target)
+        with target.open() as stream, patch.dict(os.environ, WAVY_RECETTE_LOCK_FD=str(stream.fileno())):
+            self.assertTrue(self.check())
+
+    def test_backup_lock_remains_independent_of_inherited_operation_lock(self):
+        with self.path.open() as stream, patch.dict(os.environ, WAVY_RECETTE_LOCK_FD=str(stream.fileno())):
+            fcntl.flock(stream.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+            self.assertEqual(self.check(), [])
+            # Le controle documentaire ne doit pas reutiliser le verrou d'operation.
+            self.assertTrue(self.check(operation=False))
+            os.fstat(stream.fileno())  # Le diagnostic n'a pas ferme le FD herite.
+
+
 if __name__=='__main__':unittest.main()

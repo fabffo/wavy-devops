@@ -10,7 +10,7 @@ import socket
 import subprocess
 import sys
 
-from release_images import COMPONENTS, manifest, recette_compose, release
+from release_images import COMPONENTS, manifest, recette_compose, recette_operation, release
 from recette_pwa import policy, has_subpath, storage_permissions, EMPTY_STORAGE_PROBE
 
 DATABASES = ('socle','tiers','contrats','factures','tresorerie')
@@ -95,12 +95,19 @@ def read_machine(root, report):
     return values
 
 
-def lock_check(path, report):
+def lock_check(path, report, operation=False):
     # Ne pas créer un verrou pour un diagnostic. flock n'écrit pas dans le fichier.
     if path.is_symlink():
         report.add('lock', 'error', 'Verrou symbolique refusé : '+path.name)
     elif path.exists():
         try:
+            if operation and 'WAVY_RECETTE_LOCK_FD' in os.environ:
+                # Le moteur detient deja ce verrou et transmet son descripteur.
+                # Reutiliser la validation existante (fichier, proprietaire, inode)
+                # sans rouvrir le fichier ni fermer le descripteur du parent.
+                with recette_operation(path.parent.parent, True):
+                    pass
+                return
             fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW)
             try:
                 fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
@@ -118,7 +125,7 @@ def config_checks(root, values, report):
     report.check(values.get('WAVY_INSTALL_HOSTNAME') == socket.gethostname().split('.')[0], 'WAVY_INSTALL_HOSTNAME doit identifier cet hôte', 'host')
     for path in (root/'deployments/recette-https-reservation.json', Path.home()/'.local/state/wavy/recettelocal/runtime-info.json'):
         report.check(not path.exists(), 'Session MSI réservée : '+path.name, 'reservation')
-    lock_check(root/'deployments/recette.lock', report)
+    lock_check(root/'deployments/recette.lock', report, operation=True)
     lock_check(root/'backups/.recette-backup.lock', report)
     for name in ('WAVY_PWA_ENABLED','WAVY_NOTES_WRITES_ENABLED'):
         report.check(values.get(name,'false') == 'true', name+'=true requis pour le parcours PWA demandé', name)
