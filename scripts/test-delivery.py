@@ -17,6 +17,14 @@ import recette_storage as storage
 from release_images import release, recette_compose
 
 ROOT = Path(__file__).resolve().parent.parent
+FAKE_BATCH = '''
+if [[ ${1##*/} == delivery_batch.py ]]; then
+  [[ ${2:-} != check ]] || exit 0
+  bash "$FIXTURE_ROOT/scripts/delivery-preflight.sh" recette || exit $?
+  "$FIXTURE_ROOT/scripts/backup-db.sh" || exit $?
+  exec bash "$FIXTURE_ROOT/scripts/delivery-apply.sh" recette
+fi
+'''
 
 
 class Delivery(unittest.TestCase):
@@ -122,7 +130,8 @@ class Delivery(unittest.TestCase):
             with self.subTest(failure=failure), tempfile.TemporaryDirectory() as tmp:
                 root=Path(tmp); scripts=root/'scripts'; scripts.mkdir(); (root/'deployments').mkdir()
                 binary=root/'bin'; binary.mkdir(); log=root/'events'
-                shutil.copy(ROOT/'scripts/install.sh',scripts)
+                for name in ('install.sh','delivery-preflight.sh','delivery-apply.sh'):
+                    shutil.copy(ROOT/'scripts'/name,scripts)
                 (scripts/'_common.sh').write_text("""set -euo pipefail
 ROOT_DIR="$FIXTURE_ROOT"; SCRIPT_DIR="$ROOT_DIR/scripts"
 die() { echo "$*" >&2; exit 1; }
@@ -132,7 +141,7 @@ require_docker() { :; }; require_command() { :; }; recette_operation_lock() { :;
 compose() { echo up >> "$FIXTURE_LOG"; [[ $FIXTURE_FAIL != up ]]; }
 """)
                 commands={
-                    'python3': '#!/bin/bash\n[[ ${1:-} != -B ]] || shift\naction=${2:-}; echo "$action" >> "$FIXTURE_LOG"; [[ $FIXTURE_FAIL != "$action" ]]\n',
+                    'python3': '#!/bin/bash\n[[ ${1:-} != -B ]] || shift\n'+FAKE_BATCH+'\naction=${2:-}; echo "$action" >> "$FIXTURE_LOG"; [[ $FIXTURE_FAIL != "$action" ]]\n',
                     'docker': '#!/bin/bash\nif [[ $1 == context ]]; then echo unix:///var/run/docker.sock; fi\n',
                     'git': '#!/bin/bash\nexit 0\n'}
                 for name, body in commands.items():
@@ -174,7 +183,8 @@ class GitDeliveryGuard(unittest.TestCase):
         self.root = Path(self.tmp.name)
         scripts = self.root/'scripts'; scripts.mkdir()
         (self.root/'bin').mkdir()
-        shutil.copy(ROOT/'scripts/install.sh', scripts)
+        for name in ('install.sh','delivery-preflight.sh','delivery-apply.sh'):
+            shutil.copy(ROOT/'scripts'/name,scripts)
         shutil.copytree(ROOT/'versions', self.root/'versions')
         for name in ('wavy','docker-compose.recette.yml','docker-compose.preprod.yml'):
             shutil.copy(ROOT/name, self.root/name)
@@ -188,7 +198,7 @@ require_docker() { :; }; require_command() { :; }; recette_operation_lock() { :;
 """)
         commands = {
             'docker': '#!/bin/bash\n[[ $1 == context ]] || exit 99; echo unix:///var/run/docker.sock\n',
-            'python3': '#!/bin/bash\n[[ ${1:-} != -B ]] || shift\n[[ $2 != diagnose ]] || exit 0; echo "$2"; exit 73\n'}
+            'python3': '#!/bin/bash\n[[ ${1:-} != -B ]] || shift\n'+FAKE_BATCH+'\n[[ $2 != diagnose ]] || exit 0; echo "$2"; exit 73\n'}
         for name, body in commands.items():
             path=self.root/'bin'/name; path.write_text(body); path.chmod(0o700)
         self.git('init','-q')

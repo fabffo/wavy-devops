@@ -138,3 +138,33 @@ preprod_reload_erp_shell_nginx() {
   preprod_nginx_gateway_check || return 1
   success ' Nginx ERP Shell rechargé ; Gateway et proxy /api/ vérifiés'
 }
+
+# Memes controles pour la livraison complete et les commandes ciblees.
+preprod_release_checks() {
+  # Refuse une configuration non reproductible, sans interdire l’historique runtime ignoré.
+  git -C "$ROOT_DIR" diff --quiet -- docker-compose.preprod.yml scripts versions/preprod.env versions/preprod.digests || die 'Configuration PREPROD modifiée : synchroniser Git avant déploiement.'
+  git -C "$ROOT_DIR" diff --cached --quiet || die 'Index Git modifié.'
+  [[ -z "$(git -C "$ROOT_DIR" ls-files --others --exclude-standard -- scripts versions/preprod.env versions/preprod.digests docker-compose.preprod.yml)" ]] || die 'Fichiers PREPROD non versionnés.'
+  minimum="${WAVY_DEPLOY_MIN_FREE_KB:-1048576}"
+  [[ "$minimum" =~ ^[1-9][0-9]*$ ]] || die 'Seuil disque invalide.'
+  for dir in "$ROOT_DIR" "$(docker info --format '{{.DockerRootDir}}')"; do
+    available="$(df -Pk "$dir" | awk 'NR==2 {print $4}')"
+    [[ "$available" =~ ^[0-9]+$ ]] && ((available >= minimum)) || die 'Espace disque insuffisant.'
+  done
+  # Les smoke tests doivent pouvoir être exécutés après remplacement.
+  for key in WAVY_SMOKE_TENANT_ID WAVY_SMOKE_USER_ID WAVY_SMOKE_COMPANY_ID; do
+    [[ "${!key:-}" =~ ^[1-9][0-9]*$ ]] || die "Contexte smoke requis avant déploiement : $key"
+  done
+  [[ -n "${WAVY_SMOKE_USER:-}" && -n "${WAVY_SMOKE_PASSWORD:-}" ]] || die "Authentification smoke requise."
+}
+
+# Meme detection Flyway avant reprise et apres remplacement ; aucun log brut affiche.
+preprod_migration_logs() {
+  if ! preprod_compose logs --no-color --since "$2" "$1" 2>/dev/null | python3 -c '
+import re, sys
+sys.exit(1 if re.search(r"checksum mismatch|Validate failed|migration failed|FlywayValidateException|FlywayMigrateException", sys.stdin.read(), re.I) else 0)
+'; then
+    error "Controle Flyway en echec : $1 (lecture des logs ou erreur de migration). Aucun rollback automatique."
+    return 1
+  fi
+}

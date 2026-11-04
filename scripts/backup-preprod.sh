@@ -62,7 +62,7 @@ finish_backup() {
   local code=$?
   trap - EXIT
   preprod_resume || code=1
-  rm -rf -- "$stage"
+  if ((code != 0)); then error "Lot PREPROD incomplet conserve : $stage"; fi
   exit "$code"
 }
 trap finish_backup EXIT
@@ -85,6 +85,5 @@ for service in "${QUIESCED_SERVICES[@]}"; do preprod_wait "$service"; done
 QUIESCED_SERVICES=()
 final="$base/$(date -u +%Y%m%dT%H%M%SZ)-${stage##*.}"
 mv "$stage" "$final"
-# Seuls les lots complets suivant notre convention sont éligibles à la rétention.
-find "$base" -mindepth 1 -maxdepth 1 -type d -name '????????T??????Z-*' -mtime "+$retention" -exec rm -rf -- {} +
+# Le nettoyage fait l'objet d'un plan et d'un accord distincts ; aucune purge a la livraison.
 success " Sauvegarde PREPROD complète : $final"

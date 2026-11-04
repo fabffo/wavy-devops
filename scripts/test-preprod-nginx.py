@@ -97,6 +97,13 @@ class Nginx(unittest.TestCase):
                     shutil.copyfile(ROOT/'scripts'/name, scripts/name)
                     (scripts/name).chmod(0o700)
                 shutil.copyfile(ROOT/'wavy', root/'wavy')
+                (root/'fixture-deploy-all.sh').write_text('''#!/usr/bin/env bash
+set -euo pipefail
+root="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+for component in socle-api tiers-api contrats-api factures-api tresorerie-api gateway socle-front tiers-front contrats-front factures-front tresorerie-front pwa erp-shell; do
+  "$root/scripts/deploy.sh" preprod "$component"
+done
+''')
                 # Le précontrôle des images est testé dans test-release-images.py.
                 (scripts/'release_images.py').write_text('import os\nwith open(os.environ["MOCK_LOG"], "a") as out: out.write("verify-all-images\\n")\n')
                 (scripts/'delivery_check.py').write_text('import sys\nassert sys.argv[1:] == ["promotion"]\n')
@@ -136,14 +143,14 @@ with open(os.environ['MOCK_LOG'], 'a') as out: out.write('smoke-test.sh\\n')
             journal = root/'deployments/preprod.tsv'
             return result, calls, journal.read_text() if journal.exists() else ''
 
-    def test_dotenv_only_smoke_reaches_all_thirteen_deployments(self):
+    def test_dotenv_only_smoke_reaches_thirteen_individual_deployments(self):
         values = """WAVY_SMOKE_TENANT_ID=41
 WAVY_SMOKE_USER_ID=42
 WAVY_SMOKE_COMPANY_ID=43
 WAVY_SMOKE_USER=fixture@example.test
 WAVY_SMOKE_PASSWORD='fixture $HOME `false` $(false) ; # literal'
 """
-        result, calls, journal = self.run_case(command=('wavy', 'install', 'preprod'), dotenv_smoke=values)
+        result, calls, journal = self.run_case(command=('fixture-deploy-all.sh',), dotenv_smoke=values)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(calls.count('smoke-test.sh'), 13)
         self.assertEqual(calls.count('backup-preprod.sh'), 13)

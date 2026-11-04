@@ -124,7 +124,12 @@ def main():
         with Operation(args.root) as operation:
             if args.check: return 0
             env = command_environment(args.root, operation.fd)
-            result = subprocess.run(command, env=env, pass_fds=(operation.fd,))
+            descriptors = [operation.fd]
+            if env.get('WAVY_DELIVERY_SESSION_FD'):
+                from delivery_batch import validate_session
+                validate_session(args.root, 'preprod')
+                descriptors.append(int(env['WAVY_DELIVERY_SESSION_FD']))
+            result = subprocess.run(command, env=env, pass_fds=tuple(descriptors))
             return result.returncode
     except (OSError, ValueError, KeyError):
         print('Opération PREPROD refusée : verrou, réservation ou configuration invalide (détails masqués).', file=sys.stderr)

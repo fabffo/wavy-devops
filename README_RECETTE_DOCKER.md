@@ -229,3 +229,5 @@ Une surcharge explicite `SPRING_APPLICATION_JSON` ou une propriété Spring
 passée en ligne de commande reste prioritaire sur les propriétés du profil ;
 elle doit désigner la même origine. Aucun ajustement direct de la map CORS
 Spring sur les VMs n'est nécessaire avec l'image Gateway corrigée.
+
+La livraison complète et ses règles de reprise sont décrites dans [la procédure commune](docs/livraison-complete.md).

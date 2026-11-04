@@ -23,21 +23,7 @@ preprod_host_guard
 require_command flock
 mkdir -p "$ROOT_DIR/deployments"
 preprod_backup_operation_lock
-# Refuse une configuration non reproductible, sans interdire l’historique runtime ignoré.
-git -C "$ROOT_DIR" diff --quiet -- docker-compose.preprod.yml scripts versions/preprod.env versions/preprod.digests || die 'Configuration PREPROD modifiée : synchroniser Git avant déploiement.'
-git -C "$ROOT_DIR" diff --cached --quiet || die 'Index Git modifié.'
-[[ -z "$(git -C "$ROOT_DIR" ls-files --others --exclude-standard -- scripts versions/preprod.env versions/preprod.digests docker-compose.preprod.yml)" ]] || die 'Fichiers PREPROD non versionnés.'
-minimum="${WAVY_DEPLOY_MIN_FREE_KB:-1048576}"
-[[ "$minimum" =~ ^[1-9][0-9]*$ ]] || die 'Seuil disque invalide.'
-for dir in "$ROOT_DIR" "$(docker info --format '{{.DockerRootDir}}')"; do
-  available="$(df -Pk "$dir" | awk 'NR==2 {print $4}')"
-  [[ "$available" =~ ^[0-9]+$ ]] && ((available >= minimum)) || die 'Espace disque insuffisant.'
-done
-# Les smoke tests doivent pouvoir être exécutés après remplacement.
-for key in WAVY_SMOKE_TENANT_ID WAVY_SMOKE_USER_ID WAVY_SMOKE_COMPANY_ID; do
-  [[ "${!key:-}" =~ ^[1-9][0-9]*$ ]] || die "Contexte smoke requis avant déploiement : $key"
-done
-[[ -n "${WAVY_SMOKE_USER:-}" && -n "${WAVY_SMOKE_PASSWORD:-}" ]] || die "Authentification smoke requise."
+preprod_release_checks
 version="$(component_version preprod "$component")"
 digest="$(component_digest preprod "$component")"
 if [[ "$action" == ROLLBACK ]]; then
@@ -54,8 +40,14 @@ preprod_container_guard "$service" "$service"
 for db in socle tiers contrats factures tresorerie; do
   preprod_container_guard "$(db_container "$db" preprod)" "$db-postgres"
 done
-python3 "$SCRIPT_DIR/release_images.py" verify preprod
-preprod_verify_image "$component" "$version" "$digest"
+batch=false
+if [[ -n "${WAVY_DELIVERY_SESSION_FD:-}" ]]; then
+  python3 "$SCRIPT_DIR/delivery_batch.py" check preprod "$component" "$version" "$digest"
+  batch=true
+else
+  python3 "$SCRIPT_DIR/release_images.py" verify preprod
+  preprod_verify_image "$component" "$version" "$digest"
+fi
 image="$(component_image preprod "$component" "$version")"
 pinned="${image%:*}@$digest"
 image_id="$(docker image inspect -f '{{.Id}}' "$image")"
@@ -79,12 +71,14 @@ finish() {
 trap finish EXIT
 printf 'services:\n  %s:\n    image: %s\n' "$service" "$pinned" > "$tmp/pinned.yml"
 preprod_compose -f "$tmp/pinned.yml" config --quiet >/dev/null 2>&1 || die 'Compose final invalide.'
-# Sauvegarde des cinq bases même pour un front ou Gateway.
-"$SCRIPT_DIR/backup-preprod.sh" || {
-  code=$?
-  error "PREPROD $component interrompu : sauvegarde en echec (code=$code), aucune image remplacee pour ce composant."
-  exit "$code"
-}
+# La livraison complete possede deja son lot verifie ; une commande ciblee garde son backup.
+if ! $batch; then
+  "$SCRIPT_DIR/backup-preprod.sh" || {
+    code=$?
+    error "PREPROD $component interrompu : sauvegarde en echec (code=$code), aucune image remplacee pour ce composant."
+    exit "$code"
+  }
+fi
 cache="wavy-rollback-cache/preprod-${component}:before-$(date +%Y%m%dT%H%M%S)"
 docker image tag "$current_id" "$cache"
 success " Cache avant remplacement : $cache"
@@ -92,10 +86,7 @@ mutation=true
 preprod_compose -f "$tmp/pinned.yml" up -d --no-deps --no-build --force-recreate --pull never "$service"
 preprod_wait "$service"
 if [[ "$component" == *-api ]]; then
-  preprod_compose logs --no-color --since "$started" "$service" > "$tmp/logs" 2>&1 || die 'Impossible de contrôler les logs Flyway.'
-  if grep -Eqi 'checksum mismatch|Validate failed|migration failed|FlywayValidateException|FlywayMigrateException' "$tmp/logs"; then
-    die 'Erreur Flyway détectée ; logs conservés uniquement dans Docker, aucun rollback automatique.'
-  fi
+  preprod_migration_logs "$service" "$started" || die 'Erreur Flyway ou logs inaccessibles ; aucun rollback automatique.'
 fi
 if [[ "$component" == *-front || "$component" == pwa || "$component" == erp-shell ]]; then
   docker exec "$service" wget -qO- -T 5 http://127.0.0.1/ >/dev/null || die 'Front indisponible.'

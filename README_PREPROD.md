@@ -450,3 +450,5 @@ Le test PREPROD génère uniquement un dotenv factice dans `/tmp`, utilise
 -f docker-compose.preprod.yml config --quiet`, puis vérifie le JSON rendu et
 les cas de refus. Il ne démarre rien et ne nécessite pas de daemon Docker.
 La CI exécute uniquement ces validations ; elle ne déploie jamais.
+
+La livraison complète et ses règles de reprise sont décrites dans [la procédure commune](docs/livraison-complete.md).
