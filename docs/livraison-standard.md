@@ -105,25 +105,16 @@ fonctionnels avec les écritures et les droits métier normaux. L'IA dépend des
 secrets et du fournisseur configurés ; les contrôles techniques n'appellent pas
 le fournisseur et ne certifient pas le parcours métier.
 
-Après votre décision fonctionnelle :
-
-```bash
-./wavy validate recette
-```
-
-Cette commande revérifie le runtime et vous demande explicitement votre décision.
-Elle enregistre uniquement votre validation humaine, liée aux 13 images, dans
-`deployments/recette-validation.private.json` (0600, ignoré par Git). Elle ne
-fabrique pas une liste de tests métier réussis. Transférer ce reçu privé sur la
-VM PREPROD par le canal d'exploitation autorisé, au même chemin du dépôt.
-
-Sur PREPROD :
+Après vos tests fonctionnels RECETTE, si le résultat vous convient, sur PREPROD :
 
 ```bash
 ./wavy install preprod
 ```
 
-Le reçu doit correspondre aux manifestes RECETTE et PREPROD identiques. Le
+Les 13 images, versions et digests des manifestes RECETTE et PREPROD doivent
+être identiques. Aucune commande `./wavy validate recette` ni aucun transfert
+de reçu n'est requis. Un ancien reçu privé reste conservé mais n'intervient
+plus dans la promotion. Après installation, effectuer vos tests fonctionnels PREPROD. Le
 wrapper conserve le verrou/réservation existant puis appelle `deploy.sh preprod`
 pour chacun des 13 composants, avec ses backups chiffrés, vérifications OCI,
 contrôles migrations, contexte smoke, contrôles Nginx et historiques existants.

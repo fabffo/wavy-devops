@@ -116,14 +116,41 @@ class Delivery(unittest.TestCase):
                 storage.provision('new','image',allowed=True)
             tool.assert_not_called()
 
-    def test_promotion_requires_real_human_decision_for_same_images(self):
-        with self.assertRaises(OSError): delivery.promotion(self.root)
+    def test_promotion_accepts_identical_13_images_without_receipt(self):
+        self.assertEqual(len(release(self.root, 'recette')[2]), 13)
+        self.assertFalse((self.root/'deployments/recette-validation.private.json').exists())
+        delivery.promotion(self.root)
+
+    def test_promotion_ignores_but_preserves_legacy_receipt(self):
         directory = self.root/'deployments'; directory.mkdir()
         path = directory/'recette-validation.private.json'
-        path.write_text(json.dumps({'approved':True,'reviewer':'fixture-human','images':release(self.root,'recette')[2]}));path.chmod(0o600)
+        path.write_text(json.dumps({'approved':False,'images':{}}));path.chmod(0o600)
+        original = path.read_bytes()
         delivery.promotion(self.root)
-        proof=json.loads(path.read_text());proof['images'].pop('pwa');path.write_text(json.dumps(proof))
-        with self.assertRaisesRegex(ValueError,'Validation fonctionnelle'): delivery.promotion(self.root)
+        self.assertEqual(path.read_bytes(), original)
+
+    def test_promotion_rejects_version_difference(self):
+        path = self.root/'versions/preprod.env'
+        text = path.read_text()
+        old = release(self.root, 'preprod')[0]['FACTURES_FRONT_VERSION']
+        path.write_text(text.replace('FACTURES_FRONT_VERSION='+old, 'FACTURES_FRONT_VERSION=9.9.9-abcdef0'))
+        with self.assertRaisesRegex(ValueError, 'même release'): delivery.promotion(self.root)
+
+    def test_promotion_rejects_digest_difference(self):
+        # Nouvelle version de fixture pour ne pas declencher d'abord le controle d'historique.
+        for env in ('recette', 'preprod'):
+            path = self.root/f'versions/{env}.env'
+            old = release(self.root, env)[0]['FACTURES_FRONT_VERSION']
+            path.write_text(path.read_text().replace('FACTURES_FRONT_VERSION='+old, 'FACTURES_FRONT_VERSION=9.9.9-abcdef0'))
+        path = self.root/'versions/preprod.digests'
+        old = release(self.root, 'preprod')[1]['FACTURES_FRONT_DIGEST']
+        path.write_text(path.read_text().replace(old, 'sha256:'+'f'*64))
+        with self.assertRaisesRegex(ValueError, 'même release'): delivery.promotion(self.root)
+
+    def test_promotion_rejects_missing_component_digest(self):
+        path = self.root/'versions/preprod.digests'
+        path.write_text('\n'.join(line for line in path.read_text().splitlines() if not line.startswith('PWA_DIGEST='))+'\n')
+        with self.assertRaisesRegex(ValueError, 'Digest absent ou invalide'): delivery.promotion(self.root)
 
     def test_install_order_and_fail_closed_without_real_docker(self):
         for failure in ('', 'diagnose', 'preflight', 'storage', 'backup', 'up', 'runtime'):

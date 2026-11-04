@@ -143,7 +143,7 @@ class BackupTransition(unittest.TestCase):
         with tarfile.open(fileobj=io.BytesIO(subprocess.check_output(['git','archive','HEAD'],cwd=ROOT))) as archive:
             archive.extractall(self.root,filter='data')
         for name in ('backup-preprod.sh','release-preprod.sh','install.sh','_preprod.sh','preprod_operation.py',
-                     'delivery_batch.py','delivery-preflight.sh','delivery-apply.sh','preprod_config.py'):
+                     'delivery_batch.py','delivery-preflight.sh','delivery-apply.sh','delivery_check.py','preprod_config.py'):
             shutil.copyfile(ROOT/'scripts'/name,self.root/'scripts'/name)
         lines=[]
         for line in (ROOT/'.env.preprod.example').read_text().splitlines():
@@ -158,10 +158,6 @@ class BackupTransition(unittest.TestCase):
         deploy=self.root/'deployments';deploy.mkdir(exist_ok=True)
         (deploy/'pwa-release').mkdir();(deploy/'pwa-release/state.json').write_text('{"phase":"prepared"}')
         (deploy/'pwa-release/state.json').chmod(0o600)
-        refs=references(self.root)
-        proof=deploy/'recette-validation.private.json'
-        proof.write_text(json.dumps({'approved':True,'reviewer':'fictional-test-only',
-                                    'images':{c:tag+'@'+digest for c,(tag,digest) in refs.items()}}));proof.chmod(0o600)
         docs=self.root/'documents';docs.mkdir();(docs/'contrats').mkdir()
         self.bin=self.root/'fixture-bin';self.bin.mkdir()
         shim=self.bin/'docker';shim.write_text('#!/usr/bin/env python3\nimport runpy,sys\nsys.argv=['+repr(str(Path(__file__).resolve()))+',"--fake-docker"]+sys.argv[1:]\nrunpy.run_path('+repr(str(Path(__file__).resolve()))+',run_name="__main__")\n');shim.chmod(0o700)
