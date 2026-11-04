@@ -57,13 +57,62 @@ def inputs(env_path):
     return e, v, d
 
 
+PWA_MOUNTS = {
+    '/etc/nginx/templates/default.conf.template': 'docker/recette-pwa/shell.conf.template',
+    '/etc/nginx/pwa-route.conf': 'docker/preprod-pwa/routes-open.conf',
+    '/usr/share/nginx/html/pwa-integration.json': 'docker/recette-pwa/integration-open.json',
+    '/etc/nginx/wavy-pwa/notes.conf': 'docker/recette-pwa/notes-read.conf',
+}
+
+
+def pwa_visible(e):
+    for key in ('WAVY_PWA_ENABLED', 'WAVY_NOTES_WRITES_ENABLED'):
+        check(e.get(key, 'false') in ('true', 'false'), f'{key} : true ou false requis')
+    check(e.get('WAVY_NOTES_WRITES_ENABLED', 'false') == 'false', 'Ecritures Notes PREPROD non qualifiees : conserver false')
+    enabled = e.get('WAVY_PWA_ENABLED', 'false') == 'true'
+    if enabled:
+        check(e.get('WAVY_ACCESS_MODE') == 'https' and e.get('WAVY_PUBLIC_URL', '').startswith('https://'), 'PWA PREPROD : HTTPS requis')
+    return enabled
+
+
 def compose_args(env_path, args):
     # No inherited variable may override a manifest or the machine dotenv.
+    enabled = pwa_visible(dotenv(env_path))
+    extra = ['-f', str(ROOT/'docker-compose.preprod-pwa.yml')] if enabled else []
     raw = (ROOT / 'docker-compose.preprod.yml').read_text()
+    if enabled: raw += (ROOT/'docker-compose.preprod-pwa.yml').read_text()
     keys = set(re.findall(r'\$\{([A-Z][A-Z0-9_]*)', raw))
     clean = {k: val for k, val in os.environ.items() if k not in keys and not k.startswith('COMPOSE_')}
     return (['docker', 'compose', '--env-file', str(env_path), '--env-file', str(ROOT / 'versions/preprod.env'), '--env-file', str(ROOT / 'versions/preprod.digests'),
-             '-p', 'wavy-preprod', '-f', str(ROOT / 'docker-compose.preprod.yml')] + args, clean)
+             '-p', 'wavy-preprod', '-f', str(ROOT / 'docker-compose.preprod.yml')] + extra + args, clean)
+
+
+def pwa_storage_check(env_path):
+    e, v, d = inputs(env_path)
+    if not pwa_visible(e): return
+    volume = 'wavy-preprod_documents-preprod'
+    obj = json.loads(subprocess.check_output(['docker','volume','inspect',volume], stderr=subprocess.DEVNULL))[0]
+    labels = obj.get('Labels', {})
+    check(obj.get('Driver') == 'local' and not obj.get('Options')
+          and labels.get('com.docker.compose.project') == 'wavy-preprod'
+          and labels.get('com.docker.compose.volume') == 'documents-preprod', 'Stockage Notes hors PREPROD')
+    image = v['WAVY_IMAGE_REGISTRY']+'/wavy-factures-api@'+d['FACTURES_API_DIGEST']
+    user = subprocess.check_output(['docker','image','inspect','-f','{{.Config.User}}',image], stderr=subprocess.DEVNULL, text=True).strip()
+    check(user and user.split(':')[0] not in ('0','root'), 'Utilisateur Factures non prive')
+    # Aucun mkdir/chown : sous-repertoire deja existant, monte seul et en lecture seule.
+    command = ['docker','run','--rm','--pull','never','--network','none','--read-only',
+               '--cap-drop','ALL','--security-opt','no-new-privileges:true',
+               '--mount',f'type=volume,source={volume},target=/app/justificatifs,volume-nocopy,volume-subpath=notes-frais,readonly',
+               '--entrypoint','sh',image,'-ec',
+               'test -d /app/justificatifs; test -r /app/justificatifs; test -x /app/justificatifs; test ! -L /app/justificatifs']
+    probe = list(command)
+    probe[probe.index('--mount')+1] = f'type=volume,source={volume},target=/documents,volume-nocopy,readonly'
+    probe[-1] = 'test -d /documents/notes-frais; test ! -L /documents/notes-frais'
+    check(subprocess.run(probe, capture_output=True).returncode == 0,
+          'Sous-repertoire Notes absent, inaccessible ou lien symbolique : aucune mutation')
+    check(subprocess.run(command, capture_output=True).returncode == 0,
+          'Stockage Notes absent ou illisible pour Factures : aucune creation ni correction automatique')
+    print('OK stockage Notes : volume PREPROD existant, sous-repertoire prive lisible, controle en lecture seule.')
 
 
 def render(env_path):
@@ -153,6 +202,7 @@ def validate(env_path):
     check(e['WAVY_CORS_ALLOWED_ORIGIN_PATTERNS'] == url, 'CORS doit correspondre uniquement à WAVY_PUBLIC_URL')
     check(len(e['WAVY_TIERS_SERVICE_PASSWORD']) >= 12, 'Mot de passe interservice trop court')
     ai = validate_ai(e)
+    visible = pwa_visible(e)
     config = render(env_path)
     services = config['services']
     expected = {'wavy-'+c+'-preprod' for c in COMPONENTS} | {c+'-postgres' for c in ['socle','tiers','contrats','factures','tresorerie']}
@@ -176,7 +226,14 @@ def validate(env_path):
         check(service.get('networks') and set(service['networks']) == {'wavy-preprod'}, f'Réseau inattendu : {name}')
         check(bool(service.get('healthcheck', {}).get('test')) and not service['healthcheck'].get('disable'), f'Healthcheck absent : {name}')
         for volume in service.get('volumes', []):
-            check(volume['type'] == 'volume' and volume['source'] in expected_volumes, f'Montage hors PREPROD : {name}')
+            if visible and name == 'wavy-erp-shell-preprod':
+                target = volume.get('target')
+                check(target in PWA_MOUNTS and volume['type'] == 'bind'
+                      and volume['source'] == str(ROOT/PWA_MOUNTS[target])
+                      and volume.get('read_only') is True and volume.get('bind', {}).get('create_host_path', False) is False,
+                      'Montage PWA Shell non approuve')
+            else:
+                check(volume['type'] == 'volume' and volume['source'] in expected_volumes, f'Montage hors PREPROD : {name}')
         if service.get('ports'):
             published.append(name)
             check(len(service['ports']) == 1 and service['ports'][0]['host_ip'] == '127.0.0.1' and service['ports'][0]['target'] == 80 and str(service['ports'][0]['published']) == port, 'Publication autre que loopback HTTP ERP Shell')
@@ -203,7 +260,23 @@ def validate(env_path):
               for name, service in services.items() if name != 'wavy-factures-api-preprod'),
           'Paramètres IA réservés à Factures')
     owners = [name for name, svc in services.items() if any(m['source'] == 'documents-preprod' for m in svc.get('volumes', []))]
-    check(owners == ['wavy-contrats-api-preprod'], 'Volume documentaire réservé à Contrats')
+    check(owners == (['wavy-contrats-api-preprod','wavy-factures-api-preprod'] if visible else ['wavy-contrats-api-preprod']), 'Volume documentaire hors isolation attendue')
+    if visible:
+        shell = services['wavy-erp-shell-preprod']
+        check(len(shell.get('volumes', [])) == len(PWA_MOUNTS), 'Montages PWA incomplets')
+        for target, source in PWA_MOUNTS.items():
+            path = ROOT/source
+            check(path.is_file() and not path.is_symlink(), 'Configuration PWA absente ou lien symbolique')
+        check(json.loads((ROOT/PWA_MOUNTS['/usr/share/nginx/html/pwa-integration.json']).read_text()) == {'enabled':True,'justificatifMaxBytes':10485760}, 'Politique PWA inattendue')
+        check(shell['environment'].get('WAVY_PWA_PUBLIC_ORIGIN') == url, 'Origine PWA incoherente')
+        mounts = services['wavy-factures-api-preprod'].get('volumes', [])
+        check(len(mounts) == 1, 'Montage Factures inattendu')
+        fm = mounts[0]
+        check(fm.get('type') == 'volume' and fm.get('source') == 'documents-preprod'
+              and fm.get('target') == '/app/justificatifs' and fm.get('read_only') is True
+              and fm.get('volume', {}).get('subpath') == 'notes-frais'
+              and fm.get('volume', {}).get('nocopy') is True, 'Stockage Notes : sous-repertoire prive en lecture seule requis')
+        check(factures_env.get('WAVY_FACTURES_STOCKAGE_JUSTIFICATIFS') == '/app/justificatifs', 'Racine Notes incorrecte')
     mount = services['wavy-contrats-api-preprod']['volumes'][0]
     check(mount['target'] == '/app/data' and not mount.get('read_only'), 'Montage documentaire incorrect')
     check(services['wavy-contrats-api-preprod']['environment']['WAVY_CONTRATS_STOCKAGE_PIECES_JOINTES'] == '/app/data/contrats', 'Racine documentaire incorrecte')
@@ -250,6 +323,8 @@ if __name__ == '__main__':
         env_path = Path(sys.argv[2]).resolve()
         if action == 'validate':
             validate(env_path)
+        elif action == 'pwa-storage':
+            pwa_storage_check(env_path)
         elif action == 'value':
             print(dotenv(env_path).get(sys.argv[3], ''))
         elif action == 'compose':
@@ -266,6 +341,9 @@ if __name__ == '__main__':
             os.execvpe(cmd[0], cmd, clean)
         else:
             raise ValueError('Action inconnue')
+    except subprocess.SubprocessError:
+        print('ERREUR PREPROD : inspection PWA impossible, details bruts masques.', file=sys.stderr)
+        sys.exit(1)
     except (ValueError, KeyError, OSError, IndexError) as exc:
         print('ERREUR PREPROD : '+str(exc), file=sys.stderr)
         sys.exit(1)

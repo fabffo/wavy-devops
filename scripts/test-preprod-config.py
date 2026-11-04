@@ -9,7 +9,7 @@ import shutil
 import subprocess
 import tempfile
 import unittest
-from unittest.mock import patch
+from unittest.mock import patch, Mock
 import sys
 sys.dont_write_bytecode = True
 
@@ -42,6 +42,9 @@ class Validation(unittest.TestCase):
         (self.root/'versions').mkdir()
         for f in ('versions/preprod.env', 'versions/preprod.digests', 'docker-compose.preprod.yml'):
             shutil.copyfile(ROOT/f, self.root/f)
+        shutil.copyfile(ROOT/'docker-compose.preprod-pwa.yml', self.root/'docker-compose.preprod-pwa.yml')
+        for directory in ('docker/recette-pwa','docker/preprod-pwa'):
+            shutil.copytree(ROOT/directory,self.root/directory)
         config.ROOT = self.root
 
     def tearDown(self):
@@ -53,6 +56,72 @@ class Validation(unittest.TestCase):
 
     def change(self, before, after):
         self.env.write_text(self.env.read_text().replace(before, after))
+
+    def enable_pwa(self):
+        self.change('WAVY_PWA_ENABLED=false','WAVY_PWA_ENABLED=true')
+        self.change('WAVY_ACCESS_MODE=tunnel','WAVY_ACCESS_MODE=https')
+        self.change('http://localhost:24443','https://preprod.test.invalid')
+        self.change('WAVY_COOKIE_SECURE=false','WAVY_COOKIE_SECURE=true')
+
+    def test_pwa_opt_in_keeps_digests_and_read_only_isolated_storage(self):
+        self.enable_pwa();self.valid()
+        data=config.render(self.env)
+        shell=data['services']['wavy-erp-shell-preprod']
+        self.assertEqual(len(shell['volumes']),4)
+        self.assertTrue(all(m['read_only'] for m in shell['volumes']))
+        self.assertTrue(any(m['source'].endswith('/notes-read.conf') for m in shell['volumes']))
+        api=data['services']['wavy-factures-api-preprod']
+        self.assertEqual(api['volumes'][0]['volume']['subpath'],'notes-frais')
+        self.assertTrue(api['volumes'][0]['read_only'])
+        self.assertEqual(len(data['services']),18)
+
+    def test_pwa_rejects_writes_until_qualification(self):
+        self.change('WAVY_NOTES_WRITES_ENABLED=false','WAVY_NOTES_WRITES_ENABLED=true')
+        with self.assertRaisesRegex(ValueError,'non qualifiees'):self.valid()
+
+    def test_pwa_rejects_tunnel_and_unrelated_mount(self):
+        self.change('WAVY_PWA_ENABLED=false','WAVY_PWA_ENABLED=true')
+        with self.assertRaisesRegex(ValueError,'HTTPS'):self.valid()
+        self.enable_pwa()
+        p=self.root/'docker-compose.preprod-pwa.yml'
+        p.write_text(p.read_text().replace('notes-read.conf','notes-write.conf'))
+        with self.assertRaisesRegex(ValueError,'non approuve'):self.valid()
+
+    def test_pwa_cannot_mount_contrats_or_writable_documents(self):
+        self.enable_pwa()
+        p=self.root/'docker-compose.preprod-pwa.yml';original=p.read_text()
+        for changed in (original.replace('"subpath": "notes-frais"','"subpath": "contrats"'),original.replace('"read_only": true','"read_only": false')):
+            p.write_text(changed)
+            with self.assertRaises(ValueError):self.valid()
+
+    def test_pwa_storage_probe_is_read_only_and_uses_existing_volume(self):
+        self.enable_pwa()
+        obj={'Driver':'local','Options':None,'Labels':{'com.docker.compose.project':'wavy-preprod','com.docker.compose.volume':'documents-preprod'}}
+        import json
+        with patch.object(config.subprocess,'check_output',side_effect=[json.dumps([obj]).encode(),'wavy\n']), patch.object(config.subprocess,'run',return_value=Mock(returncode=0)) as run:
+            config.pwa_storage_check(self.env)
+        self.assertEqual(run.call_count,2)
+        for call in run.call_args_list:
+            cmd=call.args[0]
+            self.assertIn('--read-only',cmd);self.assertIn('none',cmd)
+            mount=cmd[cmd.index('--mount')+1]
+            self.assertIn('readonly',mount);self.assertIn('volume-nocopy',mount)
+            self.assertNotIn('mkdir',cmd[-1]);self.assertNotIn('chown',cmd[-1])
+        self.assertIn('volume-subpath=notes-frais',run.call_args.args[0][run.call_args.args[0].index('--mount')+1])
+
+    def test_pwa_missing_storage_never_starts_probe_or_creates_volume(self):
+        self.enable_pwa()
+        with patch.object(config.subprocess,'check_output',side_effect=subprocess.CalledProcessError(1,['docker','volume','inspect'])), patch.object(config.subprocess,'run') as run:
+            with self.assertRaises(subprocess.CalledProcessError):config.pwa_storage_check(self.env)
+            run.assert_not_called()
+
+    def test_pwa_permissions_failure_refuses_without_correction(self):
+        self.enable_pwa()
+        import json
+        obj={'Driver':'local','Labels':{'com.docker.compose.project':'wavy-preprod','com.docker.compose.volume':'documents-preprod'}}
+        with patch.object(config.subprocess,'check_output',side_effect=[json.dumps([obj]).encode(),'wavy']), patch.object(config.subprocess,'run',return_value=Mock(returncode=1)) as run:
+            with self.assertRaisesRegex(ValueError,'aucune mutation'):config.pwa_storage_check(self.env)
+            self.assertEqual(run.call_count,1)
 
     def test_valid_and_inherited_version_ignored(self):
         os.environ['SOCLE_API_VERSION'] = 'latest'

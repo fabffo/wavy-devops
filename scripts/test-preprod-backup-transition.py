@@ -143,7 +143,7 @@ class BackupTransition(unittest.TestCase):
         with tarfile.open(fileobj=io.BytesIO(subprocess.check_output(['git','archive','HEAD'],cwd=ROOT))) as archive:
             archive.extractall(self.root,filter='data')
         for name in ('backup-preprod.sh','release-preprod.sh','install.sh','_preprod.sh','preprod_operation.py',
-                     'delivery_batch.py','delivery-preflight.sh','delivery-apply.sh'):
+                     'delivery_batch.py','delivery-preflight.sh','delivery-apply.sh','preprod_config.py'):
             shutil.copyfile(ROOT/'scripts'/name,self.root/'scripts'/name)
         lines=[]
         for line in (ROOT/'.env.preprod.example').read_text().splitlines():

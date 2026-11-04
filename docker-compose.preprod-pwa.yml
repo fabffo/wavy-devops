@@ -1,0 +1,65 @@
+{
+  "services": {
+    "wavy-erp-shell-preprod": {
+      "volumes": [
+        {
+          "type": "bind",
+          "source": "./docker/recette-pwa/shell.conf.template",
+          "target": "/etc/nginx/templates/default.conf.template",
+          "read_only": true,
+          "bind": {
+            "create_host_path": false
+          }
+        },
+        {
+          "type": "bind",
+          "source": "./docker/preprod-pwa/routes-open.conf",
+          "target": "/etc/nginx/pwa-route.conf",
+          "read_only": true,
+          "bind": {
+            "create_host_path": false
+          }
+        },
+        {
+          "type": "bind",
+          "source": "./docker/recette-pwa/integration-open.json",
+          "target": "/usr/share/nginx/html/pwa-integration.json",
+          "read_only": true,
+          "bind": {
+            "create_host_path": false
+          }
+        },
+        {
+          "type": "bind",
+          "source": "./docker/recette-pwa/notes-read.conf",
+          "target": "/etc/nginx/wavy-pwa/notes.conf",
+          "read_only": true,
+          "bind": {
+            "create_host_path": false
+          }
+        }
+      ],
+      "environment": {
+        "WAVY_PWA_PUBLIC_ORIGIN": "${WAVY_PUBLIC_URL:?required}",
+        "NGINX_ENVSUBST_FILTER": "_UPSTREAM$|^WAVY_PWA_PUBLIC_ORIGIN$"
+      }
+    },
+    "wavy-factures-api-preprod": {
+      "environment": {
+        "WAVY_FACTURES_STOCKAGE_JUSTIFICATIFS": "/app/justificatifs"
+      },
+      "volumes": [
+        {
+          "type": "volume",
+          "source": "documents-preprod",
+          "target": "/app/justificatifs",
+          "read_only": true,
+          "volume": {
+            "nocopy": true,
+            "subpath": "notes-frais"
+          }
+        }
+      ]
+    }
+  }
+}

@@ -142,9 +142,9 @@ preprod_reload_erp_shell_nginx() {
 # Memes controles pour la livraison complete et les commandes ciblees.
 preprod_release_checks() {
   # Refuse une configuration non reproductible, sans interdire l’historique runtime ignoré.
-  git -C "$ROOT_DIR" diff --quiet -- docker-compose.preprod.yml scripts versions/preprod.env versions/preprod.digests || die 'Configuration PREPROD modifiée : synchroniser Git avant déploiement.'
+  git -C "$ROOT_DIR" diff --quiet -- docker-compose.preprod.yml docker-compose.preprod-pwa.yml docker/preprod-pwa docker/recette-pwa scripts versions/preprod.env versions/preprod.digests || die 'Configuration PREPROD modifiée : synchroniser Git avant déploiement.'
   git -C "$ROOT_DIR" diff --cached --quiet || die 'Index Git modifié.'
-  [[ -z "$(git -C "$ROOT_DIR" ls-files --others --exclude-standard -- scripts versions/preprod.env versions/preprod.digests docker-compose.preprod.yml)" ]] || die 'Fichiers PREPROD non versionnés.'
+  [[ -z "$(git -C "$ROOT_DIR" ls-files --others --exclude-standard -- scripts versions/preprod.env versions/preprod.digests docker-compose.preprod.yml docker-compose.preprod-pwa.yml docker/preprod-pwa docker/recette-pwa)" ]] || die 'Fichiers PREPROD non versionnés.'
   minimum="${WAVY_DEPLOY_MIN_FREE_KB:-1048576}"
   [[ "$minimum" =~ ^[1-9][0-9]*$ ]] || die 'Seuil disque invalide.'
   for dir in "$ROOT_DIR" "$(docker info --format '{{.DockerRootDir}}')"; do

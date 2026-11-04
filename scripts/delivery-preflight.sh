@@ -19,6 +19,7 @@ if [[ "$env" == preprod ]]; then
     preprod_container_guard "$(service_name "$component" preprod)" "$(service_name "$component" preprod)"
     preprod_verify_image "$component" "$(component_version preprod "$component")" "$(component_digest preprod "$component")"
   done
+  python3 "$SCRIPT_DIR/preprod_config.py" pwa-storage "$ROOT_DIR/.env.preprod"
   # Reprise : controler le demarrage courant, sans relancer de migration.
   for component in socle-api tiers-api contrats-api factures-api tresorerie-api; do
     service="$(service_name "$component" preprod)"
