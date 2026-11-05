@@ -68,7 +68,6 @@ PWA_MOUNTS = {
 def pwa_visible(e):
     for key in ('WAVY_PWA_ENABLED', 'WAVY_NOTES_WRITES_ENABLED'):
         check(e.get(key, 'false') in ('true', 'false'), f'{key} : true ou false requis')
-    check(e.get('WAVY_NOTES_WRITES_ENABLED', 'false') == 'false', 'Ecritures Notes PREPROD non qualifiees : conserver false')
     enabled = e.get('WAVY_PWA_ENABLED', 'false') == 'true'
     if enabled:
         check(e.get('WAVY_ACCESS_MODE') == 'https' and e.get('WAVY_PUBLIC_URL', '').startswith('https://'), 'PWA PREPROD : HTTPS requis')
@@ -77,12 +76,17 @@ def pwa_visible(e):
 
 def compose_args(env_path, args):
     # No inherited variable may override a manifest or the machine dotenv.
-    enabled = pwa_visible(dotenv(env_path))
+    machine = dotenv(env_path)
+    enabled = pwa_visible(machine)
+    writes = machine.get('WAVY_NOTES_WRITES_ENABLED', 'false') == 'true'
     extra = ['-f', str(ROOT/'docker-compose.preprod-pwa.yml')] if enabled else []
     raw = (ROOT / 'docker-compose.preprod.yml').read_text()
     if enabled: raw += (ROOT/'docker-compose.preprod-pwa.yml').read_text()
     keys = set(re.findall(r'\$\{([A-Z][A-Z0-9_]*)', raw))
     clean = {k: val for k, val in os.environ.items() if k not in keys and not k.startswith('COMPOSE_')}
+    # Valeurs derivees du dotenv, jamais d'un override du shell appelant.
+    clean['WAVY_NOTES_NGINX_CONFIG'] = 'notes-write.conf' if writes else 'notes-read.conf'
+    clean['WAVY_NOTES_STORAGE_READ_ONLY'] = 'false' if writes else 'true'
     return (['docker', 'compose', '--env-file', str(env_path), '--env-file', str(ROOT / 'versions/preprod.env'), '--env-file', str(ROOT / 'versions/preprod.digests'),
              '-p', 'wavy-preprod', '-f', str(ROOT / 'docker-compose.preprod.yml')] + extra + args, clean)
 
@@ -203,6 +207,10 @@ def validate(env_path):
     check(len(e['WAVY_TIERS_SERVICE_PASSWORD']) >= 12, 'Mot de passe interservice trop court')
     ai = validate_ai(e)
     visible = pwa_visible(e)
+    writes = e.get('WAVY_NOTES_WRITES_ENABLED', 'false') == 'true'
+    pwa_mounts = dict(PWA_MOUNTS)
+    if writes:
+        pwa_mounts['/etc/nginx/wavy-pwa/notes.conf'] = 'docker/recette-pwa/notes-write.conf'
     config = render(env_path)
     services = config['services']
     expected = {'wavy-'+c+'-preprod' for c in COMPONENTS} | {c+'-postgres' for c in ['socle','tiers','contrats','factures','tresorerie']}
@@ -228,8 +236,8 @@ def validate(env_path):
         for volume in service.get('volumes', []):
             if visible and name == 'wavy-erp-shell-preprod':
                 target = volume.get('target')
-                check(target in PWA_MOUNTS and volume['type'] == 'bind'
-                      and volume['source'] == str(ROOT/PWA_MOUNTS[target])
+                check(target in pwa_mounts and volume['type'] == 'bind'
+                      and volume['source'] == str(ROOT/pwa_mounts[target])
                       and volume.get('read_only') is True and volume.get('bind', {}).get('create_host_path', False) is False,
                       'Montage PWA Shell non approuve')
             else:
@@ -263,19 +271,19 @@ def validate(env_path):
     check(owners == (['wavy-contrats-api-preprod','wavy-factures-api-preprod'] if visible else ['wavy-contrats-api-preprod']), 'Volume documentaire hors isolation attendue')
     if visible:
         shell = services['wavy-erp-shell-preprod']
-        check(len(shell.get('volumes', [])) == len(PWA_MOUNTS), 'Montages PWA incomplets')
-        for target, source in PWA_MOUNTS.items():
+        check(len(shell.get('volumes', [])) == len(pwa_mounts), 'Montages PWA incomplets')
+        for target, source in pwa_mounts.items():
             path = ROOT/source
             check(path.is_file() and not path.is_symlink(), 'Configuration PWA absente ou lien symbolique')
-        check(json.loads((ROOT/PWA_MOUNTS['/usr/share/nginx/html/pwa-integration.json']).read_text()) == {'enabled':True,'justificatifMaxBytes':10485760}, 'Politique PWA inattendue')
+        check(json.loads((ROOT/pwa_mounts['/usr/share/nginx/html/pwa-integration.json']).read_text()) == {'enabled':True,'justificatifMaxBytes':10485760}, 'Politique PWA inattendue')
         check(shell['environment'].get('WAVY_PWA_PUBLIC_ORIGIN') == url, 'Origine PWA incoherente')
         mounts = services['wavy-factures-api-preprod'].get('volumes', [])
         check(len(mounts) == 1, 'Montage Factures inattendu')
         fm = mounts[0]
         check(fm.get('type') == 'volume' and fm.get('source') == 'documents-preprod'
-              and fm.get('target') == '/app/justificatifs' and fm.get('read_only') is True
+              and fm.get('target') == '/app/justificatifs' and fm.get('read_only', False) is (not writes)
               and fm.get('volume', {}).get('subpath') == 'notes-frais'
-              and fm.get('volume', {}).get('nocopy') is True, 'Stockage Notes : sous-repertoire prive en lecture seule requis')
+              and fm.get('volume', {}).get('nocopy') is True, 'Stockage Notes : sous-repertoire prive et mode lecture/ecriture conformes requis')
         check(factures_env.get('WAVY_FACTURES_STOCKAGE_JUSTIFICATIFS') == '/app/justificatifs', 'Racine Notes incorrecte')
     mount = services['wavy-contrats-api-preprod']['volumes'][0]
     check(mount['target'] == '/app/data' and not mount.get('read_only'), 'Montage documentaire incorrect')

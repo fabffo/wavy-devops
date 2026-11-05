@@ -75,24 +75,51 @@ class Validation(unittest.TestCase):
         self.assertTrue(api['volumes'][0]['read_only'])
         self.assertEqual(len(data['services']),18)
 
-    def test_pwa_rejects_writes_until_qualification(self):
+    def test_pwa_writes_use_existing_nginx_and_private_subdirectory(self):
+        self.enable_pwa()
+        before = config.render(self.env)
         self.change('WAVY_NOTES_WRITES_ENABLED=false','WAVY_NOTES_WRITES_ENABLED=true')
-        with self.assertRaisesRegex(ValueError,'non qualifiees'):self.valid()
+        # Un override du shell ne peut pas inverser la decision du dotenv.
+        with patch.dict(os.environ, WAVY_NOTES_NGINX_CONFIG='notes-read.conf', WAVY_NOTES_STORAGE_READ_ONLY='true'):
+            self.valid()
+            data = config.render(self.env)
+        shell = data['services']['wavy-erp-shell-preprod']
+        self.assertTrue(any(m['source'].endswith('/notes-write.conf') for m in shell['volumes']))
+        self.assertTrue(all(m['read_only'] for m in shell['volumes']))
+        mount = data['services']['wavy-factures-api-preprod']['volumes'][0]
+        self.assertFalse(mount.get('read_only', False))
+        self.assertEqual(mount['volume'], {'nocopy': True, 'subpath': 'notes-frais'})
+        self.assertEqual(mount['source'], 'documents-preprod')
+        self.assertEqual({k:v['image'] for k,v in before['services'].items()},
+                         {k:v['image'] for k,v in data['services'].items()})
+        write = (self.root/'docker/recette-pwa/notes-write.conf').read_text()
+        self.assertIn('if ($wavy_notes_origin_denied) { return 403; }', write)
+        self.assertIn('proxy_pass $private_api_origin;', write)
+        self.assertIn('proxy_set_header Cookie $http_cookie;', write)
+        self.assertIn('proxy_cache off;', write)
+        self.change('WAVY_NOTES_WRITES_ENABLED=true','WAVY_NOTES_WRITES_ENABLED=false')
+        with patch.dict(os.environ, WAVY_NOTES_NGINX_CONFIG='notes-write.conf', WAVY_NOTES_STORAGE_READ_ONLY='false'):
+            self.valid()
+            data = config.render(self.env)
+        self.assertTrue(any(m['source'].endswith('/notes-read.conf') for m in data['services']['wavy-erp-shell-preprod']['volumes']))
+        self.assertTrue(data['services']['wavy-factures-api-preprod']['volumes'][0]['read_only'])
 
     def test_pwa_rejects_tunnel_and_unrelated_mount(self):
         self.change('WAVY_PWA_ENABLED=false','WAVY_PWA_ENABLED=true')
         with self.assertRaisesRegex(ValueError,'HTTPS'):self.valid()
         self.enable_pwa()
         p=self.root/'docker-compose.preprod-pwa.yml'
-        p.write_text(p.read_text().replace('notes-read.conf','notes-write.conf'))
+        p.write_text(p.read_text().replace('${WAVY_NOTES_NGINX_CONFIG:-notes-read.conf}','notes-write.conf'))
         with self.assertRaisesRegex(ValueError,'non approuve'):self.valid()
 
     def test_pwa_cannot_mount_contrats_or_writable_documents(self):
         self.enable_pwa()
         p=self.root/'docker-compose.preprod-pwa.yml';original=p.read_text()
-        for changed in (original.replace('"subpath": "notes-frais"','"subpath": "contrats"'),original.replace('"read_only": true','"read_only": false')):
-            p.write_text(changed)
-            with self.assertRaises(ValueError):self.valid()
+        for writes in ('false', 'true'):
+            self.change('WAVY_NOTES_WRITES_ENABLED=false', 'WAVY_NOTES_WRITES_ENABLED='+writes)
+            for changed in (original.replace('"subpath": "notes-frais"','"subpath": "contrats"'),original.replace('"read_only": true','"read_only": false')):
+                p.write_text(changed)
+                with self.assertRaises(ValueError):self.valid()
 
     def test_pwa_storage_probe_is_read_only_and_uses_existing_volume(self):
         self.enable_pwa()

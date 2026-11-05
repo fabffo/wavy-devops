@@ -31,7 +31,7 @@
         },
         {
           "type": "bind",
-          "source": "./docker/recette-pwa/notes-read.conf",
+          "source": "./docker/recette-pwa/${WAVY_NOTES_NGINX_CONFIG:-notes-read.conf}",
           "target": "/etc/nginx/wavy-pwa/notes.conf",
           "read_only": true,
           "bind": {
@@ -53,7 +53,7 @@
           "type": "volume",
           "source": "documents-preprod",
           "target": "/app/justificatifs",
-          "read_only": true,
+          "read_only": "${WAVY_NOTES_STORAGE_READ_ONLY:-true}",
           "volume": {
             "nocopy": true,
             "subpath": "notes-frais"
