@@ -121,6 +121,7 @@ services:
     container_name: wavy-tiers-api-preprod
     healthcheck:
       <<: *api-health
+      start_period: ${WAVY_API_START_PERIOD:-240s}
       test: ["CMD", "wget", "-qO-", "http://localhost:8081/actuator/health"]
     environment: {<<: *backend-environment, WAVY_TIERS_SERVICE_USERNAME: "${WAVY_TIERS_SERVICE_USERNAME:?required}", WAVY_TIERS_SERVICE_PASSWORD: "${WAVY_TIERS_SERVICE_PASSWORD:?required}", SERVER_PORT: 8081, SPRING_PROFILES_ACTIVE: "preprod,secure", SPRING_DATASOURCE_URL: "jdbc:postgresql://tiers-postgres:5432/${WAVY_TIERS_DB_NAME}", SPRING_DATASOURCE_USERNAME: "${WAVY_TIERS_DB_USER}", SPRING_DATASOURCE_PASSWORD: "${WAVY_TIERS_DB_PASSWORD}"}
     depends_on: {tiers-postgres: {condition: service_healthy}}

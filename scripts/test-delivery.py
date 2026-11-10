@@ -47,7 +47,7 @@ class Delivery(unittest.TestCase):
         rendered = recette_compose(self.root,['config','--format','json'],capture=True)
         for c in ('factures-api','tresorerie-api'):
             health = rendered['services'][f'wavy-{c}-recette']['healthcheck']
-            self.assertEqual(health['start_period'],'2m0s')
+            self.assertEqual(health['start_period'],'4m0s')
             self.assertEqual(health['retries'],18)
         with patch.object(preprod_config,'ROOT',self.root):
             cmd, env = preprod_config.compose_args(self.root/'.env.preprod', ['config','--format','json'])
@@ -57,6 +57,37 @@ class Delivery(unittest.TestCase):
         delivery.rendered_checks(config,'preprod',preprod)
         config['services']['wavy-gateway-preprod']['environment']['WAVY_CORS_ALLOWED_ORIGIN_PATTERNS']='https://contradiction.invalid'
         with self.assertRaisesRegex(ValueError,'CORS'): delivery.rendered_checks(config,'preprod',preprod)
+
+    def test_tiers_start_period_defaults_and_machine_overrides(self):
+        for value, expected in ((None, '4m0s'), ('240s', '4m0s'), ('300s', '5m0s')):
+            for environment in ('recette', 'preprod'):
+                with self.subTest(environment=environment, value=value):
+                    path = self.root/f'.env.{environment}'
+                    lines = [line for line in path.read_text().splitlines()
+                             if not line.startswith('WAVY_API_START_PERIOD=')]
+                    if value is not None:
+                        lines.append('WAVY_API_START_PERIOD='+value)
+                    path.write_text('\n'.join(lines)+'\n')
+                    # Le shell appelant ne remplace pas le dotenv ou le défaut Compose.
+                    with patch.dict(os.environ, {'WAVY_API_START_PERIOD': '1s'}):
+                        if environment == 'recette':
+                            config = recette_compose(self.root, ['config', '--format', 'json'], capture=True)
+                        else:
+                            with patch.object(preprod_config, 'ROOT', self.root):
+                                cmd, env = preprod_config.compose_args(path, ['config', '--format', 'json'])
+                                config = json.loads(subprocess.check_output(cmd, env=env))
+                    services = config['services']
+                    health = services[f'wavy-tiers-api-{environment}']['healthcheck']
+                    self.assertEqual(health['start_period'], expected)
+                    self.assertEqual(health['test'], ['CMD', 'wget', '-qO-', 'http://localhost:8081/actuator/health'])
+                    self.assertEqual(health['interval'], '10s')
+                    self.assertEqual(health['timeout'], '5s')
+                    self.assertEqual(health['retries'], 10)
+                    self.assertFalse(health.get('disable', False))
+                    self.assertEqual(services[f'wavy-tiers-api-{environment}']['depends_on']['tiers-postgres']['condition'], 'service_healthy')
+                    dependants = ('socle-api', 'tresorerie-api') if environment == 'recette' else ('gateway',)
+                    for component in dependants:
+                        self.assertEqual(services[f'wavy-{component}-{environment}']['depends_on'][f'wavy-tiers-api-{environment}']['condition'], 'service_healthy')
 
     def test_machine_duplicates_and_release_overrides_rejected(self):
         path = self.root/'.env.recette'; original = path.read_text()

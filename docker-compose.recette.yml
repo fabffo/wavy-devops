@@ -189,7 +189,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
-      start_period: 30s
+      start_period: ${WAVY_API_START_PERIOD:-240s}
     networks:
       - wavy-recette
 
