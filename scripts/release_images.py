@@ -130,6 +130,9 @@ def _recette_compose(root, args, rollback=None, capture=False):
     machine = manifest(root / '.env.recette', strict=False)
     pwa = overlay(root, machine, images, mutation=args[0] in ('up', 'create', 'run'),
                   enforce=args[0] not in ('stop', 'down', 'ps', 'logs', 'images', 'restart', 'kill', 'pause', 'unpause', 'exec', 'version', 'config'))
+    # Même moteur Compose ; politique de reproduction persistante après synchronisation.
+    from sync_recette import sync_overlay
+    pwa = sync_overlay(root, pwa, mutation=args[0] in ('up', 'create', 'run', 'restart', 'unpause'))
     raw = (root / 'docker-compose.recette.yml').read_text()
     keys = set(re.findall(r'\$\{([A-Z][A-Z0-9_]*)', raw))
     clean = {k: v for k, v in os.environ.items() if k not in keys and not k.startswith('COMPOSE_')}

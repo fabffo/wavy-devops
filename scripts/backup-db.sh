@@ -4,6 +4,11 @@ set -euo pipefail
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/_common.sh"
 
 env="$(env_name)"
+sync_hold=false
+if [[ $# != 0 ]]; then
+  [[ $# == 1 && $1 == --sync-hold && "$env" == recette ]] || die 'Option backup invalide.'
+  sync_hold=true
+fi
 [[ "$env" != preprod ]] || die 'PREPROD : utiliser la chaîne chiffrée backup-preprod.sh/restore-preprod.sh avec documents.'
 require_docker
 umask 077
@@ -12,6 +17,11 @@ if [[ "$env" == recette ]]; then
   recette_operation_lock
   source "$SCRIPT_DIR/_recette-documents.sh"
   recette_documents_setup
+  if $sync_hold; then
+    [[ -n "$DOCUMENT_VOLUME" ]] || die 'Synchronisation : stockage justificatifs requis.'
+    CONTRATS_VOLUME="$(docker inspect -f '{{range .Mounts}}{{if eq .Destination "/app/data/contrats/pieces-jointes"}}{{if eq .Type "volume"}}{{.Name}}{{end}}{{end}}{{end}}' wavy-contrats-api-recette)"
+    [[ "$CONTRATS_VOLUME" =~ ^[a-zA-Z0-9][a-zA-Z0-9_.-]*$ ]] || die 'Volume Contrats RECETTE requis.'
+  fi
 fi
 require_command flock
 mkdir -p "$ROOT_DIR/backups"
@@ -31,7 +41,7 @@ QUIESCED_SERVICES=()
 finish_backup() {
   local code=$?
   trap - EXIT
-  if [[ -n "$DOCUMENT_VOLUME" ]]; then
+  if [[ -n "$DOCUMENT_VOLUME" ]] && { ! $sync_hold || ((code != 0)); }; then
     recette_resume || { code=1; error "Services RECETTE à reprendre : ${QUIESCED_SERVICES[*]}"; }
   fi
   if ((code != 0)); then error "Sauvegarde incomplète conservée : $backup_dir"; fi
@@ -71,7 +81,13 @@ EOF
 
 if [[ -n "$DOCUMENT_VOLUME" ]]; then
   recette_archive_documents
-  recette_resume || die 'Reprise des backends RECETTE en échec ; lot non publié.'
+  if $sync_hold; then
+    docker run --rm --pull never --network none --read-only --security-opt no-new-privileges:true \
+      --user 0:0 --mount "type=volume,source=$CONTRATS_VOLUME,target=/store,readonly,volume-nocopy" \
+      --entrypoint sh "$DOCUMENT_IMAGE" -ec 'tar -cpf - -C /store .' > "$backup_dir/contrats.tar"
+  else
+    recette_resume || die 'Reprise des backends RECETTE en échec ; lot non publié.'
+  fi
   mv "$backup_dir" "$final_backup_dir"
   backup_dir="$final_backup_dir"
 fi

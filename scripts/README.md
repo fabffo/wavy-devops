@@ -122,7 +122,7 @@ Nettoie Docker sans supprimer les volumes de données Wavy :
 
 ### `backup-db.sh`
 
-Sauvegarde les bases `socle`, `tiers`, `contrats` et `factures` dans :
+Sauvegarde les bases `socle`, `tiers`, `contrats`, `factures` et `tresorerie` dans :
 
 ```text
 backups/AAAA-MM-JJ_HHMM/
@@ -143,6 +143,15 @@ Liste les sauvegardes disponibles, permet de choisir une base, puis demande conf
 ```
 
 La restauration utilise `pg_restore --clean --if-exists`.
+
+### `./wavy sync preprod recette`
+
+Depuis la VM RECETTE, sauvegarde cohérente PREPROD via SSH, secours complet RECETTE
+chiffré, confirmation unique, restauration des cinq bases et documents, mêmes
+images et réseau interne de reproduction. Retour arrière automatique si possible.
+Le mode interne `backup-db.sh --sync-hold` ajoute les pièces Contrats et laisse
+les writers arrêtés après succès pour éviter toute écriture entre backup et restore.
+Voir [configuration, déroulement et reprise](../docs/synchronisation-preprod-recette.md).
 
 ## Sécurité
 

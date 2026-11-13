@@ -61,6 +61,7 @@ Usage :
   ./wavy restart local|recette|preprod all|service
   ./wavy logs local|recette|preprod [service]
   ./wavy backup|restore local|recette|preprod
+  ./wavy sync preprod recette
   ./wavy stop local|recette|preprod
   ./wavy clean
   ./wavy ai recette
@@ -612,6 +613,7 @@ main() {
   shift || true
 
   case "$command" in
+    sync) exec python3 -B "$SCRIPT_DIR/sync_recette.py" "$@" ;;
     local) exec python3 -B "$ROOT_DIR/preparation/https-msi/wavy_deploy.py" --local-cli "$@" ;;
     validate)
       [[ "$#" -eq 1 && "$1" == recette ]] || die "Usage : ./wavy validate recette"

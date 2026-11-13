@@ -38,6 +38,8 @@ deployments/recette.lock
 
 # Historique append-only de l’installation RECETTE.
 deployments/recette-install.tsv
+deployments/recette-sync.json
+deployments/recette-sync-policy.json
 
 # Configuration Windows locale (chemins et connexions existants)
 windows/connections.json
