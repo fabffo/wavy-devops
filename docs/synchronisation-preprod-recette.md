@@ -113,6 +113,8 @@ l'espace. Il ne qualifie pas encore la restauration ni le rollback réels.
    leur transport habituel. Le Shell est vérifié par son proxy interne : cinq
    modules, chaîne Shell → Gateway → Tiers, refus de session anonyme et routes
    PWA si activées. Ce contrôle interne ne qualifie pas l'accès HTTPS via Caddy.
+   L'entrée `127.0.0.1:24207` et son routage vers Tiers sont également vérifiés
+   depuis la VM avant d'activer le redémarrage automatique.
 
 Contrats conserve des chemins absolus en base. Un alias du volume RECETTE sous
 `/app/data/contrats` permet de lire ces chemins PREPROD tout en conservant le
@@ -125,6 +127,15 @@ archivés sont conservés.
 `deployments/recette-sync-policy.json` est un état local privé, ignoré par Git,
 lu par le chemin Compose habituel. Le réseau applicatif devient le réseau Docker
 **interne** `wavy-recette-sync`, sans routage externe et sans connexion PREPROD.
+Les cinq API, cinq bases, cinq fronts, Gateway et PWA y restent exclusivement.
+Seul l'ERP Shell, reverse proxy existant, rejoint également le réseau d'entrée
+existant `wavy-recette` (déclaré externe, jamais provisionné par la synchronisation).
+Seul son port `127.0.0.1:24207` est rendu accessible à l'hôte, pour le tunnel SSH
+Windows existant. Le port 28080 de Socle reste inaccessible depuis l'hôte.
+Le Shell ne route aucun paquet entre ses interfaces (forwarding IPv4/IPv6 à 0),
+perd NET_ADMIN/NET_RAW et conserve exclusivement les destinations Nginx internes
+imposées par le code. Les contrôles refusent un proxy arbitraire, un port public,
+un service métier sur le réseau d'entrée ou un conteneur supplémentaire sur celui-ci.
 Les clés applicatives RECETTE restent configurées, mais les appels aux fournisseurs
 externes (IA comprise), emails, paiements et webhooks sont inaccessibles par ce
 réseau. SMTP pointe aussi sur un port local fermé ; la création automatique IA
@@ -134,14 +145,47 @@ raccordé à ce réseau de reproduction.
 
 Les migrations Flyway, initialisations SQL et bootstrap sont désactivés pendant
 la reproduction ; Hibernate valide les schémas restaurés. Le mode reste actif
-lors des redémarrages/recréations ordinaires. Les composants applicatifs ne
-redémarrent pas automatiquement au reboot : reprendre via le parcours Wavy.
+lors des redémarrages/recréations ordinaires. Pendant les restaurations et les
+contrôles, les 18 conteneurs restent sans redémarrage automatique ; les bases
+continuent de tourner pendant la restauration. Après validation complète,
+les 18 politiques passent à `unless-stopped`, sans recréation des services.
+Le même état `complete` produit les mêmes réseaux, ports privés, sysctls et
+protections lors des futurs passages par Compose. Un échec garde ou rétablit
+les protections ; le rollback restaure aussi les politiques des bases capturées
+avant la copie. Une politique d'isolation absente après succès bloque Compose.
 La politique n'est jamais supprimée automatiquement après succès : RECETTE
 contient toujours des données PREPROD. Sa levée requiert une intervention dédiée.
 
 Les scripts existants de sauvegarde restent utilisables, mais le backup standard
 hors `sync` n'acquiert pas automatiquement ce nouveau périmètre Contrats. Le
 secours de synchronisation est un lot spécifique complet.
+
+## Application ciblée du correctif HTTPS après une copie déjà réussie
+
+À effectuer seulement après autorisation de publication et d'intervention RECETTE.
+Ne pas relancer `sync`, ne pas utiliser `install` et ne pas intervenir sur PREPROD.
+Sous le verrou RECETTE existant, vérifier la phase `complete`, les deux réseaux
+existants et relever les IDs, dates de démarrage et politiques des 17 autres
+conteneurs. Utiliser le même moteur Compose, avec une cible unique :
+
+```bash
+python3 -B scripts/release_images.py up -d --no-deps --force-recreate --pull never wavy-erp-shell-recette
+```
+
+Le processus d'application doit conserver le verrou pendant la recréation et les
+contrôles. Seul le Shell est recréé, avec l'image épinglée déjà présente. Vérifier
+sa frontière réseau et Nginx, l'entrée HTTP locale, puis HTTPS depuis Windows via
+Caddy existant (TLS normal, sans `-k`). Comparer les 17 autres conteneurs aux
+relevés pour confirmer qu'ils n'ont été ni modifiés ni redémarrés. Aucun dump,
+restore, changement de volumes ou migration n'est nécessaire.
+
+L'activation immédiate du redémarrage automatique des 17 autres conteneurs déjà
+présents exige une mise à jour de leurs politiques Docker, sans recréation ni
+redémarrage. Cette modification de métadonnées est distincte de l'application
+strictement limitée au Shell et doit être incluse explicitement dans l'accord.
+Sans elle, leurs anciennes politiques `no` restent en place ; un simple reboot
+ne peut pas les convertir automatiquement en `unless-stopped`. Les futures
+synchronisations complètes et validées activent les 18 politiques automatiquement.
 
 ## Échecs et reprise
 
@@ -187,6 +231,7 @@ mort ; l'état durable permet la reprise à l'invocation suivante.
 ```bash
 python3 -B scripts/test-sync-recette.py
 python3 -B scripts/test-release-images.py
+python3 -B scripts/test-recette-pwa-nginx.py
 python3 -B scripts/test-preprod-backup-transition.py
 bash -n wavy scripts/backup-db.sh
 ```

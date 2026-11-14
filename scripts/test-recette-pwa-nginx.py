@@ -43,6 +43,9 @@ server { listen 127.0.0.1:8089; location / { return 200 "pwa:$request_uri"; } }
                     (ASSETS/('notes-write.conf' if writes else 'notes-read.conf'),'/etc/nginx/wavy-pwa/notes.conf'),
                     (ASSETS/('integration-open.json' if visible else 'integration-closed.json'),'/usr/share/nginx/html/pwa-integration.json')]
                 cmd = ['docker','run','-d','--name',name,'--pull','never','--network','none',
+                       '--sysctl','net.ipv4.ip_forward=0','--sysctl','net.ipv6.conf.all.forwarding=0',
+                       '--cap-drop','NET_ADMIN','--cap-drop','NET_RAW',
+                       '--security-opt','no-new-privileges:true',
                        '-e','WAVY_PWA_PUBLIC_ORIGIN='+ORIGIN,
                        '-e','NGINX_ENVSUBST_FILTER=_UPSTREAM$|^WAVY_PWA_PUBLIC_ORIGIN$']
                 for key in ('API','SOCLE_FRONT','TIERS_FRONT','CONTRATS_FRONT','FACTURES_FRONT','TRESORERIE_FRONT'):
@@ -52,6 +55,9 @@ server { listen 127.0.0.1:8089; location / { return 200 "pwa:$request_uri"; } }
                 cmd += [image]
                 try:
                     subprocess.run(cmd,check=True,capture_output=True)
+                    forwarding=subprocess.run(['docker','exec',name,'cat','/proc/sys/net/ipv4/ip_forward',
+                                                '/proc/sys/net/ipv6/conf/all/forwarding'],check=True,capture_output=True)
+                    self.assertEqual(forwarding.stdout.split(),[b'0',b'0'])
                     def request(method,path,cookie='',origin=''):
                         data = f'{method} {path} HTTP/1.1\r\nHost: recette.wavyservices.fr\r\nConnection: close\r\nContent-Length: 0\r\n'
                         if cookie:data += 'Cookie: '+cookie+'\r\n'
@@ -81,6 +87,7 @@ server { listen 127.0.0.1:8089; location / { return 200 "pwa:$request_uri"; } }
                     self.assertEqual(request('POST','/api/notes-frais;foo','valid',ORIGIN)[0],403)
                     self.assertEqual(request('POST','/api/notes-frais%253bfoo','valid',ORIGIN)[0],403)
                     self.assertEqual(request('GET','/api/pwa/session')[0],404)
+                    self.assertIn(request('CONNECT','example.invalid:443')[0],(400,405))
                     checked = subprocess.run(['docker','exec',name,'nginx','-t'],capture_output=True)
                     self.assertEqual(checked.returncode,0,checked.stderr)
                 finally:

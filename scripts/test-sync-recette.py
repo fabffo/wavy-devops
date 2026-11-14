@@ -223,7 +223,12 @@ class SyncTests(unittest.TestCase):
         for component in sync.COMPONENTS:
             service=config['services']['wavy-'+component+'-recette']
             self.assertEqual(service['image'],images[component])
-            self.assertEqual(set(service['networks']),{'wavy-recette'})
+            self.assertEqual(set(service['networks']),{'wavy-recette','recette-ingress'} if component=='erp-shell' else {'wavy-recette'})
+        shell=config['services']['wavy-erp-shell-recette']
+        self.assertEqual([(p['host_ip'],p['published'],p['target']) for p in shell['ports']], [('127.0.0.1','24207',80)])
+        self.assertEqual(shell['sysctls']['net.ipv4.ip_forward'],'0')
+        self.assertEqual(config['networks']['recette-ingress']['name'],'wavy-recette')
+        self.assertTrue(config['networks']['recette-ingress']['external'])
         contracts=config['services']['wavy-contrats-api-recette']
         self.assertEqual({v['target'] for v in contracts['volumes']},
                          {'/app/data/contrats','/app/data/contrats/pieces-jointes'})
@@ -231,6 +236,12 @@ class SyncTests(unittest.TestCase):
         self.assertEqual(factures['WAVY_AI_ACHAT_AUTO_CREATION_ENABLED'],'false')
         self.assertEqual(factures['SPRING_FLYWAY_ENABLED'],'false')
         self.assertEqual((fixture/'.env.recette').read_text(),text)
+        sync.atomic_json(fixture/sync.STATE,{'phase':'complete'})
+        restarted=sync.recette_compose(fixture,['config','--format','json'],capture=True)
+        self.assertEqual({s['restart'] for s in restarted['services'].values()},{'unless-stopped'})
+        for name,service in config['services'].items():
+            self.assertEqual(service['networks'],restarted['services'][name]['networks'])
+        self.assertEqual(restarted['services']['wavy-factures-api-recette']['environment']['SPRING_FLYWAY_ENABLED'],'false')
 
     def test_recovery_verifies_whole_backup_before_touching_recette(self):
         state={'backup':str(self.root),'before':{'runtime':{}},'volumes':{},'toolImage':'fixture',
@@ -340,10 +351,10 @@ recette_archive_documents(){ tar -cf "$backup_dir/justificatifs.tar" --files-fro
                       'backup_key':Mock(return_value='x'*40),
                       'declared_snapshot':Mock(return_value=data),'volume_for':lambda c,d:c+'-volume',
                       'shared_database_guard':Mock(),'database_guard':Mock(),'receive':receive,
-                      'auth':Mock(),'verify':Mock(),'inspect':Mock(return_value={'Id':'sha256:fixture'}),
+                      'auth':Mock(),'verify':Mock(),'inspect':Mock(return_value={'Id':'sha256:fixture','HostConfig':{'RestartPolicy':{'Name':'no'}}}),
                       'crypt':crypt,'check_dumps':Mock(),'save_rollback':save,'runtime_stop':Mock(),
                       'db_restore':restore,'compose':compose,'verify_isolation':Mock(),
-                      'command':Mock(),'check_shell':Mock(),'recover':recover}
+                      'command':Mock(),'check_shell':Mock(),'check_shell_ingress':Mock(),'recover':recover}
         with ExitStack() as stack:
             for name,value in replacements.items(): stack.enter_context(patch.object(sync,name,value))
             stack.enter_context(patch('subprocess.run',side_effect=backup_run))
@@ -546,6 +557,110 @@ else:print('[]')
         state=sync.read_private(self.root/sync.STATE)
         self.assertEqual(state['phase'],'rolled-back')
         self.assertEqual(state['failure'],{'check':'restore-databases','code':1})
+
+    def boundary_fixture(self, restart='no'):
+        objects={'wavy-recette-sync':{'Internal':True},
+                 'wavy-recette':{'Internal':False,'Driver':'bridge','Containers':{'fixture-shell':{'Name':'wavy-erp-shell-recette'}}}}
+        for name in sync.RUNTIME_CONTAINERS:
+            objects[name]={'HostConfig':{'RestartPolicy':{'Name':restart}},'NetworkSettings':{'Networks':{'wavy-recette-sync':{}},'Ports':{}}}
+        shell=objects['wavy-erp-shell-recette']
+        shell['NetworkSettings']['Networks']['wavy-recette']={}
+        shell['NetworkSettings']['Ports']={'80/tcp':[{'HostIp':'127.0.0.1','HostPort':'24207'}]}
+        shell['HostConfig'].update({'Privileged':False,'CapAdd':[], 'CapDrop':['NET_ADMIN','NET_RAW'],
+                                   'Sysctls':{'net.ipv4.ip_forward':'0','net.ipv6.conf.all.forwarding':'0'}})
+        shell['Config']={'Env':[k+'='+v for k,v in sync.SHELL_UPSTREAMS.items()]}
+        template=(sync.ROOT/'docker/recette-pwa/shell.conf.template').read_text()
+        template=template.replace('include /etc/nginx/pwa-route.conf;', (sync.ROOT/'docker/recette-pwa/routes-open.conf').read_text())
+        template=template.replace('include /etc/nginx/wavy-pwa/notes.conf;', (sync.ROOT/'docker/recette-pwa/notes-write.conf').read_text())
+        for key,value in sync.SHELL_UPSTREAMS.items(): template=template.replace('${'+key+'}',value)
+        return objects,template
+
+    def test_isolation_allows_only_shell_ingress_and_checks_real_proxy_destinations(self):
+        objects,config=self.boundary_fixture()
+        def command(args):return b'0\n0\n' if args[3]=='cat' else config.encode()
+        with patch.object(sync,'inspect',side_effect=lambda name,*a:objects[name]),patch.object(sync,'command',side_effect=command):
+            sync.verify_isolation(restart='no')
+        # Un proxy arbitraire, un upstream variable externe ou un forwarding actif échouent.
+        for replacement in [config+'\nlocation /escape { proxy_pass http://example.test; }',
+                            config.replace('set $private_api_origin http://wavy-gateway-recette:8088;',
+                                           'set $private_api_origin http://example.test;')]:
+            with patch.object(sync,'command',side_effect=lambda args:b'0\n0\n' if args[3]=='cat' else replacement.encode()):
+                with self.assertRaises(ValueError):sync.check_shell_boundary(objects['wavy-erp-shell-recette'])
+        with patch.object(sync,'command',return_value=b'1\n0\n'):
+            with self.assertRaises(ValueError):sync.check_shell_boundary(objects['wavy-erp-shell-recette'])
+
+    def test_isolation_refuses_business_egress_public_binding_and_shell_privileges(self):
+        for case in ['api-network','db-network','api-port','db-port','shell-port','shell-admin','shell-forward','shell-upstream','ingress-extra']:
+            objects,config=self.boundary_fixture();shell=objects['wavy-erp-shell-recette']
+            if case=='api-network':objects['wavy-factures-api-recette']['NetworkSettings']['Networks']['wavy-recette']={}
+            if case=='db-network':objects['socle-db-recette']['NetworkSettings']['Networks']['wavy-recette']={}
+            if case=='api-port':objects['wavy-factures-api-recette']['NetworkSettings']['Ports']={'8083/tcp':[{'HostIp':'127.0.0.1','HostPort':'28083'}]}
+            if case=='db-port':objects['socle-db-recette']['NetworkSettings']['Ports']={'5432/tcp':[{'HostIp':'127.0.0.1','HostPort':'25432'}]}
+            if case=='shell-port':shell['NetworkSettings']['Ports']['80/tcp'][0]['HostIp']='0.0.0.0'
+            if case=='shell-admin':shell['HostConfig']['CapAdd']=['CAP_NET_ADMIN']
+            if case=='shell-forward':shell['HostConfig']['Sysctls']['net.ipv4.ip_forward']='1'
+            if case=='shell-upstream':shell['Config']['Env'][0]='API_UPSTREAM=http://example.test'
+            if case=='ingress-extra':objects['wavy-recette']['Containers']['unknown']={'Name':'other-service'}
+            with self.subTest(case=case),patch.object(sync,'inspect',side_effect=lambda name,*a:objects[name]), \
+                 patch.object(sync,'command',side_effect=lambda args:b'0\n0\n' if args[3]=='cat' else config.encode()):
+                with self.assertRaises(ValueError):sync.verify_isolation(restart='no')
+
+    def test_restart_policy_persists_only_for_complete_validated_state(self):
+        sync.atomic_json(self.root/sync.POLICY,{'format':1,'contractsVolume':'fixture-contracts'})
+        for phase,failure in [('restoring',False),('recovering',False),('recovery-failed',True),('complete',True),('complete',False)]:
+            with self.subTest(phase=phase,failure=failure):
+                state={'phase':phase,'owner':os.getpid()}
+                if failure:state['failure']={'check':'fixture','code':1}
+                sync.atomic_json(self.root/sync.STATE,state)
+                config=sync.sync_overlay(self.root,{},mutation=False)
+                expected='unless-stopped' if phase=='complete' and not failure else 'no'
+                self.assertEqual({s['restart'] for s in config['services'].values()},{expected})
+                for c in sync.COMPONENTS:
+                    if c.endswith('-api'):
+                        self.assertEqual(config['services']['wavy-'+c+'-recette']['environment']['SPRING_FLYWAY_ENABLED'],'false')
+                with patch.object(sync,'command') as command:
+                    if expected=='no':
+                        with self.assertRaises(ValueError):sync.activate_restarts(self.root)
+                        command.assert_not_called()
+                    else:
+                        sync.activate_restarts(self.root)
+                        args=command.call_args.args[0]
+                        self.assertEqual(args[:3],['docker','update','--restart=unless-stopped'])
+                        self.assertEqual(set(args[3:]),set(sync.RUNTIME_CONTAINERS))
+        (self.root/sync.POLICY).unlink()
+        with self.assertRaises(ValueError):sync.sync_overlay(self.root,{},mutation=False)
+
+    def test_runtime_stop_disarms_18_services_but_never_stops_databases(self):
+        def command(args):
+            return '\n'.join(sync.RUNTIME_CONTAINERS).encode() if args[:3]==['docker','container','ls'] else b''
+        with patch.object(sync,'command',side_effect=command) as calls,patch.object(sync,'inspect',return_value={'State':{'Running':False,'ExitCode':0}}):
+            sync.runtime_stop({})
+        updates=[c.args[0][-1] for c in calls.call_args_list if c.args[0][:2]==['docker','update']]
+        stops=[c.args[0][-1] for c in calls.call_args_list if c.args[0][:2]==['docker','stop']]
+        self.assertEqual(set(updates),set(sync.RUNTIME_CONTAINERS))
+        self.assertEqual(len(stops),len(sync.COMPONENTS))
+        self.assertFalse(any('-db-' in c for c in stops))
+
+    def test_publication_is_checked_before_enabling_restart_and_failure_rolls_back(self):
+        for failure in ['ingress','restart']:
+            (self.root/sync.STATE).unlink(missing_ok=True)
+            backup=self.root/'backups/2026-01-01_000000'
+            if backup.exists():backup.rmdir()
+            with self.subTest(failure=failure),self.fixture_run():
+                hook='check_shell_ingress' if failure=='ingress' else 'activate_restarts'
+                with patch.object(sync,hook,side_effect=subprocess.CalledProcessError(7,['fixture'])):
+                    with self.assertRaises(subprocess.CalledProcessError):sync.run(self.root)
+            state=sync.read_private(self.root/sync.STATE)
+            self.assertEqual(state['phase'],'rolled-back')
+            self.assertEqual(state['failure'],{'check':'erp-ingress' if failure=='ingress' else 'restart-policy','code':7})
+
+    def test_shell_ingress_uses_only_fixed_loopback_http_endpoint(self):
+        with patch.object(sync,'command',side_effect=[b'<html>ERP</html>',b'{"module":"wavy-tiers-api","status":"OK"}']) as command:
+            sync.check_shell_ingress()
+        self.assertEqual([c.args[0][-1] for c in command.call_args_list],
+                         ['http://127.0.0.1:24207/','http://127.0.0.1:24207/api/tiers/health'])
+        with patch.object(sync,'command',return_value=b'not-an-ERP-page'):
+            with self.assertRaises(ValueError):sync.check_shell_ingress()
 
 
 if __name__=='__main__': unittest.main()

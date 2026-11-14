@@ -33,6 +33,19 @@ SUCCESS = {'complete', 'rolled-back', 'cancelled'}
 SOURCE_FILES = {db+'.dump.enc' for db in DATABASES} | {'documents.tar.enc', 'manifest.json', 'source.json'}
 REMOTE_PHASES = {'preprod-preflight', 'preprod-backup', 'preprod-resume',
                  'preprod-finalize', 'preprod-snapshot', 'preprod-transfer'}
+RUNTIME_CONTAINERS = ['wavy-'+c+'-recette' for c in COMPONENTS] + [db+'-db-recette' for db in DATABASES]
+SHELL_UPSTREAMS = {'API_UPSTREAM': 'http://wavy-gateway-recette:8088',
+                   **{c.upper()+'_UPSTREAM': 'http://wavy-'+c.lower().replace('_','-')+'-recette/'
+                      for c in ('SOCLE_FRONT', 'TIERS_FRONT', 'CONTRATS_FRONT', 'FACTURES_FRONT', 'TRESORERIE_FRONT')}}
+
+
+def sync_restart_policy(root):
+    path = root/STATE
+    if path.exists():
+        state = read_private(path)
+        if state.get('phase') == 'complete' and not state.get('failure'):
+            return 'unless-stopped'
+    return 'no'
 
 def require(ok, message):
     if not ok:
@@ -312,9 +325,9 @@ def compose(root, args):
 
 def runtime_stop(previous):
     existing = set(command(['docker', 'container', 'ls', '-a', '--format', '{{.Names}}']).decode().splitlines())
-    for c in COMPONENTS:
-        if 'wavy-'+c+'-recette' not in existing: continue
-        command(['docker', 'update', '--restart=no', 'wavy-'+c+'-recette'])
+    for name in RUNTIME_CONTAINERS:
+        if name not in existing: continue
+        command(['docker', 'update', '--restart=no', name])
     for c in ['gateway'] + [x for x in COMPONENTS if x != 'gateway']:
         name = 'wavy-'+c+'-recette'
         if name not in existing: continue
@@ -323,11 +336,18 @@ def runtime_stop(previous):
         require(not was_running or inspect(name)['State']['ExitCode'] != 137, 'Arrêt forcé ; restauration automatique non sûre')
 
 
-def restart_policies(previous):
-    for c, item in previous.items():
-        policy = item['restart']; name = policy['Name'] or 'no'
+def restart_policies(previous, databases=None):
+    policies = {'wavy-'+c+'-recette': item['restart'] for c, item in previous.items()}
+    policies.update({db+'-db-recette': policy for db, policy in (databases or {}).items()})
+    for container, policy in policies.items():
+        name = policy['Name'] or 'no'
         if name == 'on-failure' and policy.get('MaximumRetryCount'): name += ':'+str(policy['MaximumRetryCount'])
-        command(['docker', 'update', '--restart='+name, 'wavy-'+c+'-recette'])
+        command(['docker', 'update', '--restart='+name, container])
+
+
+def activate_restarts(root):
+    require(sync_restart_policy(root) == 'unless-stopped', 'Redémarrage automatique interdit avant validation complète')
+    command(['docker', 'update', '--restart=unless-stopped', *RUNTIME_CONTAINERS])
 
 
 def write_versions(root, data):
@@ -356,8 +376,8 @@ def recover(root, state, key, work):
         else: path.write_text(content)
     state['phase'] = 'recovering'; atomic_json(root/STATE, state)
     compose(root, ['up', '-d', '--force-recreate', '--wait', '--wait-timeout', '600'])
-    restart_policies(state['before']['runtime'])
     command(['bash', root/'scripts/healthcheck.sh', 'recette'])
+    restart_policies(state['before']['runtime'], state.get('databaseRestart'))
     state['phase'] = 'rolled-back'; atomic_json(root/STATE, state)
 
 
@@ -431,6 +451,17 @@ def check_shell(values):
         require(worker and b'<html' not in worker.lower(), 'Service worker PWA invalide')
 
 
+def check_shell_ingress():
+    # Même point d'entrée que le tunnel SSH Windows ; aucun accès extérieur requis.
+    curl = ['curl', '--noproxy', '*', '-fsS', '--max-time', '10', '--retry', '12',
+            '--retry-connrefused', '--retry-delay', '1', '--retry-max-time', '30']
+    body = command([*curl, 'http://127.0.0.1:24207/'])
+    require(b'<html' in body.lower(), 'Entrée HTTP ERP Shell invalide')
+    health = json.loads(command([*curl, 'http://127.0.0.1:24207/api/tiers/health']))
+    require(isinstance(health, dict) and health.get('module') == 'wavy-tiers-api' and health.get('status') == 'OK',
+            'Entrée HTTP Shell/Gateway/Tiers invalide')
+
+
 def guard_host(root, values):
     require(values.get('WAVY_INSTALL_HOSTNAME') == socket.gethostname().split('.')[0] and
             socket.gethostname().split('.')[0] != 'wavy-preprod', 'Hôte RECETTE non attesté par WAVY_INSTALL_HOSTNAME')
@@ -500,6 +531,7 @@ def run(root):
             require(input('Saisir ECRASER RECETTE pour confirmer : ') == 'ECRASER RECETTE', 'Annulé')
             names = ['versions/recette.env', 'versions/recette.digests', POLICY]
             state = {'phase': 'backup', 'owner': os.getpid(), 'before': before, 'volumes': volumes,
+                     'databaseRestart': {db: inspect(db+'-db-recette')['HostConfig']['RestartPolicy'] for db in DATABASES},
                      'toolImage': before['runtime']['factures-api']['id'], 'backup': str(target),
                      'backupVerified': False,
                      'savedFiles': {n: (root/n).read_text() if (root/n).exists() else None for n in names}}
@@ -532,14 +564,19 @@ def run(root):
                 check = 'compose-start'
                 compose(root, ['up', '-d', '--force-recreate', '--wait', '--wait-timeout', '600'])
                 check = 'isolation'
-                verify_isolation()
+                verify_isolation(restart='no')
                 check = 'healthcheck'
                 command(['bash', root/'scripts/healthcheck.sh', 'recette'])
                 check = 'smoke-test'
                 command(['bash', root/'scripts/smoke-test.sh', 'recette'])
                 check = 'erp-shell'
                 check_shell(values)
+                check = 'erp-ingress'
+                check_shell_ingress()
                 state['phase'] = 'complete'; atomic_json(root/STATE, state)
+                check = 'restart-policy'
+                activate_restarts(root)
+                verify_isolation(restart='unless-stopped')
                 print('Synchronisation terminée. Secours chiffré : '+str(target))
             except BaseException as exc:
                 # Conserver la cause initiale même si recover() remplace la phase.
@@ -563,16 +600,55 @@ def run(root):
                 raise
 
 
-def verify_isolation():
+def verify_isolation(restart=None):
+    restart = restart or sync_restart_policy(ROOT)
     net = inspect('wavy-recette-sync', 'network')
     require(net.get('Internal') is True, 'Réseau RECETTE non isolé')
+    ingress = inspect('wavy-recette', 'network')
+    require(ingress.get('Internal') is False and ingress.get('Driver') == 'bridge', 'Réseau d’entrée RECETTE invalide')
+    require(all(c.get('Name') == 'wavy-erp-shell-recette' for c in ingress.get('Containers', {}).values()),
+            'Conteneur supplémentaire sur le réseau d’entrée')
     for c in COMPONENTS:
         obj = inspect('wavy-'+c+'-recette')
-        require(set(obj['NetworkSettings']['Networks']) == {'wavy-recette-sync'}, 'Réseau supplémentaire interdit : '+c)
-        require(obj['HostConfig']['RestartPolicy']['Name'] == 'no', 'Redémarrage automatique interdit pendant reproduction')
+        expected = {'wavy-recette-sync', 'wavy-recette'} if c == 'erp-shell' else {'wavy-recette-sync'}
+        require(set(obj['NetworkSettings']['Networks']) == expected, 'Réseau supplémentaire interdit : '+c)
+        require(obj['HostConfig']['RestartPolicy']['Name'] == restart, 'Politique de redémarrage incohérente : '+c)
+        if c == 'erp-shell':
+            check_shell_boundary(obj)
+        else:
+            require(not any(obj['NetworkSettings'].get('Ports', {}).values()), 'Port métier publié interdit : '+c)
     for db in DATABASES:
-        require(set(inspect(db+'-db-recette')['NetworkSettings']['Networks']) == {'wavy-recette-sync'},
+        obj = inspect(db+'-db-recette')
+        require(set(obj['NetworkSettings']['Networks']) == {'wavy-recette-sync'},
                 'Réseau supplémentaire sur une base RECETTE')
+        require(obj['HostConfig']['RestartPolicy']['Name'] == restart, 'Politique de redémarrage incohérente : '+db)
+        require(not any(obj['NetworkSettings'].get('Ports', {}).values()), 'Port de base publié interdit : '+db)
+
+
+def check_shell_boundary(obj):
+    host = obj['HostConfig']
+    added = {c.upper().removeprefix('CAP_') for c in host.get('CapAdd') or []}
+    dropped = {c.upper().removeprefix('CAP_') for c in host.get('CapDrop') or []}
+    require(not host.get('Privileged') and not added.intersection({'NET_ADMIN','NET_RAW','ALL'}),
+            'Privilèges réseau interdits sur le Shell')
+    require({'NET_ADMIN','NET_RAW'} <= dropped, 'Capacités réseau du Shell non retirées')
+    require(all(host.get('Sysctls', {}).get(k) == '0' for k in ('net.ipv4.ip_forward','net.ipv6.conf.all.forwarding')),
+            'Forwarding IP du Shell interdit')
+    require(command(['docker','exec','wavy-erp-shell-recette','cat','/proc/sys/net/ipv4/ip_forward',
+                     '/proc/sys/net/ipv6/conf/all/forwarding']).split() == [b'0',b'0'], 'Forwarding IP actif sur le Shell')
+    published = {k:v for k,v in obj['NetworkSettings'].get('Ports', {}).items() if v}
+    require(published == {'80/tcp':[{'HostIp':'127.0.0.1','HostPort':'24207'}]}, 'Publication du Shell non privée ou absente')
+    env = environment(obj)
+    require(all(env.get(k) == v for k,v in SHELL_UPSTREAMS.items()), 'Destination externe interdite dans le Shell')
+    config = command(['docker','exec','wavy-erp-shell-recette','nginx','-T']).decode('utf-8')
+    config = '\n'.join(line.split('#',1)[0] for line in config.splitlines())
+    allowed = set(SHELL_UPSTREAMS.values()) | {'$private_api_origin', '$wavy_pwa_origin$uri$is_args$args'}
+    targets = re.findall(r'\bproxy_pass\s+([^;]+);', config)
+    require(targets and all(t.strip() in allowed for t in targets), 'Proxy sortant interdit dans le Shell')
+    for variable, target in [('private_api_origin',SHELL_UPSTREAMS['API_UPSTREAM']), ('wavy_pwa_origin','http://wavy-pwa-recette')]:
+        assignments = re.findall(r'\bset\s+\$'+variable+r'\s+([^;]+);',config)
+        used = any('$'+variable in t for t in targets)
+        require((assignments or not used) and all(x.strip() == target for x in assignments), 'Destination variable du Shell invalide')
 
 
 def sync_overlay(root, overlay, mutation=True):
@@ -583,14 +659,21 @@ def sync_overlay(root, overlay, mutation=True):
         require(state['phase'] in SUCCESS or state.get('owner') == os.getpid(),
                 'Synchronisation incomplète : relancer ./wavy sync preprod recette pour restaurer le secours')
     path = root/POLICY
-    if not path.exists(): return overlay
+    if not path.exists():
+        require(not path.is_symlink(), 'Politique sync symbolique interdite')
+        if state_path.exists():
+            require(read_private(state_path).get('phase') != 'complete', 'Politique sync requise pour conserver l’isolation')
+        return overlay
     policy = read_private(path)
     require(policy.get('format') == 1 and re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_.-]*', policy.get('contractsVolume','')),
             'Politique sync RECETTE invalide')
     overlay.setdefault('networks', {})['wavy-recette'] = {'name': 'wavy-recette-sync', 'internal': True}
+    # Réseau d'entrée déjà provisionné par le Compose RECETTE initial.
+    overlay['networks']['recette-ingress'] = {'name':'wavy-recette','external':True}
+    restart = sync_restart_policy(root)
     for c in COMPONENTS:
         service = overlay.setdefault('services', {}).setdefault('wavy-'+c+'-recette', {})
-        service['restart'] = 'no'
+        service['restart'] = restart
         if c.endswith('-api'):
             service.setdefault('environment', {}).update({
                 'SPRING_JPA_HIBERNATE_DDL_AUTO': 'validate', 'SPRING_FLYWAY_ENABLED': 'false',
@@ -598,6 +681,14 @@ def sync_overlay(root, overlay, mutation=True):
                 'WAVY_AI_ACHAT_AUTO_CREATION_ENABLED': 'false',
                 'SPRING_MAIL_HOST': '127.0.0.1', 'SPRING_MAIL_PORT': '9',
                 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''})
+    for db in DATABASES:
+        overlay['services'].setdefault(db+'-postgres', {})['restart'] = restart
+    shell = overlay['services']['wavy-erp-shell-recette']
+    shell['networks'] = {'wavy-recette':{}, 'recette-ingress':{}}
+    shell['sysctls'] = {'net.ipv4.ip_forward':'0','net.ipv6.conf.all.forwarding':'0'}
+    shell['cap_drop'] = ['NET_ADMIN','NET_RAW']
+    shell['security_opt'] = ['no-new-privileges:true']
+    shell.setdefault('environment', {}).update(SHELL_UPSTREAMS)
     overlay.setdefault('volumes', {})['sync-contrats'] = {'name': policy['contractsVolume'], 'external': True}
     # Les chemins Contrats sont absolus en base. Un alias conserve les chemins PREPROD
     # et le montage historique RECETTE, sans réécriture de données métier.

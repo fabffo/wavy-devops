@@ -139,6 +139,10 @@ def _recette_compose(root, args, rollback=None, capture=False):
     # Les manifestes ont priorité sur le shell et le dotenv machine.
     clean.update(versions)
     clean.update(digests)
+    if (root/'deployments/recette-sync-policy.json').exists():
+        # La même entrée locale que le tunnel Windows, sans modifier le dotenv.
+        clean['WAVY_RECETTE_PRIVATE_BIND_ADDRESS'] = '127.0.0.1'
+        clean['WAVY_ERP_SHELL_HOST_PORT'] = '24207'
     if args[0] == 'build':
         print('RECETTE : commande build historique → téléchargement des images validées.', flush=True)
         if rollback: verify(root,'recette',images)
