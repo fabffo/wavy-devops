@@ -128,13 +128,48 @@ def source_export(root):
             archive.addfile(member, io.BytesIO(data))
 
 
-def receive(root, values, folder):
+def source_ssh(values, action):
     host = values.get('WAVY_SYNC_PREPROD_SSH', '')
     remote = values.get('WAVY_SYNC_PREPROD_ROOT', '')
     require(re.fullmatch(r'[A-Za-z0-9_][A-Za-z0-9_.@-]*', host) is not None, 'Destination SSH PREPROD absente/invalide')
     require(remote.startswith('/') and '\n' not in remote, 'Checkout distant PREPROD absolu requis')
-    args = ['ssh', '-T', '-o', 'BatchMode=yes', '-o', 'StrictHostKeyChecking=yes', '-o', 'ConnectTimeout=15',
-            '--', host, 'cd '+shlex.quote(remote)+' && python3 -B scripts/sync_recette.py _export']
+    return ['ssh', '-n', '-T', '-o', 'BatchMode=yes', '-o', 'StrictHostKeyChecking=yes', '-o', 'ConnectTimeout=15',
+            '--', host, 'cd '+shlex.quote(remote)+' && '+action]
+
+
+# Le lecteur et le dotenv existent déjà sur PREPROD : aucune installation distante
+# requise pour lire le secret, aucune sauvegarde ni écriture déclenchée ici.
+REMOTE_KEY_READER = '''import os, socket, stat, sys
+from pathlib import Path
+sys.path.insert(0, str(Path.cwd() / 'scripts'))
+from preprod_config import dotenv
+path = Path('.env.preprod')
+info = path.lstat()
+if (socket.gethostname().split('.')[0] != 'wavy-preprod'
+        or not stat.S_ISREG(info.st_mode) or info.st_uid != os.getuid()
+        or info.st_mode & 0o077):
+    raise ValueError('Configuration PREPROD privée requise')
+key = dotenv(path).get('WAVY_BACKUP_ENCRYPTION_PASSPHRASE', '')
+if len(key) < 32 or 'CHANGE_ME' in key:
+    raise ValueError('Passphrase PREPROD absente ou invalide')
+sys.stdout.write(key)
+'''
+
+
+def backup_key(values):
+    try:
+        raw = command(source_ssh(values, 'python3 -B -c '+shlex.quote(REMOTE_KEY_READER)), timeout=30)
+        key = raw.decode('utf-8')
+        require(32 <= len(key) <= 65536 and '\n' not in key and '\r' not in key and 'CHANGE_ME' not in key,
+                'Passphrase PREPROD invalide')
+        return key
+    except (subprocess.SubprocessError, UnicodeError, OSError):
+        raise ValueError('Lecture sécurisée de la passphrase PREPROD impossible : vérifier que le compte SSH '
+                         'configuré peut lire son .env.preprod privé.') from None
+
+
+def receive(root, values, folder):
+    args = source_ssh(values, 'python3 -B scripts/sync_recette.py _export')
     # Pas de copie de dotenv ; SSH transporte seulement les dumps déjà chiffrés et les images.
     with tempfile.TemporaryFile() as errors:
         process = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=errors)
@@ -346,9 +381,8 @@ def guard_host(root, values):
 def run(root):
     os.umask(0o077)
     values = machine(root); guard_host(root, values)
-    key = values.get('WAVY_SYNC_PREPROD_BACKUP_PASSPHRASE', '')
-    require(len(key) >= 32, 'Passphrase du backup PREPROD requise sur RECETTE (secret local)')
     with locked(root, 'recette') as (fd, env):
+        key = backup_key(values)
         with tempfile.TemporaryDirectory(prefix='wavy-sync-') as temporary:
             work = Path(temporary)
             if (root/STATE).exists():

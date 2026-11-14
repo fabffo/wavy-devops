@@ -20,13 +20,15 @@ monté). Ajouter une seule fois dans ce fichier privé 0600 :
 ```dotenv
 WAVY_SYNC_PREPROD_SSH=operateur@wavy-preprod
 WAVY_SYNC_PREPROD_ROOT=/chemin/absolu/wavy-devops
-WAVY_SYNC_PREPROD_BACKUP_PASSPHRASE='passphrase de sauvegarde PREPROD provisionnée hors Git'
 ```
 
-La passphrase doit correspondre au chiffrement des sauvegardes PREPROD, avec au
-moins 32 caractères. Ce secret de sauvegarde ne remplace aucun secret applicatif
-RECETTE. Il chiffre aussi le secours RECETTE ; le conserver tant que ces lots sont
-utiles. SSH utilise la configuration OpenSSH existante, une clé déjà autorisée et
+La passphrase existante `WAVY_BACKUP_ENCRYPTION_PASSPHRASE` est lue automatiquement
+dans le `.env.preprod` privé via SSH, avec le parseur PREPROD existant. Aucune saisie
+ni copie du secret dans `.env.recette` n'est requise ; l'ancienne variable
+`WAVY_SYNC_PREPROD_BACKUP_PASSPHRASE` n'est plus consultée. Le secret reste en mémoire,
+sans affichage ni enregistrement dans les fichiers de synchronisation. Le dotenv
+PREPROD n'est ni copié ni modifié. Ce secret chiffre aussi le secours RECETTE ;
+le conserver tant que ces lots sont utiles. SSH utilise la configuration existante, une clé déjà autorisée et
 une clé d'hôte déjà approuvée (`BatchMode`, `StrictHostKeyChecking`). Aucun secret
 n'est transmis en argument de commande ou journalisé.
 
@@ -53,13 +55,18 @@ ou de redémarrer les applications pour installer cette commande.
 
 Sur RECETTE seulement, éditer le `.env.recette` existant avec un éditeur local :
 `WAVY_SYNC_PREPROD_SSH` est le compte et le nom/adresse SSH de PREPROD ;
-`WAVY_SYNC_PREPROD_ROOT` est le chemin absolu de son checkout DevOps ;
-`WAVY_SYNC_PREPROD_BACKUP_PASSPHRASE` est exactement la valeur existante de
-`WAVY_BACKUP_ENCRYPTION_PASSPHRASE` dans le `.env.preprod` de PREPROD. La saisir
-hors chat, historique de commandes et journaux, sans copier le fichier source.
+`WAVY_SYNC_PREPROD_ROOT` est le chemin absolu de son checkout DevOps.
+Si ces deux paramètres sont déjà renseignés, aucune nouvelle configuration n'est
+nécessaire. La passphrase est récupérée automatiquement avant toute sauvegarde,
+sans interruption de PREPROD pour cette lecture. Le compte SSH doit être le
+propriétaire habilité à lire le `.env.preprod` privé, comme pour son backup habituel.
 Conserver le fichier RECETTE privé (0600), sans doublons ni changement des autres
 paramètres. La liaison SSH doit fonctionner depuis RECETTE vers PREPROD avec les
 clés et droits Docker de l'opérateur habituel.
+
+Le correctif de chargement de la passphrase ne nécessite de mettre à jour que le
+code de RECETTE : il utilise le parseur déjà installé sur PREPROD, sans nouveau
+script ni changement de secret sur cette dernière.
 
 Pour le premier essai **après autorisation distincte**, vérifier l'absence d'état
 `deployments/recette-sync.json` sur RECETTE : un état incomplet déclencherait une

@@ -47,6 +47,49 @@ class SyncTests(unittest.TestCase):
         self.assertTrue(sync.same_reference('ghcr.io/fixture/wavy-api@sha256:'+'a'*64,expected))
         self.assertFalse(sync.same_reference('ghcr.io/fixture/wavy-api@sha256:'+'b'*64,expected))
 
+    def test_key_is_loaded_from_existing_source_secret_not_stale_recette_setting(self):
+        values={'WAVY_SYNC_PREPROD_SSH':'operator@preprod', 'WAVY_SYNC_PREPROD_ROOT':'/srv/wavy devops',
+                'WAVY_SYNC_PREPROD_BACKUP_PASSPHRASE':'stale-unused-copy'}
+        secret='synthetic-source-key-0123456789abcdef0123456789'
+        with patch.object(sync,'command',return_value=secret.encode()) as command:
+            self.assertTrue(sync.backup_key(values) == secret)
+        args=command.call_args.args[0]
+        self.assertEqual(args[0],'ssh')
+        self.assertIn('BatchMode=yes',args); self.assertIn('StrictHostKeyChecking=yes',args)
+        self.assertIn("cd '/srv/wavy devops'",args[-1])
+        self.assertNotIn('_export',args[-1])
+        self.assertNotIn(secret,' '.join(args))
+        self.assertNotIn('stale-unused-copy',' '.join(args))
+
+    def test_existing_preprod_parser_reads_secret_without_changing_dotenv(self):
+        (self.root/'scripts').mkdir()
+        shutil.copy(sync.ROOT/'scripts/preprod_config.py',self.root/'scripts')
+        path=self.root/'.env.preprod'
+        secret='synthetic-only-source-key-0123456789abcdef0123456789'
+        content="WAVY_BACKUP_ENCRYPTION_PASSPHRASE='"+secret+"'\n"
+        path.write_text(content); path.chmod(0o600)
+        code="import socket; socket.gethostname=lambda:'wavy-preprod'\n"+sync.REMOTE_KEY_READER
+        result=subprocess.run(['python3','-B','-c',code],cwd=self.root,capture_output=True)
+        self.assertEqual(result.returncode,0)
+        self.assertTrue(result.stdout.decode() == secret)
+        self.assertTrue(path.read_text() == content)
+        self.assertEqual(result.stderr,b'')
+        path.chmod(0o644)
+        refused=subprocess.run(['python3','-B','-c',code],cwd=self.root,capture_output=True)
+        self.assertNotEqual(refused.returncode,0)
+        self.assertEqual(refused.stdout,b'')
+        self.assertNotIn(secret.encode(),refused.stderr)
+
+    def test_key_errors_do_not_expose_remote_output_or_trigger_backup(self):
+        values={'WAVY_SYNC_PREPROD_SSH':'operator@preprod','WAVY_SYNC_PREPROD_ROOT':'/srv/devops'}
+        secret=b'synthetic-sensitive-error-payload'
+        error=subprocess.CalledProcessError(1,['ssh'],output=secret,stderr=secret)
+        with patch.object(sync,'command',side_effect=error):
+            with self.assertRaises(ValueError) as caught: sync.backup_key(values)
+        self.assertNotIn(secret.decode(),str(caught.exception))
+        with patch.object(sync,'command',return_value=b''):
+            with self.assertRaises(ValueError): sync.backup_key(values)
+
     def test_transport_rejects_traversal_links_duplicates_and_missing_files(self):
         for names in [[('../escape', None)], [('source.json', tarfile.SYMTYPE)],
                       [('source.json',None),('source.json',None)], [('source.json',None)]]:
@@ -250,6 +293,7 @@ recette_archive_documents(){ tar -cf "$backup_dir/justificatifs.tar" --files-fro
             if recover_failure: raise RuntimeError('fixture recovery failure')
             state=args[1]; state['phase']='rolled-back'; sync.atomic_json(self.root/sync.STATE,state)
         replacements={'machine':Mock(return_value=values),'guard_host':Mock(),'locked':locked,
+                      'backup_key':Mock(return_value='x'*40),
                       'declared_snapshot':Mock(return_value=data),'volume_for':lambda c,d:c+'-volume',
                       'shared_database_guard':Mock(),'database_guard':Mock(),'receive':receive,
                       'auth':Mock(),'verify':Mock(),'inspect':Mock(return_value={'Id':'sha256:fixture'}),
