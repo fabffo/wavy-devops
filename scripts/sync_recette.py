@@ -398,6 +398,39 @@ def save_rollback(root, backup, target, key):
     shutil.rmtree(backup)
 
 
+def check_shell(values):
+    """GET internes : Shell -> fronts et Shell -> Gateway -> Tiers, sans session."""
+    command(['docker', 'exec', 'wavy-erp-shell-recette', 'nginx', '-t'])
+
+    def get(path, status=200):
+        # Curl est déjà présent dans Socle et utilisé par les smoke tests PREPROD.
+        payload = command(['docker', 'exec', 'wavy-socle-api-recette', 'curl', '-sS',
+                           '--max-time', '10', '--write-out', '\n%{http_code}',
+                           'http://wavy-erp-shell-recette'+path])
+        body, _, code = payload.rpartition(b'\n')
+        require(code == str(status).encode(), 'Statut ERP Shell inattendu : '+path)
+        return body
+
+    require(b'<html' in get('/').lower(), 'Page ERP Shell invalide')
+    for module in ('socle', 'tiers', 'contrats', 'factures', 'tresorerie'):
+        path = '/modules/'+module+'/'
+        body = get(path)
+        require(b'<html' in body.lower() and
+                re.search(rb'<base\s+href=["\x27]'+re.escape(path.encode())+rb'["\x27]', body, re.I),
+                'Proxy ERP Shell invalide : '+module)
+    health = json.loads(get('/api/tiers/health'))
+    require(isinstance(health, dict) and health.get('module') == 'wavy-tiers-api' and health.get('status') == 'OK',
+            'Réponse Tiers via ERP Shell/Gateway invalide')
+    get('/api/auth/session', status=401)
+    enabled = values.get('WAVY_PWA_ENABLED', 'false') == 'true'
+    integration = json.loads(get('/pwa-integration.json'))
+    require(isinstance(integration, dict) and integration.get('enabled') is enabled, 'Manifeste PWA du Shell incohérent')
+    if enabled:
+        require(b'<html' in get('/pwa/').lower(), 'Proxy PWA du Shell invalide')
+        worker = get('/pwa/ngsw-worker.js')
+        require(worker and b'<html' not in worker.lower(), 'Service worker PWA invalide')
+
+
 def guard_host(root, values):
     require(values.get('WAVY_INSTALL_HOSTNAME') == socket.gethostname().split('.')[0] and
             socket.gethostname().split('.')[0] != 'wavy-preprod', 'Hôte RECETTE non attesté par WAVY_INSTALL_HOSTNAME')
@@ -472,6 +505,7 @@ def run(root):
                      'savedFiles': {n: (root/n).read_text() if (root/n).exists() else None for n in names}}
             atomic_json(root/STATE, state)
             mutated = False
+            check = 'backup'
             try:
                 old = backup_folders(root, 'recette')
                 subprocess.run(['bash', str(root/'scripts/backup-db.sh'), '--sync-hold'],
@@ -481,22 +515,41 @@ def run(root):
                 require(len(added) == 1, 'Backup RECETTE non identifiable')
                 save_rollback(root, added.pop(), target, key)
                 state['backupVerified'] = True; state['phase'] = 'stopping'; atomic_json(root/STATE, state)
+                check = 'stop'
                 runtime_stop(before['runtime'])
                 state['phase'] = 'restoring'; atomic_json(root/STATE, state)
                 mutated = True
+                check = 'restore-databases'
                 db_restore(work)
+                check = 'tenant-routing'
                 shared_database_guard()
+                check = 'restore-documents'
                 for name, volume in volumes.items():
                     document_restore(work/(name+'.tar'), volume, state['toolImage'])
+                check = 'release-config'
                 write_versions(root, data)
                 atomic_json(root/POLICY, {'format': 1, 'contractsVolume': volumes['contrats']})
+                check = 'compose-start'
                 compose(root, ['up', '-d', '--force-recreate', '--wait', '--wait-timeout', '600'])
+                check = 'isolation'
                 verify_isolation()
+                check = 'healthcheck'
                 command(['bash', root/'scripts/healthcheck.sh', 'recette'])
+                check = 'smoke-test'
                 command(['bash', root/'scripts/smoke-test.sh', 'recette'])
+                check = 'erp-shell'
+                check_shell(values)
                 state['phase'] = 'complete'; atomic_json(root/STATE, state)
                 print('Synchronisation terminée. Secours chiffré : '+str(target))
-            except BaseException:
+            except BaseException as exc:
+                # Conserver la cause initiale même si recover() remplace la phase.
+                # Aucune sortie brute, commande, réponse HTTP ou valeur de secret.
+                state['failure'] = {'check': check, 'code': exc.returncode if isinstance(exc, subprocess.CalledProcessError)
+                                    else (130 if isinstance(exc, KeyboardInterrupt) else 1)}
+                try:
+                    atomic_json(root/STATE, state)
+                except OSError:
+                    print('Écriture du diagnostic impossible ; retour arrière toujours tenté.', file=sys.stderr)
                 if mutated and state['backupVerified']:
                     try:
                         safe_recover(root, state, key, work)

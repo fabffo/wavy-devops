@@ -15,6 +15,12 @@ case "$env" in
   *) usage; die "Environnement invalide : $env" ;;
 esac
 
+# Politique persistante déjà créée par sync ; aucun réglage manuel supplémentaire.
+container_http=false
+if [[ "$env" == preprod || ( "$env" == recette && -e "$ROOT_DIR/deployments/recette-sync-policy.json" ) ]]; then
+  container_http=true
+fi
+
 attempts="${HEALTHCHECK_MAX_ATTEMPTS:-30}"
 interval="${HEALTHCHECK_INTERVAL_SECONDS:-2}"
 [[ "$attempts" =~ ^[1-9][0-9]*$ ]] || die "HEALTHCHECK_MAX_ATTEMPTS doit être un entier positif."
@@ -40,8 +46,8 @@ http_check_from_host() {
 
 http_check_in_container() {
   local service="$1" port="$2" container tool
-  container="wavy-${service}-api-preprod"
-  [[ "$service" == "gateway" ]] && container="wavy-gateway-preprod"
+  container="wavy-${service}-api-${env}"
+  [[ "$service" == "gateway" ]] && container="wavy-gateway-${env}"
   tool=wget
   [[ "$service" == "socle" ]] && tool=curl
   if [[ "$tool" == curl ]]; then
@@ -56,7 +62,7 @@ check_service() {
   service="${services[$index]}"
   port="${ports[$index]}"
 
-  if [[ "$env" == preprod ]]; then
+  if $container_http; then
     url="http://localhost:${port}/actuator/health (dans le conteneur)"
   else
     if [[ "$env" == local ]]; then
@@ -69,7 +75,7 @@ check_service() {
 
   printf '%-12s attente de %s\n' "${service^}" "$url"
   for ((attempt = 1; attempt <= attempts; attempt++)); do
-    if [[ "$env" == preprod ]]; then
+    if $container_http; then
       if http_check_in_container "$service" "$port"; then
         printf '%-12s OK (tentative %d/%d)\n' "${service^}" "$attempt" "$attempts"
         return 0
@@ -86,7 +92,7 @@ check_service() {
 }
 
 require_command curl
-[[ "$env" != preprod ]] || require_docker
+$container_http && require_docker
 
 failed=0
 for index in "${!services[@]}"; do

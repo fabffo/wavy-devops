@@ -107,6 +107,12 @@ l'espace. Il ne qualifie pas encore la restauration ni le rollback réels.
    utilisateurs métier et leurs identifiants sont copiés avec les bases.
 7. Recréation via `release_images.py` et le Compose RECETTE existant, attente de
    santé et smoke tests existants. Aucun build, installation ou second moteur.
+   Lorsque la politique de synchronisation est active, les contrôles HTTP passent
+   par `docker exec` sur le réseau interne, sans dépendre des ports publiés sur la
+   VM. Les mêmes réponses applicatives sont exigées ; les autres modes conservent
+   leur transport habituel. Le Shell est vérifié par son proxy interne : cinq
+   modules, chaîne Shell → Gateway → Tiers, refus de session anonyme et routes
+   PWA si activées. Ce contrôle interne ne qualifie pas l'accès HTTPS via Caddy.
 
 Contrats conserve des chemins absolus en base. Un alias du volume RECETTE sous
 `/app/data/contrats` permet de lire ces chemins PREPROD tout en conservant le
@@ -140,6 +146,10 @@ secours de synchronisation est un lot spécifique complet.
 ## Échecs et reprise
 
 L'état durable est `deployments/recette-sync.json`, privé et ignoré par Git.
+En cas d'échec, `failure.check` et `failure.code` sont enregistrés avant le retour
+arrière et conservés avec la phase finale `rolled-back` ou `recovery-failed`.
+Aucune sortie brute, réponse métier ni valeur de secret n'est ajoutée au journal.
+Si l'écriture du diagnostic échoue, le retour arrière est quand même tenté.
 Le secours est `backups/sync/<date UTC>/recette.tar.enc`, avec son manifeste HMAC ;
 le sous-dossier `source/` conserve le lot source chiffré. Les fichiers temporaires
 déchiffrés restent privés et sont supprimés à la sortie normale. Un arrêt brutal

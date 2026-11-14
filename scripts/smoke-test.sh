@@ -15,8 +15,13 @@ case "$env" in
   *) usage; die "Environnement invalide : $env" ;;
 esac
 
+container_http=false
+if [[ "$env" == preprod || ( "$env" == recette && -e "$ROOT_DIR/deployments/recette-sync-policy.json" ) ]]; then
+  container_http=true
+fi
+
 require_command curl
-[[ "$env" != preprod ]] || require_docker
+$container_http && require_docker
 
 tenant_id="${WAVY_SMOKE_TENANT_ID:-}"
 user_id="${WAVY_SMOKE_USER_ID:-}"
@@ -77,26 +82,27 @@ fetch_from_host() {
   response_body="$output"
 }
 
-fetch_from_preprod() {
+fetch_from_container() {
   local service="$1" port="$2" path="$3" container output
-  container="wavy-${service}-api-preprod"
-  [[ "$service" != gateway ]] || container=wavy-gateway-preprod
+  container="wavy-${service}-api-${env}"
+  [[ "$service" != gateway ]] || container="wavy-gateway-${env}"
   # Curl installé dans Socle ; évite les options Basic absentes du wget BusyBox.
-  local -a args=(-fsS --max-time 10
-    -H "X-Tenant-Id: $tenant_id"
-    -H "X-Utilisateur-Id: $user_id"
-    -H "X-Societe-Courante-Id: $company_id")
-  if [[ -n "$smoke_user" && -n "$smoke_password" ]]; then
-    args+=(-u "$smoke_user:$smoke_password")
+  local -a args=(-fsS --max-time 10)
+  # Même contrat que les requêtes RECETTE historiques vers Socle/Contrats.
+  if [[ "$env" != recette || "$path" != /actuator/health || ( "$service" != socle && "$service" != contrats ) ]]; then
+    args+=(-H "X-Tenant-Id: $tenant_id" -H "X-Utilisateur-Id: $user_id" -H "X-Societe-Courante-Id: $company_id")
+    if [[ -n "$smoke_user" && -n "$smoke_password" ]]; then
+      args+=(-u "$smoke_user:$smoke_password")
+    fi
   fi
-  output="$(docker exec wavy-socle-api-preprod curl "${args[@]}" "http://${container}:${port}${path}")" || return 1
+  output="$(docker exec "wavy-socle-api-${env}" curl "${args[@]}" "http://${container}:${port}${path}")" || return 1
   response_body="$output"
 }
 
 fetch_service() {
   local index="$1" host_port url
-  if [[ "$env" == preprod ]]; then
-    fetch_from_preprod "${services[$index]}" "${internal_ports[$index]}" "${paths[$index]}"
+  if $container_http; then
+    fetch_from_container "${services[$index]}" "${internal_ports[$index]}" "${paths[$index]}"
     return
   fi
 

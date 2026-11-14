@@ -343,7 +343,7 @@ recette_archive_documents(){ tar -cf "$backup_dir/justificatifs.tar" --files-fro
                       'auth':Mock(),'verify':Mock(),'inspect':Mock(return_value={'Id':'sha256:fixture'}),
                       'crypt':crypt,'check_dumps':Mock(),'save_rollback':save,'runtime_stop':Mock(),
                       'db_restore':restore,'compose':compose,'verify_isolation':Mock(),
-                      'command':Mock(),'recover':recover}
+                      'command':Mock(),'check_shell':Mock(),'recover':recover}
         with ExitStack() as stack:
             for name,value in replacements.items(): stack.enter_context(patch.object(sync,name,value))
             stack.enter_context(patch('subprocess.run',side_effect=backup_run))
@@ -397,6 +397,155 @@ recette_archive_documents(){ tar -cf "$backup_dir/justificatifs.tar" --files-fro
         self.assertEqual(events,[])
         self.assertFalse((self.root/sync.STATE).exists())
         self.assertEqual((self.root/'versions/recette.env').read_text(),'original versions')
+
+    def control_fixture(self, env, internal, script, mode='ok'):
+        fixture=Path(tempfile.mkdtemp(dir=self.root)); (fixture/'scripts').mkdir()
+        (fixture/'deployments').mkdir(); (fixture/('.env.'+env)).write_text('')
+        for name in ['_common.sh',script]: shutil.copy(sync.ROOT/'scripts'/name,fixture/'scripts'/name)
+        if internal: (fixture/sync.POLICY).write_text('{}')
+        binary=fixture/'bin';binary.mkdir();log=fixture/'calls.jsonl'
+        fake=r'''import json,os,sys
+from pathlib import Path
+kind=Path(sys.argv[0]).name;args=sys.argv[1:];container=None
+if kind=='docker':
+ if args[:1]==['info'] or args[:2]==['compose','version']:sys.exit(0)
+ if args[:1]!=['exec']:sys.exit(99)
+ container=args[1]
+url=args[-1]
+with open(os.environ['FIXTURE_CONTROL_LOG'],'a') as f:
+ f.write(json.dumps({'kind':kind,'container':container,'url':url,'basicAuth':'-u' in args})+'\n')
+mode=os.environ['FIXTURE_CONTROL_MODE']
+if mode=='transport-failure':sys.exit(7)
+if '/referentiels/natures-personne' in url:
+ print('{"value":"SALARIE_INTERNE"}' if mode=='bad-json-shape' else '["SALARIE_INTERNE"]')
+elif url.endswith('/api/tiers/health'):
+ print('{"module":"wrong","status":"OK"}' if mode=='bad-gateway' else '{"module":"wavy-tiers-api","status":"OK"}')
+elif '/actuator/health' in url:print('{"status":"DOWN"}' if mode=='down' else '{"status":"UP"}')
+else:print('[]')
+'''
+        for name in ['docker','curl']:
+            path=binary/name;path.write_text('#!'+sys.executable+'\n'+fake);path.chmod(0o700)
+        envvars=dict(os.environ,PATH=str(binary)+os.pathsep+os.environ['PATH'],
+                     FIXTURE_CONTROL_LOG=str(log),FIXTURE_CONTROL_MODE=mode,
+                     HEALTHCHECK_MAX_ATTEMPTS='1',HEALTHCHECK_INTERVAL_SECONDS='0',
+                     WAVY_SMOKE_TENANT_ID='1',WAVY_SMOKE_USER_ID='1',WAVY_SMOKE_COMPANY_ID='1',
+                     WAVY_SMOKE_USER='fixture@example.test',WAVY_SMOKE_PASSWORD='synthetic-private-password')
+        result=subprocess.run(['bash',str(fixture/'scripts'/script),env],env=envvars,capture_output=True)
+        self.assertNotIn(b'synthetic-private-password',result.stdout+result.stderr)
+        calls=[json.loads(x) for x in log.read_text().splitlines()] if log.exists() else []
+        return result,calls
+
+    def test_isolated_recette_controls_use_only_docker_exec(self):
+        for script in ['healthcheck.sh','smoke-test.sh']:
+            with self.subTest(script=script):
+                result,calls=self.control_fixture('recette',True,script)
+                self.assertEqual(result.returncode,0,result.stderr)
+                self.assertEqual(len(calls),6)
+                self.assertTrue(all(c['kind']=='docker' and c['container'].endswith('-recette') for c in calls))
+                self.assertFalse(any('2808' in c['url'] or 'preprod' in c['url'] for c in calls))
+                if script=='smoke-test.sh':
+                    self.assertTrue(all(c['container']=='wavy-socle-api-recette' for c in calls))
+                    self.assertTrue(any('http://wavy-gateway-recette:8088/api/tiers/health'==c['url'] for c in calls))
+                    for c in calls:
+                        if '/wavy-socle-api-' in c['url'] or '/wavy-contrats-api-' in c['url']:
+                            self.assertFalse(c['basicAuth'])
+
+    def test_legacy_recette_local_and_preprod_keep_their_transports(self):
+        for env in ['local','recette','preprod']:
+            for script in ['healthcheck.sh','smoke-test.sh']:
+                with self.subTest(env=env,script=script):
+                    result,calls=self.control_fixture(env,False,script)
+                    self.assertEqual(result.returncode,0,result.stderr)
+                    self.assertEqual(len(calls),6)
+                    self.assertTrue(all(c['kind']==('docker' if env=='preprod' else 'curl') for c in calls))
+                    if env=='preprod':self.assertTrue(all(c['container'].endswith('-preprod') for c in calls))
+
+    def test_internal_smoke_tests_keep_response_validations(self):
+        for mode in ['bad-json-shape','bad-gateway','down','transport-failure']:
+            with self.subTest(mode=mode):
+                result,calls=self.control_fixture('recette',True,'smoke-test.sh',mode)
+                self.assertNotEqual(result.returncode,0)
+                self.assertEqual(len(calls),6)
+        result,_=self.control_fixture('recette',True,'healthcheck.sh','transport-failure')
+        self.assertNotEqual(result.returncode,0)
+
+    def shell_response(self, args, enabled=True, broken=None):
+        if args[-1]=='-t':return b''
+        self.assertEqual(args[:4],['docker','exec','wavy-socle-api-recette','curl'])
+        self.assertNotIn('-k',args);self.assertNotIn('-X',args);self.assertNotIn('-L',args)
+        url=args[-1];self.assertTrue(url.startswith('http://wavy-erp-shell-recette/'))
+        path=url.removeprefix('http://wavy-erp-shell-recette')
+        if path==broken:return b'fixture-private-error\n502'
+        if path=='/api/auth/session':return b'\n401'
+        if path=='/api/tiers/health':return b'{"module":"wavy-tiers-api","status":"OK"}\n200'
+        if path=='/pwa-integration.json':return json.dumps({'enabled':enabled}).encode()+b'\n200'
+        if path.endswith('.js'):return b'/* synthetic service worker */\n200'
+        return ('<html><head><base href="'+path+'"></head></html>\n200').encode()
+
+    def test_erp_shell_checks_proxies_auth_and_optional_pwa_without_public_ports(self):
+        for enabled in [True,False]:
+            with self.subTest(pwa=enabled), patch.object(sync,'command',side_effect=lambda args:self.shell_response(args,enabled)) as cmd:
+                sync.check_shell({'WAVY_PWA_ENABLED':str(enabled).lower()})
+                urls=[c.args[0][-1] for c in cmd.call_args_list]
+                for module in ['socle','tiers','contrats','factures','tresorerie']:
+                    self.assertIn('http://wavy-erp-shell-recette/modules/'+module+'/',urls)
+                self.assertEqual('http://wavy-erp-shell-recette/pwa/ngsw-worker.js' in urls,enabled)
+
+    def test_erp_shell_refuses_proxy_errors_wrong_content_and_unprotected_sessions(self):
+        for path in ['/','/modules/factures/','/api/tiers/health','/pwa/']:
+            with self.subTest(path=path), patch.object(sync,'command',side_effect=lambda args:self.shell_response(args,broken=path)):
+                with self.assertRaises(ValueError):sync.check_shell({'WAVY_PWA_ENABLED':'true'})
+        for path,payload in [('/modules/tiers/',b'<html><base href="/"></html>\n200'),
+                             ('/api/tiers/health',b'{"status":"OK","module":"wrong"}\n200'),
+                             ('/api/auth/session',b'{}\n200'),
+                             ('/pwa/ngsw-worker.js',b'<html>fallback</html>\n200')]:
+            def response(args):
+                return payload if args[-1]=='http://wavy-erp-shell-recette'+path else self.shell_response(args)
+            with self.subTest(path=path),patch.object(sync,'command',side_effect=response):
+                with self.assertRaises(ValueError):sync.check_shell({'WAVY_PWA_ENABLED':'true'})
+
+    def test_post_start_failures_are_saved_before_rollback_without_secrets(self):
+        for check,code in [('isolation',1),('healthcheck',7),('smoke-test',8),('erp-shell',22)]:
+            with self.subTest(check=check),self.fixture_run():
+                # Chaque scénario utilise une nouvelle opération après le rollback précédent.
+                (self.root/sync.STATE).unlink(missing_ok=True)
+                backup=self.root/'backups/2026-01-01_000000'
+                if backup.exists():backup.rmdir()
+                old_recover=sync.recover
+                def recover(*args):
+                    persisted=sync.read_private(self.root/sync.STATE)
+                    self.assertEqual(persisted['failure'],{'check':check,'code':code})
+                    old_recover(*args)
+                def command(args, **kwargs):
+                    if Path(str(args[1])).name==('healthcheck.sh' if check=='healthcheck' else 'smoke-test.sh'):
+                        raise subprocess.CalledProcessError(code,args,stderr=b'sensitive-fixture-error')
+                with ExitStack() as stack:
+                    stack.enter_context(patch.object(sync,'recover',side_effect=recover))
+                    if check=='isolation':stack.enter_context(patch.object(sync,'verify_isolation',side_effect=ValueError('sensitive-fixture-error')))
+                    elif check=='erp-shell':stack.enter_context(patch.object(sync,'check_shell',side_effect=subprocess.CalledProcessError(code,['fixture'],stderr=b'sensitive-fixture-error')))
+                    else:stack.enter_context(patch.object(sync,'command',side_effect=command))
+                    with self.assertRaises((ValueError,subprocess.CalledProcessError)):sync.run(self.root)
+                state=sync.read_private(self.root/sync.STATE)
+                self.assertEqual(state['phase'],'rolled-back')
+                self.assertEqual(state['failure'],{'check':check,'code':code})
+                self.assertNotIn('sensitive-fixture-error',(self.root/sync.STATE).read_text())
+
+    def test_diagnostic_write_failure_does_not_prevent_automatic_rollback(self):
+        with self.fixture_run(failure='restore') as events:
+            original=sync.atomic_json;failed=False
+            def write(path,state):
+                nonlocal failed
+                if 'failure' in state and not failed:
+                    failed=True
+                    raise OSError('synthetic disk error')
+                original(path,state)
+            with patch.object(sync,'atomic_json',side_effect=write):
+                with self.assertRaises(RuntimeError):sync.run(self.root)
+        self.assertTrue(failed)
+        self.assertEqual(events[-1],'recover')
+        state=sync.read_private(self.root/sync.STATE)
+        self.assertEqual(state['phase'],'rolled-back')
+        self.assertEqual(state['failure'],{'check':'restore-databases','code':1})
 
 
 if __name__=='__main__': unittest.main()
