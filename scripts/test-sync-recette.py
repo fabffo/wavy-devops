@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Tests sans Docker, SSH ou données réelles ; chiffrement réel sur fixtures privées."""
 import copy
-from contextlib import ExitStack, contextmanager
+from contextlib import ExitStack, contextmanager, redirect_stderr
 import io
 import json
 import os
@@ -89,6 +89,50 @@ class SyncTests(unittest.TestCase):
         self.assertNotIn(secret.decode(),str(caught.exception))
         with patch.object(sync,'command',return_value=b''):
             with self.assertRaises(ValueError): sync.backup_key(values)
+
+    def test_receive_reports_remote_phase_and_code_without_raw_secrets(self):
+        secret='fixture-sensitive-message-never-display'
+        cases=[(1,'WAVY_SYNC_ERROR phase=preprod-resume code=1\nWAVY_SYNC_ERROR phase=preprod-backup code=1\n','preprod-resume',1),
+               (1,'WAVY_SYNC_ERROR phase=preprod-backup code=66\n','preprod-backup',66),
+               (255,'WAVY_SYNC_ERROR phase=preprod-backup code=1\n','ssh',255),
+               (17,'WAVY_SYNC_ERROR phase=unknown-secret code=17\n','preprod-export',17),
+               (0,'','transfer',1)]
+        for code,markers,phase,expected in cases:
+            with self.subTest(code=code):
+                child=[sys.executable,'-B','-c',"import sys;sys.stderr.write("+repr(secret+'\n'+markers)+");sys.exit("+str(code)+")"]
+                with patch.object(sync,'source_ssh',return_value=child):
+                    with self.assertRaises(ValueError) as caught: sync.receive(self.root,{},self.root)
+                message=str(caught.exception)
+                self.assertIn('phase='+phase+', code='+str(expected)+', ssh_code='+str(code),message)
+                self.assertNotIn(secret,message);self.assertNotIn('unknown-secret',message)
+                self.assertFalse((self.root/sync.STATE).exists())
+
+    def test_receive_preserves_successful_binary_transfer(self):
+        path=self.root/'bundle.tar'
+        with tarfile.open(path,'w') as archive:
+            for name in sync.SOURCE_FILES: add(archive,name,b'fixture')
+        target=self.root/'received';target.mkdir()
+        child=[sys.executable,'-B','-c','import sys;from pathlib import Path;sys.stdout.buffer.write(Path(sys.argv[1]).read_bytes())',str(path)]
+        with patch.object(sync,'source_ssh',return_value=child): sync.receive(self.root,{},target)
+        self.assertEqual({p.name for p in target.iterdir()},sync.SOURCE_FILES)
+
+    def test_source_export_marks_preflight_and_backup_failures(self):
+        errors=io.StringIO()
+        with patch.object(sync.socket,'gethostname',return_value='wrong-host'), redirect_stderr(errors):
+            with self.assertRaises(ValueError): sync.source_export(self.root)
+        self.assertIn('phase=preprod-preflight code=1',errors.getvalue())
+        @contextmanager
+        def locked(*args): yield 3, {}
+        errors=io.StringIO()
+        with patch.object(sync.socket,'gethostname',return_value='wavy-preprod'), \
+             patch.object(sync,'locked',locked), patch.object(sync,'database_guard'), \
+             patch.object(sync,'shared_database_guard'), patch.object(sync,'declared_snapshot'), \
+             patch.object(sync,'backup_folders',return_value=set()), \
+             patch.object(sync.subprocess,'run',side_effect=subprocess.CalledProcessError(66,['fixture-backup'],stderr=b'fixture-sensitive')), \
+             redirect_stderr(errors):
+            with self.assertRaises(subprocess.CalledProcessError): sync.source_export(self.root)
+        self.assertIn('phase=preprod-backup code=66',errors.getvalue())
+        self.assertNotIn('fixture-sensitive',errors.getvalue())
 
     def test_transport_rejects_traversal_links_duplicates_and_missing_files(self):
         for names in [[('../escape', None)], [('source.json', tarfile.SYMTYPE)],

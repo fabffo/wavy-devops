@@ -14,6 +14,62 @@ DIGEST = 'sha256:'+'a'*64
 
 
 class Guards(unittest.TestCase):
+    def wait_fixture(self, case, backup=True, group=False):
+        # Horloge et Docker simulés : aucun sommeil réel, aucun daemon sollicité.
+        shell = r'''
+source "$1/scripts/_preprod.sh"
+SECONDS=0
+docker() {
+  [[ "$1" == inspect ]] || return 97
+  if [[ "$*" == *'.State.Running'* ]]; then
+    if [[ "$CASE" == stopped && $SECONDS -ge 10 ]]; then echo false; else echo true; fi
+  elif [[ "$CASE" == missing ]]; then echo missing
+  elif [[ "$CASE" == group ]]; then
+    if [[ "${@: -1}" == first && $SECONDS -ge 400 || "${@: -1}" == second && $SECONDS -ge 602 ]]; then echo healthy; else echo unhealthy; fi
+  elif [[ "$CASE" != timeout && $SECONDS -ge 212 ]]; then echo healthy
+  elif ((SECONDS < 30)); then echo starting
+  else echo unhealthy
+  fi
+}
+sleep() { SECONDS=$((SECONDS + $1)); }
+trap 'echo ELAPSED=$SECONDS >&2' EXIT
+'''
+        if group:
+            block=(ROOT/'scripts/backup-preprod.sh').read_text().split('backup_phase=preprod-resume\n',1)[1].split('QUIESCED_SERVICES=()',1)[0]
+            shell += '\npreprod_resume() { :; }\nQUIESCED_SERVICES=(first second)\n'+block
+        else: shell += '\npreprod_wait fixture-service'+(' 600' if backup else '')+'\n'
+        return subprocess.run(['bash','-c',shell,'_',str(ROOT)],env=dict(os.environ,CASE=case),capture_output=True,text=True)
+
+    def test_backup_wait_accepts_slow_start_and_transient_unhealthy(self):
+        result=self.wait_fixture('slow')
+        self.assertEqual(result.returncode,0,result.stderr)
+        self.assertIn('ELAPSED=212',result.stderr)
+
+    def test_backup_wait_requires_healthy_by_600_seconds(self):
+        result=self.wait_fixture('timeout')
+        self.assertNotEqual(result.returncode,0)
+        self.assertIn('Délai healthy dépassé',result.stderr)
+        self.assertIn('ELAPSED=600',result.stderr)
+
+    def test_backup_wait_refuses_stopped_or_missing_healthcheck(self):
+        for case,elapsed in [('stopped',10),('missing',0)]:
+            with self.subTest(case=case):
+                result=self.wait_fixture(case)
+                self.assertNotEqual(result.returncode,0)
+                self.assertIn('ELAPSED='+str(elapsed),result.stderr)
+
+    def test_other_preprod_paths_keep_strict_wait(self):
+        result=self.wait_fixture('slow',backup=False)
+        self.assertNotEqual(result.returncode,0)
+        self.assertIn('Healthcheck Docker en échec',result.stderr)
+        self.assertIn('ELAPSED=30',result.stderr)
+
+    def test_backup_wait_has_one_shared_600_second_budget(self):
+        result=self.wait_fixture('group',group=True)
+        self.assertNotEqual(result.returncode,0)
+        self.assertIn('Délai healthy dépassé : second',result.stderr)
+        self.assertIn('ELAPSED=600',result.stderr)
+
     def smoke_environment(self, dotenv, assertion, overrides=None):
         with tempfile.TemporaryDirectory(prefix='wavy-smoke-environment-') as tmp:
             (Path(tmp)/'.env.preprod').write_text(dotenv)

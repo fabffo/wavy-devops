@@ -86,6 +86,10 @@ l'espace. Il ne qualifie pas encore la restauration ni le rollback réels.
    `backup-preprod.sh` inchangée : arrêt propre des six backends, cinq dumps et
    documents chiffrés, puis reprise. Un lot frais et les références des treize
    images sont reçus via SSH. Aucun dotenv PREPROD n'est copié.
+   La reprise dispose d'un budget commun de 600 secondes pour les six backends :
+   les états transitoires sont tolérés tant que les conteneurs fonctionnent, mais
+   tous doivent être `healthy` avant la finalisation du lot. Ce délai concerne
+   uniquement la sauvegarde ; les autres parcours PREPROD restent inchangés.
 2. Authentification HMAC du lot, déchiffrement privé, validation des archives et
    catalogues PostgreSQL, vérification des images. PREPROD est déjà repartie.
 3. **Une confirmation** `ECRASER RECETTE`, indiquant la date source et l'hôte cible.
@@ -158,8 +162,12 @@ ou expiration automatique de ces lots n'est ajouté.
   secours validé, une intervention opérateur est exigée ; ne pas effacer l'état
   avant d'avoir vérifié que les données sont intactes et les writers sûrs.
 
-Un échec reste un code de sortie non nul même si le rollback réussit. Il n'existe
-pas de transaction distribuée : la sûreté repose sur l'arrêt des writers, le
+Un échec reste un code de sortie non nul même si le rollback réussit. Les erreurs
+distantes indiquent une phase connue et des codes numériques, sans restituer
+les sorties brutes, par exemple
+`phase=preprod-resume, code=1, ssh_code=1`.
+
+Il n'existe pas de transaction distribuée : la sûreté repose sur l'arrêt des writers, le
 secours complet et le maintien en maintenance en cas d'incertitude. Un `SIGKILL`
 ou une panne machine ne peuvent pas déclencher un rollback dans le processus
 mort ; l'état durable permet la reprise à l'invocation suivante.

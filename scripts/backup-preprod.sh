@@ -58,11 +58,15 @@ for db in socle tiers contrats factures tresorerie; do
 done
 stage="$(mktemp -d "$base/.incomplete.XXXXXX")"
 QUIESCED_SERVICES=()
+backup_phase=preprod-backup
 finish_backup() {
   local code=$?
   trap - EXIT
   preprod_resume || code=1
-  if ((code != 0)); then error "Lot PREPROD incomplet conserve : $stage"; fi
+  if ((code != 0)); then
+    printf 'WAVY_SYNC_ERROR phase=%s code=%d\n' "$backup_phase" "$code" >&2
+    error "Lot PREPROD incomplet conserve : $stage"
+  fi
   exit "$code"
 }
 trap finish_backup EXIT
@@ -80,9 +84,17 @@ preprod_document_tool ro 'test -d /documents/contrats; test ! -L /documents/note
 WAVY_BACKUP_PASSPHRASE="$passphrase" openssl enc -d -aes-256-cbc -pbkdf2 -pass env:WAVY_BACKUP_PASSPHRASE -in "$stage/documents.tar.enc" \
   | python3 "$SCRIPT_DIR/preprod_document_archive.py" -
 WAVY_BACKUP_PASSPHRASE="$passphrase" python3 "$SCRIPT_DIR/preprod_backup_manifest.py" sign "$stage"
+backup_phase=preprod-resume
+# Budget commun aux six services, sans nouvelle configuration machine.
+resume_deadline=$((SECONDS + 600))
 preprod_resume || die "Reprise des backends impossible."
-for service in "${QUIESCED_SERVICES[@]}"; do preprod_wait "$service"; done
+for service in "${QUIESCED_SERVICES[@]}"; do
+  remaining=$((resume_deadline - SECONDS))
+  ((remaining >= 0)) || die "Délai healthy dépassé : $service"
+  preprod_wait "$service" "$remaining"
+done
 QUIESCED_SERVICES=()
+backup_phase=preprod-finalize
 final="$base/$(date -u +%Y%m%dT%H%M%SZ)-${stage##*.}"
 mv "$stage" "$final"
 # Le nettoyage fait l'objet d'un plan et d'un accord distincts ; aucune purge a la livraison.

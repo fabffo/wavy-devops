@@ -57,14 +57,32 @@ if labels.get("org.opencontainers.image.source") != "https://github.com/fabffo/w
   success " Image $component : version, RepoDigest et labels OCI conformes."
 }
 preprod_wait() {
-  local service="$1" status attempt
-  for ((attempt=1; attempt<=60; attempt++)); do
+  local service="$1" status running remaining deadline
+  # Le second argument interne est réservé à la reprise du backup. Les autres
+  # parcours conservent leur délai de 120 s et leur refus immédiat d'unhealthy.
+  deadline=$((SECONDS + ${2:-120}))
+  while true; do
+    if [[ $# == 2 ]]; then
+      running="$(docker inspect -f '{{.State.Running}}' "$service" 2>/dev/null)" \
+        || die "Conteneur inaccessible pendant la reprise : $service"
+      [[ "$running" == true ]] || die "Conteneur arrêté pendant la reprise : $service"
+    fi
     status="$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}missing{{end}}' "$service" 2>/dev/null || true)"
-    [[ "$status" != healthy ]] || return 0
-    [[ "$status" != unhealthy ]] || die "Healthcheck Docker en échec : $service"
-    sleep 2
+    if [[ "$status" == healthy ]]; then
+      if [[ $# == 2 ]]; then
+        ((SECONDS <= deadline)) || die "Délai healthy dépassé : $service"
+      fi
+      return 0
+    fi
+    if [[ $# == 1 ]]; then
+      [[ "$status" != unhealthy ]] || die "Healthcheck Docker en échec : $service"
+    else
+      [[ "$status" == starting || "$status" == unhealthy ]] || die "Healthcheck Docker absent pendant la reprise : $service"
+    fi
+    remaining=$((deadline - SECONDS))
+    ((remaining > 0)) || die "Délai healthy dépassé : $service"
+    if ((remaining < 2)); then sleep "$remaining"; else sleep 2; fi
   done
-  die "Délai healthy dépassé : $service"
 }
 
 # Un reload est asynchrone : valider aussi une requête via les workers Nginx.

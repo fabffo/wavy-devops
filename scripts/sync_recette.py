@@ -31,6 +31,8 @@ STATE = 'deployments/recette-sync.json'
 POLICY = 'deployments/recette-sync-policy.json'
 SUCCESS = {'complete', 'rolled-back', 'cancelled'}
 SOURCE_FILES = {db+'.dump.enc' for db in DATABASES} | {'documents.tar.enc', 'manifest.json', 'source.json'}
+REMOTE_PHASES = {'preprod-preflight', 'preprod-backup', 'preprod-resume',
+                 'preprod-finalize', 'preprod-snapshot', 'preprod-transfer'}
 
 def require(ok, message):
     if not ok:
@@ -107,25 +109,34 @@ def database_guard(environment_name):
 
 
 def source_export(root):
-    require(socket.gethostname().split('.')[0] == 'wavy-preprod', 'Export réservé à wavy-preprod')
-    with locked(root, 'preprod') as (fd, env):
-        database_guard('preprod'); shared_database_guard('preprod')
-        before = declared_snapshot(root, 'preprod')
-        folders = backup_folders(root, 'preprod')
-        # Le backup existant garde ses contrôles host, réservations et reprise des writers.
-        subprocess.run(['bash', str(root/'scripts/backup-preprod.sh')], env=env,
-                       pass_fds=(fd,), stdout=sys.stderr, check=True)
-        added = backup_folders(root, 'preprod') - folders
-        require(len(added) == 1, 'Lot PREPROD non identifiable')
-        require(declared_snapshot(root, 'preprod') == before, 'Images PREPROD modifiées pendant la capture')
-        folder = added.pop()
-        before['capturedAt'] = datetime.now(timezone.utc).isoformat()
-        data = json.dumps(before).encode()
-        with tarfile.open(fileobj=sys.stdout.buffer, mode='w|') as archive:
-            for name in sorted(SOURCE_FILES - {'source.json'}):
-                archive.add(folder/name, arcname=name, recursive=False)
-            member = tarfile.TarInfo('source.json'); member.size = len(data); member.mode = 0o600
-            archive.addfile(member, io.BytesIO(data))
+    phase = 'preprod-preflight'
+    try:
+        require(socket.gethostname().split('.')[0] == 'wavy-preprod', 'Export réservé à wavy-preprod')
+        with locked(root, 'preprod') as (fd, env):
+            database_guard('preprod'); shared_database_guard('preprod')
+            before = declared_snapshot(root, 'preprod')
+            folders = backup_folders(root, 'preprod')
+            phase = 'preprod-backup'
+            # Le backup existant garde ses contrôles host, réservations et reprise des writers.
+            subprocess.run(['bash', str(root/'scripts/backup-preprod.sh')], env=env,
+                           pass_fds=(fd,), stdout=sys.stderr, check=True)
+            phase = 'preprod-snapshot'
+            added = backup_folders(root, 'preprod') - folders
+            require(len(added) == 1, 'Lot PREPROD non identifiable')
+            require(declared_snapshot(root, 'preprod') == before, 'Images PREPROD modifiées pendant la capture')
+            folder = added.pop()
+            before['capturedAt'] = datetime.now(timezone.utc).isoformat()
+            data = json.dumps(before).encode()
+            phase = 'preprod-transfer'
+            with tarfile.open(fileobj=sys.stdout.buffer, mode='w|') as archive:
+                for name in sorted(SOURCE_FILES - {'source.json'}):
+                    archive.add(folder/name, arcname=name, recursive=False)
+                member = tarfile.TarInfo('source.json'); member.size = len(data); member.mode = 0o600
+                archive.addfile(member, io.BytesIO(data))
+    except Exception as exc:
+        code = exc.returncode if isinstance(exc, subprocess.CalledProcessError) else 1
+        print(f'WAVY_SYNC_ERROR phase={phase} code={code}', file=sys.stderr)
+        raise
 
 
 def source_ssh(values, action):
@@ -173,14 +184,32 @@ def receive(root, values, folder):
     # Pas de copie de dotenv ; SSH transporte seulement les dumps déjà chiffrés et les images.
     with tempfile.TemporaryFile() as errors:
         process = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=errors)
+        transfer_error = False
         try:
             unpack_bundle(process.stdout, folder)
-            require(process.wait() == 0, 'Sauvegarde/transport PREPROD en échec (aucun remplacement)')
+        except (ValueError, OSError, EOFError, tarfile.TarError):
+            transfer_error = True
         finally:
             process.stdout.close()
-            if process.poll() is None:
-                # Fermer le flux permet au backup distant de finir sa reprise, sans le tuer.
-                process.wait()
+            # Attendre la fin du backup et de son trap de reprise, sans tuer SSH.
+            code = process.wait()
+        if code != 0 or transfer_error:
+            phase, remote_code = ('ssh', code) if code == 255 else ('preprod-export', code)
+            if code == 0: phase, remote_code = 'transfer', 1
+            errors.seek(0)
+            # Ne restituer que des phases connues et des codes numériques, jamais
+            # les sorties brutes Docker/OpenSSL, chemins, dotenv ou exceptions.
+            markers = []
+            for line in errors:
+                match = re.fullmatch(rb'WAVY_SYNC_ERROR phase=([a-z-]+) code=(-?[0-9]{1,5})\r?\n?', line)
+                if match and match[1].decode('ascii') in REMOTE_PHASES and int(match[2]) != 0:
+                    markers.append((match[1].decode('ascii'), int(match[2])))
+            if markers and code != 255:
+                # Le trap Bash indique la sous-phase précise avant le marqueur
+                # générique du wrapper Python (preprod-backup).
+                phase, remote_code = next((m for m in markers if m[0] in {'preprod-resume', 'preprod-finalize'}), markers[-1])
+            raise ValueError(f'Échec distant : phase={phase}, code={remote_code}, ssh_code={code}. '
+                             'Aucun remplacement RECETTE.') from None
 
 
 def unpack_bundle(stream, folder):
