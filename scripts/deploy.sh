@@ -181,7 +181,7 @@ front_url() {
 # Le mode sync ne publie pas les fronts ; même contrôle HTTP, depuis leur conteneur.
 front_http_check() {
   if [[ "$env" == recette && -e "$ROOT_DIR/deployments/recette-sync-policy.json" ]]; then
-    docker exec "$service" wget -qO- -T 5 http://localhost/ >/dev/null 2>&1
+    docker exec "$service" wget -qO- -T 5 http://127.0.0.1/ >/dev/null 2>&1
   else
     curl -fsS --max-time 5 "$(front_url)" >/dev/null 2>&1
   fi

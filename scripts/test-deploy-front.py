@@ -30,7 +30,7 @@ curl() { printf 'curl'; printf ' <%s>' "$@"; return "$FAIL"; }
         result = self.check('recette', True)
         self.assertEqual(result.returncode, 0)
         self.assertIn('docker <exec> <wavy-tiers-front-recette> <wget>', result.stdout)
-        self.assertIn('<http://localhost/>', result.stdout)
+        self.assertIn('<http://127.0.0.1/>', result.stdout)
         self.assertNotIn('24201', result.stdout)
 
     def test_local_and_normal_recette_preserve_host_http(self):
