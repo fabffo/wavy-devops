@@ -178,6 +178,15 @@ front_url() {
   printf 'http://localhost:%s/' "$port"
 }
 
+# Le mode sync ne publie pas les fronts ; même contrôle HTTP, depuis leur conteneur.
+front_http_check() {
+  if [[ "$env" == recette && -e "$ROOT_DIR/deployments/recette-sync-policy.json" ]]; then
+    docker exec "$service" wget -qO- -T 5 http://localhost/ >/dev/null 2>&1
+  else
+    curl -fsS --max-time 5 "$(front_url)" >/dev/null 2>&1
+  fi
+}
+
 if $is_api; then
   wait_for_docker_health "$service"
   if $has_database; then
@@ -193,10 +202,9 @@ if $is_api; then
   "$SCRIPT_DIR/healthcheck.sh" "$env"
   "$SCRIPT_DIR/smoke-test.sh" "$env"
 else
-  url="$(front_url)"
-  for attempt in {1..30}; do curl -fsS --max-time 5 "$url" >/dev/null 2>&1 && break; ((attempt < 30)) && sleep 2; done
-  curl -fsS --max-time 5 "$url" >/dev/null || die "$component ne répond pas sur $url."
-  success " $component répond sur $url"
+  for attempt in {1..30}; do front_http_check && break; ((attempt < 30)) && sleep 2; done
+  front_http_check || die "$component ne répond pas au contrôle HTTP."
+  success " $component répond au contrôle HTTP"
   if [[ "$mode" == IMAGE ]]; then
     "$SCRIPT_DIR/healthcheck.sh" "$env"
     "$SCRIPT_DIR/smoke-test.sh" "$env"
