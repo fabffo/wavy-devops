@@ -143,13 +143,16 @@ class ReleaseImages(unittest.TestCase):
             self.assertEqual(release.recette_compose(self.root, ['up', '-d']), 0)
         self.assertFalse(any('build' in c for c in calls))
 
-    def run_install_with_sync_policy(self, *, changed, session=True, operations=None,
+    def run_install_with_sync_policy(self, *, changed, config_changed=(), session=True, operations=None,
                                      migration_result=0, install_result=0, rejected_session=False):
         _, _, images = release.release(self.root, 'recette')
         policy = self.root/'deployments/recette-sync-policy.json'
         policy.parent.mkdir(exist_ok=True)
         policy.write_text(json.dumps({'format': 1, 'contractsVolume': 'fixture-contracts'}))
         policy.chmod(0o600)
+        state = policy.with_name('recette-sync.json')
+        state.write_text(json.dumps({'phase': 'complete'}))
+        state.chmod(0o600)
         files = [policy, self.root/'.env.recette', self.root/'docker-compose.recette.yml']
         original = {path: path.read_bytes() for path in files}
         before = {c: {'reference': i, 'id': i.partition('@')[2]} for c, i in images.items()}
@@ -160,6 +163,10 @@ class ReleaseImages(unittest.TestCase):
 
         def docker(command, **kwargs):
             if command[:2] == ['docker', 'inspect']:
+                if '-f' in command and len(command) == 4 + len(images):
+                    self.assertEqual(command[4:], [f'wavy-{c}-recette' for c in images])
+                    output = ''.join(f'{("old" if c in config_changed else "no")}-{c} unless-stopped\n' for c in images)
+                    return subprocess.CompletedProcess(command, 0, output)
                 return subprocess.CompletedProcess(command, 1, '', 'No such container')
             if command[:3] == ['docker', 'image', 'inspect']:
                 return subprocess.CompletedProcess(command, 0, images['tresorerie-api'].partition('@')[2])
@@ -171,11 +178,16 @@ class ReleaseImages(unittest.TestCase):
                 self.assertEqual(command, ['docker', 'rm', '-f', 'fixture-temporary-id'])
                 calls.append(('remove', command))
                 return subprocess.CompletedProcess(command, 0)
+            if '--hash' in command:
+                prefix = 'no' if any(arg.endswith('/restart-reference.json') for arg in command) else 'current'
+                output = ''.join(f'wavy-{c}-recette {prefix}-{c}\n' for c in images)
+                return subprocess.CompletedProcess(command, 0, output)
             verb = next(i for i, arg in enumerate(command) if arg in ('up', 'restart'))
             config = run_docker([*command[:verb], 'config', '--format', 'json'],
                                 env=kwargs['env'], capture_output=True, text=True, check=True)
             calls.append((command[verb], command[verb+1:], json.loads(config.stdout)['services']))
-            return subprocess.CompletedProcess(command, migration_result if '--no-deps' in command else install_result)
+            temporary = any(arg.endswith('/migration.json') for arg in command)
+            return subprocess.CompletedProcess(command, migration_result if temporary else install_result)
 
         with patch.dict(os.environ) as env, patch('delivery_batch.validate_session') as validate, \
                 patch.object(release, 'verify'), patch.object(release.subprocess, 'run', side_effect=docker):
@@ -206,7 +218,7 @@ class ReleaseImages(unittest.TestCase):
         _, migration_args, migration = calls[0]
         self.assertEqual(migration_args[-2:], ['--no-deps', 'wavy-tresorerie-api-recette'])
         self.assertIn('--wait', migration_args)
-        self.assertNotIn('--no-deps', calls[1][1])
+        self.assertEqual(calls[1][1][-3:], ['--no-deps', 'wavy-tresorerie-api-recette', 'wavy-tresorerie-front-recette'])
         for component in release.COMPONENTS:
             if component.endswith('-api'):
                 name = f'wavy-{component}-recette'
@@ -220,7 +232,17 @@ class ReleaseImages(unittest.TestCase):
     def test_install_without_api_replacement_keeps_one_compose_start(self):
         calls = self.run_install_with_sync_policy(changed=['tresorerie-front'])
         self.assertEqual(len(calls), 1)
+        self.assertEqual(calls[0][1][-2:], ['--no-deps', 'wavy-tresorerie-front-recette'])
         self.assertEqual(calls[0][2]['wavy-tresorerie-api-recette']['environment']['SPRING_FLYWAY_ENABLED'], 'false')
+
+    def test_install_selects_real_config_change_without_enabling_flyway(self):
+        calls = self.run_install_with_sync_policy(changed=[], config_changed=['tresorerie-api'])
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(calls[0][1][-2:], ['--no-deps', 'wavy-tresorerie-api-recette'])
+        self.assertEqual(calls[0][2]['wavy-tresorerie-api-recette']['environment']['SPRING_FLYWAY_ENABLED'], 'false')
+
+    def test_install_ignores_historical_hash_when_restart_policy_is_already_correct(self):
+        self.assertEqual(self.run_install_with_sync_policy(changed=[]), [])
 
     def test_sync_restore_and_restart_keep_flyway_disabled(self):
         for operations, session in ((['up', '-d', '--wait'], False), (['restart'], True)):

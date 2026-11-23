@@ -119,31 +119,53 @@ def recette_compose(root, args, rollback=None, capture=False):
         return _recette_compose(root,args,rollback,capture)
 
 
-def migration_services(root, args, images, overlay, rollback):
-    from delivery_batch import SESSION_KEY, validate_session
+def delivery_services(command, env, directory, images, overlay, before):
+    def hashes(compose):
+        output = subprocess.check_output([*compose, 'config', '--hash', '*'], env=env, text=True)
+        return dict(line.split() for line in output.splitlines() if line.strip())
 
-    if rollback or args[0] != 'up' or '--wait' not in args or SESSION_KEY not in os.environ:
-        return []
-    before = validate_session(root, 'recette')['before']
-    services = []
-    for component, image in images.items():
-        if not component.endswith('-api'):
-            continue
-        service = f'wavy-{component}-recette'
-        environment = overlay.get('services', {}).get(service, {}).get('environment', {})
-        # Le Compose standard des environnements sans politique de reproduction
-        # laisse déjà Spring démarrer Flyway normalement.
-        if environment.get('SPRING_FLYWAY_ENABLED') != 'false':
-            continue
-        if before[component]['reference'].partition('@')[2] == image.partition('@')[2]:
-            continue
-        image_id = subprocess.check_output(['docker', 'image', 'inspect', '-f', '{{.Id}}', image], text=True).strip()
-        if image_id != before[component]['id']:
-            services.append(service)
-    return services
+    names = {component: f'wavy-{component}-recette' for component in images}
+    template = ('{{index .Config.Labels "com.docker.compose.config-hash"}} '
+                '{{.HostConfig.RestartPolicy.Name}}')
+    runtime = subprocess.check_output(
+        ['docker', 'inspect', '-f', template, *names.values()], text=True)
+    active = dict(zip(names.values(), map(str.split, runtime.splitlines()), strict=True))
+    desired = hashes(command)
+    settings = overlay.get('services', {})
+    # La synchronisation active le redémarrage avec docker update. Le label
+    # Compose conserve alors le hash de la configuration initiale restart=no.
+    previous_restart = {
+        name: {'restart': 'no'} for name, (old_hash, restart) in active.items()
+        if old_hash != desired[name] and restart == settings.get(name, {}).get('restart') == 'unless-stopped'
+    }
+    historical = {}
+    if previous_restart:
+        reference = directory/'restart-reference.json'
+        reference.write_text(json.dumps({'services': previous_restart}))
+        historical = hashes([*command, '-f', str(reference)])
+
+    selected, migrations = [], []
+    for component, name in names.items():
+        image = images[component]
+        old = before[component]
+        old_digest = old['reference'].partition('@')[2]
+        if old_digest:
+            replaced = old_digest != image.partition('@')[2]
+        else:
+            image_id = subprocess.check_output(['docker', 'image', 'inspect', '-f', '{{.Id}}', image], text=True).strip()
+            replaced = image_id != old['id']
+        old_hash, restart = active[name]
+        service = settings.get(name, {})
+        config_changed = (old_hash not in (desired[name], historical.get(name))
+                          or restart != service.get('restart', restart))
+        if replaced or config_changed:
+            selected.append(name)
+        if replaced and component.endswith('-api') and service.get('environment', {}).get('SPRING_FLYWAY_ENABLED') == 'false':
+            migrations.append(name)
+    return selected, migrations
 
 
-def compose_with_migrations(command, args, env, directory, services):
+def compose_with_migrations(command, args, env, directory, services, selected):
     # Ces conteneurs n'ont pas vocation à rester actifs une fois le schéma prêt.
     label = f'fr.wavy.delivery.migration={directory.name}'
     migration = directory/'migration.json'
@@ -162,7 +184,7 @@ def compose_with_migrations(command, args, env, directory, services):
         result = subprocess.run([*command, '-f', str(migration), *args, '--no-deps', *services], env=env)
         if result.returncode:
             return result.returncode
-        result = subprocess.run([*command, *args], env=env)
+        result = subprocess.run([*command, *args, '--no-deps', *selected], env=env)
         completed = result.returncode == 0
         return result.returncode
     finally:
@@ -210,7 +232,9 @@ def _recette_compose(root, args, rollback=None, capture=False):
         if rollback: verify(root,'recette',images)
         else: verify(root,'recette')
         args = [args[0], '--no-build', *args[1:]]
-    migrations = [] if capture else migration_services(root, args, images, pwa, rollback)
+    from delivery_batch import SESSION_KEY, validate_session
+    delivery = not capture and not rollback and args[0] == 'up' and '--wait' in args and SESSION_KEY in os.environ
+    before = validate_session(root, 'recette')['before'] if delivery else None
     # Seul le fichier Compose intermédiaire est temporaire ; tous les bind mounts
     # pointent sur les fichiers persistants versionnés du dépôt, jamais sur /tmp.
     with tempfile.TemporaryDirectory(prefix='wavy-recette-compose-') as temporary:
@@ -221,8 +245,13 @@ def _recette_compose(root, args, rollback=None, capture=False):
                    '--env-file', str(root / 'versions/recette.digests'),
                    '-p', literal(machine.get('COMPOSE_PROJECT_NAME', 'wavy-recette')),
                    '-f', str(root / 'docker-compose.recette.yml'), '-f', str(override)]
-        if migrations:
-            return compose_with_migrations(command, args, clean, Path(temporary), migrations)
+        if before is not None:
+            selected, migrations = delivery_services(command, clean, Path(temporary), images, pwa, before)
+            if not selected:
+                return 0
+            if migrations:
+                return compose_with_migrations(command, args, clean, Path(temporary), migrations, selected)
+            args = [*args, '--no-deps', *selected]
         result = subprocess.run([*command, *args], env=clean,
                                 **({'capture_output': True, 'text': True} if capture else {}))
         if capture:
