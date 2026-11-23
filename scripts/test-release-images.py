@@ -143,6 +143,106 @@ class ReleaseImages(unittest.TestCase):
             self.assertEqual(release.recette_compose(self.root, ['up', '-d']), 0)
         self.assertFalse(any('build' in c for c in calls))
 
+    def run_install_with_sync_policy(self, *, changed, session=True, operations=None,
+                                     migration_result=0, install_result=0, rejected_session=False):
+        _, _, images = release.release(self.root, 'recette')
+        policy = self.root/'deployments/recette-sync-policy.json'
+        policy.parent.mkdir(exist_ok=True)
+        policy.write_text(json.dumps({'format': 1, 'contractsVolume': 'fixture-contracts'}))
+        policy.chmod(0o600)
+        files = [policy, self.root/'.env.recette', self.root/'docker-compose.recette.yml']
+        original = {path: path.read_bytes() for path in files}
+        before = {c: {'reference': i, 'id': i.partition('@')[2]} for c, i in images.items()}
+        for component in changed:
+            before[component] = {'reference': 'fixture:old@sha256:'+'0'*64, 'id': 'fixture-old'}
+        calls = []
+        run_docker = subprocess.run
+
+        def docker(command, **kwargs):
+            if command[:2] == ['docker', 'inspect']:
+                return subprocess.CompletedProcess(command, 1, '', 'No such container')
+            if command[:3] == ['docker', 'image', 'inspect']:
+                return subprocess.CompletedProcess(command, 0, images['tresorerie-api'].partition('@')[2])
+            if command[:2] == ['docker', 'ps']:
+                self.assertIn('label=fr.wavy.delivery.migration=', command[-1])
+                calls.append(('cleanup', command))
+                return subprocess.CompletedProcess(command, 0, 'fixture-temporary-id\n')
+            if command[:2] == ['docker', 'rm']:
+                self.assertEqual(command, ['docker', 'rm', '-f', 'fixture-temporary-id'])
+                calls.append(('remove', command))
+                return subprocess.CompletedProcess(command, 0)
+            verb = next(i for i, arg in enumerate(command) if arg in ('up', 'restart'))
+            config = run_docker([*command[:verb], 'config', '--format', 'json'],
+                                env=kwargs['env'], capture_output=True, text=True, check=True)
+            calls.append((command[verb], command[verb+1:], json.loads(config.stdout)['services']))
+            return subprocess.CompletedProcess(command, migration_result if '--no-deps' in command else install_result)
+
+        with patch.dict(os.environ) as env, patch('delivery_batch.validate_session') as validate, \
+                patch.object(release, 'verify'), patch.object(release.subprocess, 'run', side_effect=docker):
+            if session:
+                env['WAVY_DELIVERY_SESSION_FD'] = '51'
+            else:
+                env.pop('WAVY_DELIVERY_SESSION_FD', None)
+            validate.return_value = {'before': before}
+            if rejected_session:
+                validate.side_effect = ValueError('Sauvegarde de livraison absente')
+                with self.assertRaisesRegex(ValueError, 'Sauvegarde de livraison absente'):
+                    release.recette_compose(self.root, operations or ['up', '-d', '--wait', '--wait-timeout', '600'])
+                self.assertEqual(calls, [])
+                return calls
+            result = release.recette_compose(self.root, operations or ['up', '-d', '--wait', '--wait-timeout', '600'])
+            if session and (not operations or operations[0] == 'up'):
+                validate.assert_called_once_with(self.root, 'recette')
+            else:
+                validate.assert_not_called()
+
+        self.assertEqual(result, migration_result or install_result)
+        self.assertEqual({path: path.read_bytes() for path in files}, original)
+        return calls
+
+    def test_install_enables_flyway_only_for_replaced_apis_and_recreates_them_normally(self):
+        calls = self.run_install_with_sync_policy(changed=['tresorerie-api', 'tresorerie-front'])
+        self.assertEqual(len(calls), 2)
+        _, migration_args, migration = calls[0]
+        self.assertEqual(migration_args[-2:], ['--no-deps', 'wavy-tresorerie-api-recette'])
+        self.assertIn('--wait', migration_args)
+        self.assertNotIn('--no-deps', calls[1][1])
+        for component in release.COMPONENTS:
+            if component.endswith('-api'):
+                name = f'wavy-{component}-recette'
+                expected = 'true' if component == 'tresorerie-api' else 'false'
+                self.assertEqual(migration[name]['environment']['SPRING_FLYWAY_ENABLED'], expected)
+                self.assertEqual(calls[1][2][name]['environment']['SPRING_FLYWAY_ENABLED'], 'false')
+                self.assertEqual(migration[name]['environment']['SPRING_JPA_HIBERNATE_DDL_AUTO'], 'validate')
+        self.assertEqual(migration['wavy-tresorerie-api-recette']['restart'], 'no')
+        self.assertNotIn('fr.wavy.delivery.migration', calls[1][2]['wavy-tresorerie-api-recette'].get('labels', {}))
+
+    def test_install_without_api_replacement_keeps_one_compose_start(self):
+        calls = self.run_install_with_sync_policy(changed=['tresorerie-front'])
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(calls[0][2]['wavy-tresorerie-api-recette']['environment']['SPRING_FLYWAY_ENABLED'], 'false')
+
+    def test_sync_restore_and_restart_keep_flyway_disabled(self):
+        for operations, session in ((['up', '-d', '--wait'], False), (['restart'], True)):
+            with self.subTest(operations=operations):
+                calls = self.run_install_with_sync_policy(changed=['tresorerie-api'], session=session,
+                                                          operations=operations)
+                self.assertEqual(len(calls), 1)
+                self.assertEqual(calls[0][2]['wavy-tresorerie-api-recette']['environment']['SPRING_FLYWAY_ENABLED'], 'false')
+
+    def test_install_requires_verified_backup_before_enabling_flyway(self):
+        self.run_install_with_sync_policy(changed=['tresorerie-api'], rejected_session=True)
+
+    def test_failed_start_removes_only_temporary_containers(self):
+        for migration_result, install_result, expected in (
+            (1, 0, ['up', 'cleanup', 'remove']),
+            (0, 1, ['up', 'up', 'cleanup', 'remove']),
+        ):
+            with self.subTest(migration=migration_result, install=install_result):
+                calls = self.run_install_with_sync_policy(changed=['tresorerie-api'],
+                    migration_result=migration_result, install_result=install_result)
+                self.assertEqual([call[0] for call in calls], expected)
+
 
 if __name__ == '__main__':
     unittest.main()

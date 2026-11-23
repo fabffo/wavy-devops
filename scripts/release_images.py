@@ -7,6 +7,7 @@ from contextlib import contextmanager
 import os
 from pathlib import Path
 import re
+import signal
 import subprocess
 import sys
 import tempfile
@@ -118,6 +119,61 @@ def recette_compose(root, args, rollback=None, capture=False):
         return _recette_compose(root,args,rollback,capture)
 
 
+def migration_services(root, args, images, overlay, rollback):
+    from delivery_batch import SESSION_KEY, validate_session
+
+    if rollback or args[0] != 'up' or '--wait' not in args or SESSION_KEY not in os.environ:
+        return []
+    before = validate_session(root, 'recette')['before']
+    services = []
+    for component, image in images.items():
+        if not component.endswith('-api'):
+            continue
+        service = f'wavy-{component}-recette'
+        environment = overlay.get('services', {}).get(service, {}).get('environment', {})
+        # Le Compose standard des environnements sans politique de reproduction
+        # laisse déjà Spring démarrer Flyway normalement.
+        if environment.get('SPRING_FLYWAY_ENABLED') != 'false':
+            continue
+        if before[component]['reference'].partition('@')[2] == image.partition('@')[2]:
+            continue
+        image_id = subprocess.check_output(['docker', 'image', 'inspect', '-f', '{{.Id}}', image], text=True).strip()
+        if image_id != before[component]['id']:
+            services.append(service)
+    return services
+
+
+def compose_with_migrations(command, args, env, directory, services):
+    # Ces conteneurs n'ont pas vocation à rester actifs une fois le schéma prêt.
+    label = f'fr.wavy.delivery.migration={directory.name}'
+    migration = directory/'migration.json'
+    migration.write_text(json.dumps({'services': {
+        service: {'environment': {'SPRING_FLYWAY_ENABLED': 'true'},
+                  'restart': 'no', 'labels': [label]}
+        for service in services
+    }}))
+
+    def interrupted(signum, _frame):
+        raise SystemExit(128 + signum)
+
+    previous = {sig: signal.signal(sig, interrupted) for sig in (signal.SIGINT, signal.SIGTERM)}
+    completed = False
+    try:
+        result = subprocess.run([*command, '-f', str(migration), *args, '--no-deps', *services], env=env)
+        if result.returncode:
+            return result.returncode
+        result = subprocess.run([*command, *args], env=env)
+        completed = result.returncode == 0
+        return result.returncode
+    finally:
+        for sig, handler in previous.items():
+            signal.signal(sig, handler)
+        if not completed:
+            containers = subprocess.check_output(['docker', 'ps', '-aq', '--filter', f'label={label}'], text=True).split()
+            if containers:
+                subprocess.run(['docker', 'rm', '-f', *containers], check=True)
+
+
 def _recette_compose(root, args, rollback=None, capture=False):
     from recette_pwa import overlay, literal
     versions, digests, images = release(root, 'recette')
@@ -154,18 +210,21 @@ def _recette_compose(root, args, rollback=None, capture=False):
         if rollback: verify(root,'recette',images)
         else: verify(root,'recette')
         args = [args[0], '--no-build', *args[1:]]
+    migrations = [] if capture else migration_services(root, args, images, pwa, rollback)
     # Seul le fichier Compose intermédiaire est temporaire ; tous les bind mounts
     # pointent sur les fichiers persistants versionnés du dépôt, jamais sur /tmp.
     with tempfile.TemporaryDirectory(prefix='wavy-recette-compose-') as temporary:
         override = Path(temporary)/'pwa.json'
         override.write_text(json.dumps(pwa))
-        result = subprocess.run(['docker', 'compose', '--env-file', str(root / '.env.recette'),
-                               '--env-file', str(root / 'versions/recette.env'),
-                               '--env-file', str(root / 'versions/recette.digests'),
-                               '-p', literal(machine.get('COMPOSE_PROJECT_NAME', 'wavy-recette')),
-                               '-f', str(root / 'docker-compose.recette.yml'),
-                               '-f', str(override), *args], env=clean,
-                              **({'capture_output': True, 'text': True} if capture else {}))
+        command = ['docker', 'compose', '--env-file', str(root / '.env.recette'),
+                   '--env-file', str(root / 'versions/recette.env'),
+                   '--env-file', str(root / 'versions/recette.digests'),
+                   '-p', literal(machine.get('COMPOSE_PROJECT_NAME', 'wavy-recette')),
+                   '-f', str(root / 'docker-compose.recette.yml'), '-f', str(override)]
+        if migrations:
+            return compose_with_migrations(command, args, clean, Path(temporary), migrations)
+        result = subprocess.run([*command, *args], env=clean,
+                                **({'capture_output': True, 'text': True} if capture else {}))
         if capture:
             if result.returncode:
                 raise ValueError('Rendu Compose RECETTE refusé (sortie masquée)')
