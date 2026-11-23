@@ -120,6 +120,8 @@ def recette_compose(root, args, rollback=None, capture=False):
 
 
 def delivery_services(command, env, directory, images, overlay, before):
+    from sync_recette import ANTHROPIC_PROXY
+
     def hashes(compose):
         output = subprocess.check_output([*compose, 'config', '--hash', '*'], env=env, text=True)
         return dict(line.split() for line in output.splitlines() if line.strip())
@@ -162,6 +164,12 @@ def delivery_services(command, env, directory, images, overlay, before):
             selected.append(name)
         if replaced and component.endswith('-api') and service.get('environment', {}).get('SPRING_FLYWAY_ENABLED') == 'false':
             migrations.append(name)
+    if ANTHROPIC_PROXY in settings:
+        proxy = subprocess.check_output([*command, 'ps', '-q', ANTHROPIC_PROXY], env=env, text=True).strip()
+        if not proxy or subprocess.check_output(
+                ['docker', 'inspect', '-f', '{{index .Config.Labels "com.docker.compose.config-hash"}}', proxy],
+                text=True).strip() != desired[ANTHROPIC_PROXY]:
+            selected.insert(0, ANTHROPIC_PROXY)
     return selected, migrations
 
 

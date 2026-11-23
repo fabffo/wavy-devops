@@ -144,7 +144,7 @@ class ReleaseImages(unittest.TestCase):
         self.assertFalse(any('build' in c for c in calls))
 
     def run_install_with_sync_policy(self, *, changed, config_changed=(), session=True, operations=None,
-                                     migration_result=0, install_result=0, rejected_session=False):
+                                     migration_result=0, install_result=0, rejected_session=False, proxy=False):
         _, _, images = release.release(self.root, 'recette')
         policy = self.root/'deployments/recette-sync-policy.json'
         policy.parent.mkdir(exist_ok=True)
@@ -153,6 +153,10 @@ class ReleaseImages(unittest.TestCase):
         state = policy.with_name('recette-sync.json')
         state.write_text(json.dumps({'phase': 'complete'}))
         state.chmod(0o600)
+        if proxy:
+            with (self.root/'.env.recette').open('a') as env_file:
+                env_file.write('\nWAVY_RECETTE_ANTHROPIC_PROXY=true\n')
+            shutil.copytree(ROOT/'docker/recette-anthropic', self.root/'docker/recette-anthropic')
         files = [policy, self.root/'.env.recette', self.root/'docker-compose.recette.yml']
         original = {path: path.read_bytes() for path in files}
         before = {c: {'reference': i, 'id': i.partition('@')[2]} for c, i in images.items()}
@@ -181,7 +185,11 @@ class ReleaseImages(unittest.TestCase):
             if '--hash' in command:
                 prefix = 'no' if any(arg.endswith('/restart-reference.json') for arg in command) else 'current'
                 output = ''.join(f'wavy-{c}-recette {prefix}-{c}\n' for c in images)
+                if proxy:
+                    output += 'wavy-anthropic-proxy-recette proxy-hash\n'
                 return subprocess.CompletedProcess(command, 0, output)
+            if command[-3:] == ['ps', '-q', 'wavy-anthropic-proxy-recette']:
+                return subprocess.CompletedProcess(command, 0, '')
             verb = next(i for i, arg in enumerate(command) if arg in ('up', 'restart'))
             config = run_docker([*command[:verb], 'config', '--format', 'json'],
                                 env=kwargs['env'], capture_output=True, text=True, check=True)
@@ -243,6 +251,12 @@ class ReleaseImages(unittest.TestCase):
 
     def test_install_ignores_historical_hash_when_restart_policy_is_already_correct(self):
         self.assertEqual(self.run_install_with_sync_policy(changed=[]), [])
+
+    def test_install_selects_new_proxy_and_factures_without_other_dependencies(self):
+        calls = self.run_install_with_sync_policy(changed=[], config_changed=['factures-api'], proxy=True)
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(calls[0][1][-3:],
+                         ['--no-deps', 'wavy-anthropic-proxy-recette', 'wavy-factures-api-recette'])
 
     def test_sync_restore_and_restart_keep_flyway_disabled(self):
         for operations, session in ((['up', '-d', '--wait'], False), (['restart'], True)):

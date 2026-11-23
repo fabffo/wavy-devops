@@ -141,7 +141,14 @@ externes (IA comprise), emails, paiements et webhooks sont inaccessibles par ce
 réseau. SMTP pointe aussi sur un port local fermé ; la création automatique IA
 est désactivée. L'accès entrant continue d'utiliser les domaines et ports RECETTE.
 Un proxy ou service local capable de relayer des appels externes ne doit pas être
-raccordé à ce réseau de reproduction.
+raccordé à ce réseau de reproduction. L’exception Anthropic est désactivée par
+défaut. Si l’envoi de justificatifs RECETTE est autorisé, l’option
+`WAVY_RECETTE_ANTHROPIC_PROXY=true` dans `.env.recette` ajoute un réseau de transit
+interne réservé à Factures API et au proxy. Le proxy seul rejoint son réseau
+sortant. Il accepte uniquement les tunnels CONNECT de Factures API vers
+`api.anthropic.com:443`, sans terminaison TLS ni journal d’accès. Les appels
+HTTPS aux services Wavy utilisent les exclusions JVM. La livraison reste
+`./wavy install recette` et utilise la configuration Compose de la VM.
 
 Les migrations Flyway, initialisations SQL et bootstrap sont désactivés pendant
 la reproduction ; Hibernate valide les schémas restaurés. Le mode reste actif

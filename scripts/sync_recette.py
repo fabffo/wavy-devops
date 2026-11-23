@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Synchronisation ponctuelle, sur RECETTE ; primitives de backup et Compose existantes."""
+import hashlib
 import io
 import json
 import os
@@ -22,13 +23,16 @@ from preprod_config import dotenv
 from preprod_backup_manifest import DATABASES, run as authenticate
 from preprod_document_archive import validate as validate_source_documents
 from recette_documents import verify as verify_recette
-from release_images import COMPONENTS, release, recette_compose, verify
+from release_images import COMPONENTS, manifest, release, recette_compose, verify
 from delivery_check import machine
-from recette_pwa import policy as pwa_policy
+from recette_pwa import literal, policy as pwa_policy
 
 ROOT = Path(__file__).resolve().parent.parent
 STATE = 'deployments/recette-sync.json'
 POLICY = 'deployments/recette-sync-policy.json'
+ANTHROPIC_PROXY = 'wavy-anthropic-proxy-recette'
+ANTHROPIC_TRANSIT = 'wavy-recette-anthropic-transit'
+ANTHROPIC_EGRESS = 'wavy-recette-anthropic-egress'
 SUCCESS = {'complete', 'rolled-back', 'cancelled'}
 SOURCE_FILES = {db+'.dump.enc' for db in DATABASES} | {'documents.tar.enc', 'manifest.json', 'source.json'}
 REMOTE_PHASES = {'preprod-preflight', 'preprod-backup', 'preprod-resume',
@@ -608,9 +612,23 @@ def verify_isolation(restart=None):
     require(ingress.get('Internal') is False and ingress.get('Driver') == 'bridge', 'Réseau d’entrée RECETTE invalide')
     require(all(c.get('Name') == 'wavy-erp-shell-recette' for c in ingress.get('Containers', {}).values()),
             'Conteneur supplémentaire sur le réseau d’entrée')
+    anthropic = anthropic_proxy_enabled(ROOT)
+    if anthropic:
+        transit = inspect(ANTHROPIC_TRANSIT, 'network')
+        egress = inspect(ANTHROPIC_EGRESS, 'network')
+        require(transit.get('Internal') is True and egress.get('Internal') is False, 'Réseaux proxy Anthropic incohérents')
+        require({c['Name'] for c in transit['Containers'].values()} == {'wavy-factures-api-recette', ANTHROPIC_PROXY}
+                and {c['Name'] for c in egress['Containers'].values()} == {ANTHROPIC_PROXY},
+                'Membres des réseaux proxy Anthropic invalides')
+        proxy = inspect(ANTHROPIC_PROXY)
+        require(set(proxy['NetworkSettings']['Networks']) == {ANTHROPIC_TRANSIT, ANTHROPIC_EGRESS},
+                'Réseau supplémentaire interdit sur le proxy Anthropic')
+        require(not any(proxy['NetworkSettings']['Ports'].values()), 'Port proxy Anthropic publié')
     for c in COMPONENTS:
         obj = inspect('wavy-'+c+'-recette')
         expected = {'wavy-recette-sync', 'wavy-recette'} if c == 'erp-shell' else {'wavy-recette-sync'}
+        if c == 'factures-api' and anthropic:
+            expected.add(ANTHROPIC_TRANSIT)
         require(set(obj['NetworkSettings']['Networks']) == expected, 'Réseau supplémentaire interdit : '+c)
         require(obj['HostConfig']['RestartPolicy']['Name'] == restart, 'Politique de redémarrage incohérente : '+c)
         if c == 'erp-shell':
@@ -651,6 +669,46 @@ def check_shell_boundary(obj):
         require((assignments or not used) and all(x.strip() == target for x in assignments), 'Destination variable du Shell invalide')
 
 
+def anthropic_proxy_enabled(root):
+    path = root/'.env.recette'
+    value = literal(manifest(path, strict=False).get('WAVY_RECETTE_ANTHROPIC_PROXY', 'false')) if path.is_file() else 'false'
+    require(value in ('false', 'true'), 'WAVY_RECETTE_ANTHROPIC_PROXY attend true ou false')
+    return value == 'true'
+
+
+def add_anthropic_proxy(root, overlay):
+    config = root/'docker/recette-anthropic/squid.conf'
+    factures = overlay['services']['wavy-factures-api-recette']
+    factures['networks'] = {'wavy-recette': {}, ANTHROPIC_TRANSIT: {'ipv4_address': '172.30.254.2'}}
+    factures['environment']['JAVA_TOOL_OPTIONS'] = (
+        '-Dhttps.proxyHost=172.30.254.3 -Dhttps.proxyPort=3128 '
+        '-Dhttp.nonProxyHosts=localhost|127.*|[::1]|*-recette'
+    )
+    overlay['networks'][ANTHROPIC_TRANSIT] = {
+        'name': ANTHROPIC_TRANSIT, 'internal': True, 'ipam': {'config': [{'subnet': '172.30.254.0/29'}]},
+    }
+    overlay['networks'][ANTHROPIC_EGRESS] = {'name': ANTHROPIC_EGRESS}
+    overlay['services'][ANTHROPIC_PROXY] = {
+        'container_name': ANTHROPIC_PROXY,
+        'image': 'ubuntu/squid@sha256:8fafd41d6ddceb295d26eea9938321d825ac5351c7e46cf6a8aa5d093b8ed1ce',
+        'entrypoint': ['/usr/sbin/squid', '-N', '-f', '/etc/squid/wavy.conf'],
+        'user': '13:13',
+        'restart': 'unless-stopped',
+        'read_only': True,
+        'tmpfs': ['/tmp:rw,noexec,nosuid,nodev', '/var/log/squid', '/var/spool/squid'],
+        'cap_drop': ['ALL'],
+        'security_opt': ['no-new-privileges:true'],
+        'sysctls': {'net.ipv4.ip_forward': '0', 'net.ipv6.conf.all.forwarding': '0'},
+        'logging': {'driver': 'none'},
+        'labels': {'fr.wavy.anthropic.config': hashlib.sha256(config.read_bytes()).hexdigest()},
+        'volumes': [{'type': 'bind', 'source': str(config), 'target': '/etc/squid/wavy.conf',
+                     'read_only': True, 'bind': {'create_host_path': False}}],
+        'networks': {ANTHROPIC_TRANSIT: {'ipv4_address': '172.30.254.3'}, ANTHROPIC_EGRESS: {}},
+        'healthcheck': {'test': ['CMD', '/usr/sbin/squid', '-k', 'check', '-f', '/etc/squid/wavy.conf'],
+                        'interval': '5s', 'timeout': '3s', 'retries': 5},
+    }
+
+
 def sync_overlay(root, overlay, mutation=True):
     """Extension du seul chemin Compose RECETTE, persistante et fermée par défaut."""
     state_path = root/STATE
@@ -659,7 +717,9 @@ def sync_overlay(root, overlay, mutation=True):
         require(state['phase'] in SUCCESS or state.get('owner') == os.getpid(),
                 'Synchronisation incomplète : relancer ./wavy sync preprod recette pour restaurer le secours')
     path = root/POLICY
+    anthropic = anthropic_proxy_enabled(root)
     if not path.exists():
+        require(not anthropic, 'Le proxy Anthropic nécessite la politique réseau RECETTE isolée')
         require(not path.is_symlink(), 'Politique sync symbolique interdite')
         if state_path.exists():
             require(read_private(state_path).get('phase') != 'complete', 'Politique sync requise pour conserver l’isolation')
@@ -694,6 +754,8 @@ def sync_overlay(root, overlay, mutation=True):
     # et le montage historique RECETTE, sans réécriture de données métier.
     overlay['services']['wavy-contrats-api-recette'].setdefault('volumes', []).append(
         {'type': 'volume', 'source': 'sync-contrats', 'target': '/app/data/contrats', 'volume': {'nocopy': True}})
+    if anthropic:
+        add_anthropic_proxy(root, overlay)
     return overlay
 
 

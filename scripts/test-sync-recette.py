@@ -188,6 +188,30 @@ class SyncTests(unittest.TestCase):
         self.assertEqual(overlay['services']['wavy-contrats-api-recette']['volumes'][0]['target'],'/app/data/contrats')
         for component in sync.COMPONENTS:
             self.assertEqual(overlay['services']['wavy-'+component+'-recette']['restart'],'no')
+        self.assertNotIn(sync.ANTHROPIC_PROXY, overlay['services'])
+
+    def test_anthropic_proxy_requires_opt_in_and_only_connects_factures_to_transit(self):
+        (self.root/'.env.recette').write_text('WAVY_RECETTE_ANTHROPIC_PROXY=true\n')
+        with self.assertRaisesRegex(ValueError, 'politique réseau RECETTE isolée'):
+            sync.sync_overlay(self.root, {})
+        sync.atomic_json(self.root/sync.POLICY, {'format':1,'contractsVolume':'contracts-recette'})
+        directory = self.root/'docker/recette-anthropic'
+        directory.mkdir(parents=True)
+        (directory/'squid.conf').write_text((sync.ROOT/'docker/recette-anthropic/squid.conf').read_text())
+        overlay = sync.sync_overlay(self.root, {})
+        proxy = overlay['services'][sync.ANTHROPIC_PROXY]
+        factures = overlay['services']['wavy-factures-api-recette']
+        self.assertEqual(set(factures['networks']), {'wavy-recette', sync.ANTHROPIC_TRANSIT})
+        self.assertTrue(overlay['networks'][sync.ANTHROPIC_TRANSIT]['internal'])
+        self.assertEqual(set(proxy['networks']), {sync.ANTHROPIC_TRANSIT, sync.ANTHROPIC_EGRESS})
+        self.assertNotIn('ports', proxy)
+        self.assertEqual(proxy['logging'], {'driver': 'none'})
+        self.assertIn('-Dhttp.nonProxyHosts=', factures['environment']['JAVA_TOOL_OPTIONS'])
+        for name, service in overlay['services'].items():
+            if name not in ('wavy-factures-api-recette', sync.ANTHROPIC_PROXY):
+                self.assertNotIn(sync.ANTHROPIC_TRANSIT, service.get('networks', {}))
+                self.assertNotIn(sync.ANTHROPIC_EGRESS, service.get('networks', {}))
+                self.assertNotIn('JAVA_TOOL_OPTIONS', service.get('environment', {}))
 
     def test_interrupted_state_blocks_restart_but_allows_diagnostics(self):
         sync.atomic_json(self.root/sync.STATE,{'phase':'restoring','owner':-1})
